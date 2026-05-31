@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { ArrowRight, Cpu, Layers, Zap } from "lucide-react";
+import { KurtiLogo } from "@/components/KurtiLogo";
 import heroImg from "@/assets/hero-printer.jpg";
 import work1 from "@/assets/work-1.jpg";
 import work2 from "@/assets/work-2.jpg";
@@ -18,22 +19,22 @@ import work6 from "@/assets/work-6.jpg";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Filament Forge — Precision 3D Printing Studio" },
-      { name: "description", content: "High-resolution FDM and resin 3D printing for prototypes, parts and custom builds." },
-      { property: "og:title", content: "Filament Forge — Precision 3D Printing" },
-      { property: "og:description", content: "High-resolution FDM and resin 3D printing for prototypes, parts and custom builds." },
+      { title: "Kurti 3D — Impressão 3D multicor de alta qualidade" },
+      { name: "description", content: "Sociedade Zé & Kurt. Tecnologia Bambu Lab com AMS. Impressão 3D multicor rápida, colorida e perfeita." },
+      { property: "og:title", content: "Kurti 3D — Rápido. Colorido. Perfeito." },
+      { property: "og:description", content: "Impressão 3D multicor com Bambu Lab AMS. Faça seu orçamento." },
     ],
   }),
   component: Landing,
 });
 
 const gallery = [
-  { src: work1, alt: "Geometric lattice vase", span: "row-span-2" },
-  { src: work2, alt: "Neon green gear assembly", span: "" },
-  { src: work3, alt: "Articulated dragon figurine", span: "row-span-2" },
-  { src: work4, alt: "Prosthetic hand prototype", span: "" },
-  { src: work5, alt: "Architectural miniature", span: "" },
-  { src: work6, alt: "Custom drone frame", span: "row-span-2" },
+  { src: work1, alt: "Vaso 3D arco-íris", span: "row-span-2" },
+  { src: work2, alt: "Corações multicoloridos", span: "" },
+  { src: work3, alt: "Dragão articulado colorido", span: "row-span-2" },
+  { src: work4, alt: "Vaso geométrico neon", span: "" },
+  { src: work5, alt: "Castelo miniatura colorido", span: "" },
+  { src: work6, alt: "Corrente flexível multicolor", span: "row-span-2" },
 ];
 
 function Landing() {
@@ -52,26 +53,26 @@ function Landing() {
 
 function Nav() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-primary text-primary-foreground shadow-[var(--shadow-glow)]">
-            <Layers className="h-4 w-4" />
-          </div>
-          <span className="font-display text-lg font-bold tracking-tight">Filament Forge</span>
+    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
+        <Link to="/">
+          <KurtiLogo />
         </Link>
-        <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
-          <a href="#work" className="transition-colors hover:text-foreground">Our Work</a>
-          <a href="#services" className="transition-colors hover:text-foreground">Services</a>
-          <a href="#contact" className="transition-colors hover:text-foreground">Contact</a>
+        <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
+          <a href="#work" className="transition-colors hover:text-foreground">Portfólio</a>
+          <a href="#services" className="transition-colors hover:text-foreground">Serviços</a>
+          <a href="#contact" className="transition-colors hover:text-foreground">Contato</a>
         </nav>
         <div className="flex items-center gap-2">
           <Link to="/admin">
             <Button variant="ghost" size="sm">Admin</Button>
           </Link>
-          <a href="#contact"><Button size="sm">Get a quote</Button></a>
+          <a href="#contact" className="btn-filament inline-flex h-10 items-center px-5 text-sm font-semibold">
+            Faça seu Orçamento
+          </a>
         </div>
       </div>
+      <div className="filament-divider" />
     </header>
   );
 }
@@ -79,46 +80,58 @@ function Nav() {
 function Hero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="absolute inset-0 -z-10" style={{ background: "var(--gradient-glow)" }} />
-      <div className="mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center lg:py-32">
+      <div className="mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center lg:py-28">
         <div>
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            Now printing — 24/7 farm online
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--filament-green)" }} />
+            Tecnologia Bambu Lab com AMS
           </div>
-          <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tighter md:text-7xl">
-            Precision parts,<br />
-            <span className="text-primary">printed perfectly.</span>
+          <h1 className="font-display text-5xl font-extrabold leading-[1.05] tracking-tighter md:text-7xl">
+            Rápido. Colorido.<br />
+            <span
+              style={{
+                backgroundImage: "var(--gradient-filament)",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >
+              Perfeito.
+            </span>{" "}
+            <span className="text-foreground">Quem vê, curte!</span>
           </h1>
           <p className="mt-6 max-w-lg text-lg text-muted-foreground">
-            High-resolution FDM and resin printing for prototypes, production parts, and one-off creations. Sub-millimeter tolerances, next-day turnaround.
+            Sociedade Zé &amp; Kurt | Tecnologia Bambu Lab com AMS | Impressão multicor de alta qualidade
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="#contact"><Button size="lg" className="gap-2">Start a project <ArrowRight className="h-4 w-4" /></Button></a>
-            <a href="#work"><Button size="lg" variant="outline">View portfolio</Button></a>
+            <a href="#contact" className="btn-filament inline-flex h-12 items-center gap-2 px-6 text-sm font-semibold">
+              Faça seu Orçamento <ArrowRight className="h-4 w-4" />
+            </a>
+            <a href="#work"><Button size="lg" variant="outline">Ver portfólio</Button></a>
           </div>
-          <div className="mt-12 grid grid-cols-3 gap-6 border-t border-border pt-8">
+          <div className="mt-12 grid grid-cols-3 gap-6 pt-6">
             {[
-              { k: "0.05mm", v: "Layer height" },
-              { k: "<24h", v: "Turnaround" },
-              { k: "12+", v: "Materials" },
+              { k: "0,05mm", v: "Camada", c: "var(--filament-cyan)" },
+              { k: "<24h", v: "Entrega", c: "var(--filament-pink)" },
+              { k: "12+", v: "Cores", c: "var(--filament-yellow)" },
             ].map((s) => (
               <div key={s.v}>
-                <div className="font-display text-2xl font-bold text-primary">{s.k}</div>
+                <div className="font-display text-2xl font-extrabold" style={{ color: s.c }}>{s.k}</div>
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.v}</div>
               </div>
             ))}
           </div>
         </div>
         <div className="relative">
-          <div className="absolute -inset-4 -z-10 rounded-3xl bg-primary/20 opacity-40 blur-3xl" />
-          <img
-            src={heroImg}
-            alt="3D printer producing a neon green lattice sphere"
-            width={1920}
-            height={1280}
-            className="aspect-[4/3] w-full rounded-2xl border border-border object-cover shadow-2xl"
-          />
+          <div className="filament-border shadow-2xl">
+            <img
+              src={heroImg}
+              alt="Impressora Bambu Lab com AMS"
+              width={1280}
+              height={1024}
+              className="aspect-[4/3] w-full object-cover"
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -127,16 +140,17 @@ function Hero() {
 
 function Features() {
   const items = [
-    { icon: Cpu, title: "Engineering grade", desc: "Carbon fiber, PEEK, ABS — parts that survive real loads." },
-    { icon: Zap, title: "Lightning turnaround", desc: "Most jobs ship within 24 hours of approval." },
-    { icon: Layers, title: "Multi-material", desc: "Combine rigid and flexible materials in a single print." },
+    { icon: Cpu, title: "Qualidade Bambu", desc: "Impressoras Bambu Lab com AMS para multicor pixel-perfect.", color: "var(--filament-cyan)" },
+    { icon: Zap, title: "Entrega expressa", desc: "A maioria dos pedidos sai em até 24 horas.", color: "var(--filament-pink)" },
+    { icon: Layers, title: "Multimaterial", desc: "PLA, PETG, ABS, TPU e filamentos especiais em qualquer cor.", color: "var(--filament-green)" },
   ];
   return (
-    <section id="services" className="border-y border-border/60 bg-card/30">
+    <section id="services" className="bg-card/50">
+      <div className="filament-divider" />
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-16 md:grid-cols-3">
-        {items.map(({ icon: Icon, title, desc }) => (
-          <div key={title} className="group rounded-2xl border border-border bg-card p-6 transition-colors hover:border-primary/50">
-            <div className="mb-4 grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+        {items.map(({ icon: Icon, title, desc, color }) => (
+          <div key={title} className="group rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-lg">
+            <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl text-white" style={{ background: color }}>
               <Icon className="h-5 w-5" />
             </div>
             <h3 className="text-lg font-semibold">{title}</h3>
@@ -144,6 +158,7 @@ function Features() {
           </div>
         ))}
       </div>
+      <div className="filament-divider" />
     </section>
   );
 }
@@ -153,11 +168,11 @@ function Gallery() {
     <section id="work" className="mx-auto max-w-7xl px-6 py-24">
       <div className="mb-12 flex items-end justify-between">
         <div>
-          <div className="text-xs font-medium uppercase tracking-widest text-primary">Portfolio</div>
-          <h2 className="mt-2 font-display text-4xl font-bold tracking-tight md:text-5xl">Our work</h2>
+          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-magenta)" }}>Portfólio</div>
+          <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">Nossos trabalhos</h2>
         </div>
         <p className="hidden max-w-sm text-sm text-muted-foreground md:block">
-          A small sample of the parts, models and prototypes printed in our studio.
+          Uma amostra das peças, modelos e protótipos impressos no nosso estúdio.
         </p>
       </div>
       <div className="grid auto-rows-[180px] grid-cols-2 gap-4 md:grid-cols-4">
@@ -185,20 +200,21 @@ function Gallery() {
 function Contact() {
   const [loading, setLoading] = useState(false);
   return (
-    <section id="contact" className="border-t border-border/60 bg-card/30">
+    <section id="contact" className="bg-card/50">
+      <div className="filament-divider" />
       <div className="mx-auto grid max-w-7xl gap-12 px-6 py-24 lg:grid-cols-2">
         <div>
-          <div className="text-xs font-medium uppercase tracking-widest text-primary">Contact</div>
-          <h2 className="mt-2 font-display text-4xl font-bold tracking-tight md:text-5xl">
-            Got a part in mind?
+          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-cyan)" }}>Contato</div>
+          <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+            Tem uma peça em mente?
           </h2>
           <p className="mt-4 max-w-md text-muted-foreground">
-            Send us your STL or just a sketch — we'll come back with a quote and timeline within a day.
+            Envie seu STL ou apenas um esboço — retornamos com orçamento e prazo em até 24 horas.
           </p>
           <dl className="mt-8 space-y-3 text-sm">
-            <div className="flex gap-3"><dt className="w-20 text-muted-foreground">Email</dt><dd>hello@filamentforge.io</dd></div>
-            <div className="flex gap-3"><dt className="w-20 text-muted-foreground">Studio</dt><dd>Brooklyn, NY</dd></div>
-            <div className="flex gap-3"><dt className="w-20 text-muted-foreground">Hours</dt><dd>Mon–Fri · 9–6</dd></div>
+            <div className="flex gap-3"><dt className="w-24 text-muted-foreground">E-mail</dt><dd>contato@kurti3d.com.br</dd></div>
+            <div className="flex gap-3"><dt className="w-24 text-muted-foreground">Estúdio</dt><dd>São Paulo, SP</dd></div>
+            <div className="flex gap-3"><dt className="w-24 text-muted-foreground">Horário</dt><dd>Seg–Sex · 9h–18h</dd></div>
           </dl>
         </div>
         <form
@@ -207,7 +223,7 @@ function Contact() {
             setLoading(true);
             setTimeout(() => {
               setLoading(false);
-              toast.success("Message sent — we'll reply within 24h.");
+              toast.success("Mensagem enviada — responderemos em até 24h.");
               (e.target as HTMLFormElement).reset();
             }, 600);
           }}
@@ -215,21 +231,21 @@ function Contact() {
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input id="name" required placeholder="Ada Lovelace" />
+              <Label htmlFor="name">Nome</Label>
+              <Input id="name" required placeholder="Seu nome" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required placeholder="ada@studio.com" />
+              <Label htmlFor="email">E-mail</Label>
+              <Input id="email" type="email" required placeholder="voce@email.com" />
             </div>
           </div>
           <div className="mt-4 space-y-2">
-            <Label htmlFor="project">Project</Label>
-            <Textarea id="project" required rows={5} placeholder="Tell us about the part, material, quantity…" />
+            <Label htmlFor="project">Projeto</Label>
+            <Textarea id="project" required rows={5} placeholder="Conte sobre a peça, material, quantidade…" />
           </div>
-          <Button type="submit" size="lg" className="mt-6 w-full" disabled={loading}>
-            {loading ? "Sending…" : "Send message"}
-          </Button>
+          <button type="submit" disabled={loading} className="btn-filament mt-6 inline-flex h-12 w-full items-center justify-center text-sm font-semibold disabled:opacity-60">
+            {loading ? "Enviando…" : "Enviar mensagem"}
+          </button>
         </form>
       </div>
     </section>
@@ -238,10 +254,11 @@ function Contact() {
 
 function Footer() {
   return (
-    <footer className="border-t border-border">
+    <footer>
+      <div className="filament-divider" />
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 text-xs text-muted-foreground md:flex-row">
-        <p>© {new Date().getFullYear()} Filament Forge. All rights reserved.</p>
-        <p>Crafted with neon green filament.</p>
+        <p>© {new Date().getFullYear()} Kurti 3D — Sociedade Zé &amp; Kurt. Todos os direitos reservados.</p>
+        <p>Feito com filamento multicor.</p>
       </div>
     </footer>
   );
