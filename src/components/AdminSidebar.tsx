@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, Images, Settings } from "lucide-react";
-import { KurtiLogo } from "@/components/KurtiLogo";
+import { LayoutDashboard, Wallet, Images, Settings, ThumbsUp } from "lucide-react";
+
 import {
   Sidebar,
   SidebarContent,
@@ -29,11 +29,20 @@ export function AdminSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="filament-top border-b border-sidebar-border">
         <Link to="/" className="flex items-center gap-2 px-2 py-2">
-          <KurtiLogo className="h-8 w-8 shrink-0" textHidden />
+          <div
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-white"
+            style={{
+              background:
+                "linear-gradient(135deg,#00bcd4,#2dd47a,#ffd60a,#ff4d8d,#e91e63)",
+            }}
+          >
+            <ThumbsUp className="h-4 w-4" />
+          </div>
           <span className="font-display text-sm font-bold tracking-tight group-data-[collapsible=icon]:hidden">
             Kurti 3D
           </span>
         </Link>
+
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
