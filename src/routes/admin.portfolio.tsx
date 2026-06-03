@@ -1,11 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
-import { Upload, X, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -29,96 +28,123 @@ export const Route = createFileRoute("/admin/portfolio")({
   component: Portfolio,
 });
 
-const CATEGORIES = ["Action Figure", "Mechanical Part", "Decoration", "Prototype", "Cosplay"] as const;
+const CATEGORIES = [
+  "Chaveiro",
+  "Miniatura",
+  "Peça Mecânica",
+  "Decoração",
+  "Cosplay",
+  "Protótipo",
+] as const;
+type Category = (typeof CATEGORIES)[number];
 
 const schema = z.object({
-  name: z.string().trim().min(1, "Name required").max(100),
-  category: z.enum(CATEGORIES),
-  spoolCost: z.number().min(0).max(10000),
-  weightG: z.number().min(0).max(100000),
-  salePrice: z.number().min(0).max(100000),
-  published: z.boolean(),
-  imageUrl: z.string().optional(),
+  nome: z.string().trim().min(1, "Informe o nome do projeto").max(100),
+  categoria: z.enum(CATEGORIES),
+  custoRolo: z.number().min(0.01, "Custo do rolo inválido").max(100000),
+  pesoRolo: z.number().min(1, "Peso do rolo inválido").max(100000),
+  pesoPeca: z.number().min(0.1, "Peso da peça inválido").max(100000),
+  tempoMin: z.number().min(0).max(100000),
+  quantidade: z.number().int().min(1, "Quantidade mínima 1").max(100000),
+  precoVenda: z.number().min(0).max(1000000),
 });
 
-type Project = z.infer<typeof schema> & { id: string };
+type ProjectInput = z.infer<typeof schema>;
+type Project = ProjectInput & { id: string };
 
-// Spool cost per kg → cost = spoolCost * (weight / 1000)
-function materialCost(p: Pick<Project, "spoolCost" | "weightG">) {
-  return (p.spoolCost * p.weightG) / 1000;
-}
-function profit(p: Pick<Project, "spoolCost" | "weightG" | "salePrice">) {
-  return p.salePrice - materialCost(p);
-}
-
-const initialForm = {
-  name: "",
-  category: "Action Figure" as (typeof CATEGORIES)[number],
-  spoolCost: "",
-  weightG: "",
-  salePrice: "",
-  published: true,
-  imageUrl: undefined as string | undefined,
+type FormState = {
+  nome: string;
+  categoria: Category;
+  custoRolo: string;
+  pesoRolo: string;
+  pesoPeca: string;
+  tempoMin: string;
+  quantidade: string;
+  precoVenda: string;
 };
+
+const initialForm: FormState = {
+  nome: "",
+  categoria: "Chaveiro",
+  custoRolo: "",
+  pesoRolo: "1000",
+  pesoPeca: "",
+  tempoMin: "",
+  quantidade: "10",
+  precoVenda: "",
+};
+
+function calc(p: {
+  custoRolo: number;
+  pesoRolo: number;
+  pesoPeca: number;
+  quantidade: number;
+  precoVenda: number;
+}) {
+  const custoUnidade = p.pesoRolo > 0 ? (p.custoRolo / p.pesoRolo) * p.pesoPeca : 0;
+  const custoLote = custoUnidade * p.quantidade;
+  const receitaTotal = p.precoVenda * p.quantidade;
+  const lucroLiquido = receitaTotal - custoLote;
+  return { custoUnidade, custoLote, receitaTotal, lucroLiquido };
+}
+
+const brl = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Portfolio() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [form, setForm] = useState(initialForm);
-  const [dragOver, setDragOver] = useState(false);
+  const [form, setForm] = useState<FormState>(initialForm);
 
-  const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Only image files are supported.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be under 5MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setForm((f) => ({ ...f, imageUrl: reader.result as string }));
-    reader.readAsDataURL(file);
-  }, []);
+  const numeric = useMemo(
+    () => ({
+      custoRolo: Number(form.custoRolo) || 0,
+      pesoRolo: Number(form.pesoRolo) || 0,
+      pesoPeca: Number(form.pesoPeca) || 0,
+      quantidade: Number(form.quantidade) || 0,
+      precoVenda: Number(form.precoVenda) || 0,
+    }),
+    [form],
+  );
 
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFile(file);
-  };
+  const results = useMemo(() => calc(numeric), [numeric]);
+
+  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse({
-      name: form.name,
-      category: form.category,
-      spoolCost: Number(form.spoolCost),
-      weightG: Number(form.weightG),
-      salePrice: Number(form.salePrice),
-      published: form.published,
-      imageUrl: form.imageUrl,
+      nome: form.nome,
+      categoria: form.categoria,
+      custoRolo: Number(form.custoRolo),
+      pesoRolo: Number(form.pesoRolo),
+      pesoPeca: Number(form.pesoPeca),
+      tempoMin: Number(form.tempoMin),
+      quantidade: Number(form.quantidade),
+      precoVenda: Number(form.precoVenda),
     });
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
+      toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
-    setProjects((p) => [{ ...parsed.data, id: crypto.randomUUID() }, ...p]);
+    setProjects((list) => [{ ...parsed.data, id: crypto.randomUUID() }, ...list]);
     setForm(initialForm);
-    toast.success("Project added to portfolio.");
+    toast.success("Projeto salvo no portfólio.");
   };
-
-  const togglePublish = (id: string) =>
-    setProjects((list) =>
-      list.map((p) => (p.id === id ? { ...p, published: !p.published } : p))
-    );
 
   const remove = (id: string) =>
     setProjects((list) => list.filter((p) => p.id !== id));
 
   const totals = useMemo(() => {
-    const totalProfit = projects.reduce((s, p) => s + profit(p), 0);
-    const published = projects.filter((p) => p.published).length;
-    return { totalProfit, published };
+    return projects.reduce(
+      (acc, p) => {
+        const r = calc(p);
+        acc.lucro += r.lucroLiquido;
+        acc.receita += r.receitaTotal;
+        return acc;
+      },
+      { lucro: 0, receita: 0 },
+    );
   }, [projects]);
 
   return (
@@ -126,223 +152,194 @@ function Portfolio() {
       <Toaster />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">Portfolio Manager</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">
+            Gerenciar Portfólio
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Add new prints, track margins, and choose what goes on the public gallery.
+            Calculadora de custo para chaveiros e lotes de impressão.
           </p>
         </div>
         <div className="flex gap-6 text-sm">
           <div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Total profit</div>
-            <div className="font-display text-xl font-bold text-primary">
-              ${totals.totalProfit.toFixed(2)}
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              Lucro acumulado
+            </div>
+            <div className="font-display text-xl font-bold filament-text">
+              {brl(totals.lucro)}
             </div>
           </div>
           <div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Published</div>
-            <div className="font-display text-xl font-bold">
-              {totals.published} / {projects.length}
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              Projetos
             </div>
+            <div className="font-display text-xl font-bold">{projects.length}</div>
           </div>
         </div>
       </div>
 
-      {/* Form */}
+      {/* Form + Results */}
       <form
         onSubmit={submit}
-        className="grid gap-6 rounded-2xl border border-border bg-card p-6 lg:grid-cols-[1fr_1.2fr]"
+        className="filament-top space-y-6 rounded-2xl border border-border bg-card p-6"
       >
-        {/* Drop zone */}
-        <div className="space-y-2">
-          <Label>Project Image</Label>
-          <label
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            className={`relative flex aspect-square cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-colors ${
-              dragOver
-                ? "border-primary bg-primary/5"
-                : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
-            }`}
-          >
-            {form.imageUrl ? (
-              <>
-                <img src={form.imageUrl} alt="Preview" className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setForm((f) => ({ ...f, imageUrl: undefined }));
-                  }}
-                  className="absolute right-2 top-2 rounded-full bg-background/80 p-1.5 backdrop-blur transition-colors hover:bg-background"
-                  aria-label="Remove image"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </>
-            ) : (
-              <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
-                  <Upload className="h-5 w-5" />
-                </div>
-                <p className="text-sm font-medium">Drop an image here</p>
-                <p className="text-xs text-muted-foreground">or click to browse · PNG, JPG up to 5MB</p>
-              </div>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <Field label="Nome do Projeto" className="md:col-span-2">
+            <Input
+              value={form.nome}
+              onChange={(e) => setField("nome", e.target.value)}
+              placeholder="Chaveiro logo Bambu"
+              maxLength={100}
             />
-          </label>
+          </Field>
+          <Field label="Categoria" className="md:col-span-2">
+            <Select
+              value={form.categoria}
+              onValueChange={(v) => setField("categoria", v as Category)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <NumberField
+            label="Custo do Rolo de Filamento (R$)"
+            value={form.custoRolo}
+            onChange={(v) => setField("custoRolo", v)}
+            placeholder="120,00"
+          />
+          <NumberField
+            label="Peso do Rolo (g)"
+            value={form.pesoRolo}
+            onChange={(v) => setField("pesoRolo", v)}
+            placeholder="1000"
+          />
+          <NumberField
+            label="Peso da Peça (g)"
+            value={form.pesoPeca}
+            onChange={(v) => setField("pesoPeca", v)}
+            placeholder="6"
+          />
+          <NumberField
+            label="Tempo de Impressão (min)"
+            value={form.tempoMin}
+            onChange={(v) => setField("tempoMin", v)}
+            placeholder="35"
+          />
+          <NumberField
+            label="Quantidade do Lote"
+            value={form.quantidade}
+            onChange={(v) => setField("quantidade", v)}
+            placeholder="20"
+            step="1"
+          />
+          <NumberField
+            label="Preço de Venda Sugerido (R$)"
+            value={form.precoVenda}
+            onChange={(v) => setField("precoVenda", v)}
+            placeholder="15,00"
+          />
         </div>
 
-        {/* Fields */}
-        <div className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="name">Project Name</Label>
-              <Input
-                id="name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Articulated dragon v2"
-                maxLength={100}
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={form.category}
-                onValueChange={(v) => setForm({ ...form, category: v as (typeof CATEGORIES)[number] })}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        {/* Dynamic Results */}
+        <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <ResultCard
+            label="Custo por Unidade"
+            value={brl(results.custoUnidade)}
+            accent="cyan"
+          />
+          <ResultCard
+            label="Custo Total do Lote"
+            value={brl(results.custoLote)}
+            accent="yellow"
+          />
+          <ResultCard
+            label="Receita Total"
+            value={brl(results.receitaTotal)}
+            accent="pink"
+          />
+          <ResultCard
+            label="Lucro Líquido"
+            value={brl(results.lucroLiquido)}
+            accent={results.lucroLiquido >= 0 ? "green" : "magenta"}
+            emphasize
+          />
+        </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <NumberField
-              id="spoolCost" label="Spool Cost ($/kg)" value={form.spoolCost}
-              onChange={(v) => setForm({ ...form, spoolCost: v })} placeholder="25"
-            />
-            <NumberField
-              id="weight" label="Print Weight (g)" value={form.weightG}
-              onChange={(v) => setForm({ ...form, weightG: v })} placeholder="120"
-            />
-            <NumberField
-              id="price" label="Sale Price ($)" value={form.salePrice}
-              onChange={(v) => setForm({ ...form, salePrice: v })} placeholder="45"
-            />
-          </div>
-
-          {/* Live profit preview */}
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
-            <span className="text-muted-foreground">Estimated profit</span>
-            <span className="font-display text-base font-bold text-primary">
-              ${profit({
-                spoolCost: Number(form.spoolCost) || 0,
-                weightG: Number(form.weightG) || 0,
-                salePrice: Number(form.salePrice) || 0,
-              }).toFixed(2)}
-            </span>
-          </div>
-
-          {/* Publish toggle */}
-          <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
-            <div>
-              <Label htmlFor="publish" className="text-sm font-semibold">
-                Publish to Public Website Gallery
-              </Label>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Visible on the home page portfolio when enabled.
-              </p>
-            </div>
-            <Switch
-              id="publish"
-              checked={form.published}
-              onCheckedChange={(c) => setForm({ ...form, published: c })}
-            />
-          </div>
-
-          <Button type="submit" size="lg" className="w-full gap-2">
-            <Plus className="h-4 w-4" /> Add Project
+        <div className="flex justify-end">
+          <Button type="submit" size="lg" className="btn-filament gap-2 px-6">
+            <Plus className="h-4 w-4" /> Salvar Projeto
           </Button>
         </div>
       </form>
 
       {/* Table */}
-      <div className="rounded-2xl border border-border bg-card">
+      <div className="filament-top rounded-2xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-display text-lg font-semibold">Projects</h2>
-          <span className="text-xs text-muted-foreground">{projects.length} total</span>
+          <h2 className="font-display text-lg font-semibold">Projetos salvos</h2>
+          <span className="text-xs text-muted-foreground">
+            {projects.length} no total
+          </span>
         </div>
         {projects.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
-            No projects yet. Add your first print above.
+            Nenhum projeto ainda. Calcule e salve seu primeiro lote acima.
           </div>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Material</TableHead>
-                <TableHead className="text-right">Sale</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Projeto</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead className="text-right">Qtd.</TableHead>
+                <TableHead className="text-right">Custo/un.</TableHead>
+                <TableHead className="text-right">Custo lote</TableHead>
+                <TableHead className="text-right">Receita</TableHead>
+                <TableHead className="text-right">Lucro</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {projects.map((p) => {
-                const prof = profit(p);
+                const r = calc(p);
                 return (
                   <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="h-10 w-10 rounded-md object-cover" />
-                        ) : (
-                          <div className="h-10 w-10 rounded-md bg-muted" />
-                        )}
-                        <span className="font-medium">{p.name}</span>
-                      </div>
+                      <Badge variant="secondary">{p.categoria}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{p.category}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.quantidade}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      ${materialCost(p).toFixed(2)}
+                      {brl(r.custoUnidade)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">${p.salePrice.toFixed(2)}</TableCell>
-                    <TableCell className={`text-right tabular-nums font-semibold ${prof >= 0 ? "text-primary" : "text-destructive"}`}>
-                      ${prof.toFixed(2)}
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {brl(r.custoLote)}
                     </TableCell>
-                    <TableCell>
-                      <button onClick={() => togglePublish(p.id)} className="cursor-pointer">
-                        {p.published ? (
-                          <Badge className="bg-primary text-primary-foreground hover:bg-primary/90">Public</Badge>
-                        ) : (
-                          <Badge variant="secondary">Hidden</Badge>
-                        )}
-                      </button>
+                    <TableCell className="text-right tabular-nums">
+                      {brl(r.receitaTotal)}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums font-semibold ${
+                        r.lucroLiquido >= 0 ? "filament-text" : "text-destructive"
+                      }`}
+                    >
+                      {brl(r.lucroLiquido)}
                     </TableCell>
                     <TableCell>
                       <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => remove(p.id)}
-                        aria-label="Delete project"
+                        aria-label="Excluir projeto"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -358,25 +355,92 @@ function Portfolio() {
   );
 }
 
-function NumberField({
-  id, label, value, onChange, placeholder,
+function Field({
+  label,
+  children,
+  className = "",
 }: {
-  id: string; label: string; value: string;
-  onChange: (v: string) => void; placeholder?: string;
+  label: string;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+    <div className={`space-y-2 ${className}`}>
+      <Label>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  step = "0.01",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  step?: string;
+}) {
+  return (
+    <Field label={label}>
       <Input
-        id={id}
         type="number"
         inputMode="decimal"
         min={0}
-        step="0.01"
+        step={step}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
       />
+    </Field>
+  );
+}
+
+const ACCENT_COLORS: Record<string, string> = {
+  cyan: "#00bcd4",
+  green: "#2dd47a",
+  yellow: "#ffd60a",
+  pink: "#ff4d8d",
+  magenta: "#e91e63",
+};
+
+function ResultCard({
+  label,
+  value,
+  accent,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  accent: keyof typeof ACCENT_COLORS;
+  emphasize?: boolean;
+}) {
+  const color = ACCENT_COLORS[accent];
+  return (
+    <div
+      className="relative overflow-hidden rounded-xl border border-border bg-card p-4"
+      style={{ boxShadow: `0 8px 24px -16px ${color}` }}
+    >
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-1"
+        style={{ background: color }}
+      />
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className={`mt-2 font-display font-bold tabular-nums ${
+          emphasize ? "text-3xl" : "text-2xl"
+        }`}
+        style={emphasize ? undefined : { color }}
+      >
+        {emphasize ? <span className="filament-text">{value}</span> : value}
+      </div>
     </div>
   );
 }
