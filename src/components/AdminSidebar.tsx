@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, Images, Settings, ThumbsUp } from "lucide-react";
+import { LayoutDashboard, Wallet, Images, Settings, ThumbsUp, ListChecks } from "lucide-react";
 
 import {
   Sidebar,
@@ -15,6 +15,7 @@ import {
 
 const items = [
   { title: "Painel", url: "/admin", icon: LayoutDashboard },
+  { title: "Fila de Pedidos", url: "/admin/queue", icon: ListChecks },
   { title: "Finanças", url: "/admin/finances", icon: Wallet },
   { title: "Gerenciar Portfólio", url: "/admin/portfolio", icon: Images },
   { title: "Configurações", url: "/admin/settings", icon: Settings },
