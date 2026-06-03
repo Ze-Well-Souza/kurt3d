@@ -3,7 +3,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AdminSidebar } from "@/components/AdminSidebar";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin — Filament Forge" }] }),
+  head: () => ({ meta: [{ title: "Admin — Kurti 3D" }] }),
   component: AdminLayout,
 });
 
@@ -13,10 +13,10 @@ function AdminLayout() {
       <div className="flex min-h-screen w-full bg-background">
         <AdminSidebar />
         <SidebarInset>
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
+          <header className="filament-top sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
             <SidebarTrigger />
             <div className="h-4 w-px bg-border" />
-            <span className="text-sm font-medium text-muted-foreground">Admin Console</span>
+            <span className="text-sm font-medium text-muted-foreground">Console do Admin</span>
           </header>
           <main className="flex-1 p-6">
             <Outlet />

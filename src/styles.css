@@ -157,6 +157,48 @@
     background-size: 200% 100%;
     animation: filament-flow 4s linear infinite reverse;
   }
+
+  /* Gradient filament text — for highlighted numbers/headlines */
+  .filament-text {
+    background: var(--gradient-filament);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: filament-flow 6s linear infinite;
+  }
+
+  /* Sidebar active item with left filament bar */
+  .filament-active {
+    position: relative;
+    background: oklch(0.96 0.005 240);
+  }
+  .filament-active::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 6px; bottom: 6px;
+    width: 3px;
+    border-radius: 999px;
+    background: var(--gradient-filament);
+    background-size: 100% 200%;
+    animation: filament-flow 4s linear infinite;
+  }
+
+  /* Filament top accent bar for cards/headers */
+  .filament-top {
+    position: relative;
+    overflow: hidden;
+  }
+  .filament-top::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: var(--gradient-filament);
+    background-size: 200% 100%;
+    animation: filament-flow 5s linear infinite;
+  }
+
   .btn-filament:hover {
     transform: translateY(-1px);
     box-shadow: 0 14px 36px -12px oklch(0.65 0.18 320 / 0.5);
