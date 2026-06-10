@@ -61,7 +61,7 @@ export function KurtiLogo({ className = "" }: { className?: string }) {
             className="inline-block"
             style={{
               backgroundImage:
-                "linear-gradient(90deg,#00bcd4,#2dd47a,#ffd60a,#ff4d8d,#e91e63)",
+                "linear-gradient(90deg,#c96f4a,#e0a93b,#8aab6e,#5fa8a3,#8a3a52)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               color: "transparent",
