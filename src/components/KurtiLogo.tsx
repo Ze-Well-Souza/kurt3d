@@ -3,7 +3,7 @@
  * draw a thumbs-up icon, then the wordmark fades in. Plays once on mount.
  */
 export function KurtiLogo({ className = "" }: { className?: string }) {
-  const colors = ["#00bcd4", "#2dd47a", "#ffd60a", "#ff4d8d", "#e91e63"];
+  const colors = ["#c96f4a", "#e0a93b", "#8aab6e", "#5fa8a3", "#8a3a52"];
   // Thumbs-up silhouette path (simplified)
   const thumbPath =
     "M14 28 L14 46 L20 46 L20 28 Z M22 28 L22 46 Q22 48 24 48 L36 48 Q39 48 40 45 L43 33 Q43.5 30 40.5 30 L32 30 L33 22 Q33.5 18 30 17 Q27 16 26 19 L22 28 Z";
