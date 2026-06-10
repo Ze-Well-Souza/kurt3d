@@ -81,19 +81,19 @@
   --sidebar-border: oklch(0.90 0.005 240);
   --sidebar-ring: oklch(0.65 0.18 200);
 
-  /* Bambu Lab AMS filament palette */
-  --filament-cyan: #00bcd4;
-  --filament-magenta: #e91e63;
-  --filament-yellow: #ffd60a;
-  --filament-pink: #ff4d8d;
-  --filament-green: #2dd47a;
+  /* Crochet yarn palette — warm, handmade, cozy */
+  --filament-cyan: #5fa8a3;    /* sage teal */
+  --filament-magenta: #8a3a52; /* burgundy */
+  --filament-yellow: #e0a93b;  /* mustard */
+  --filament-pink: #d98ca0;    /* dusty rose */
+  --filament-green: #8aab6e;   /* sage green */
 
   --gradient-filament: linear-gradient(
     90deg,
-    var(--filament-cyan) 0%,
-    var(--filament-green) 25%,
-    var(--filament-yellow) 50%,
-    var(--filament-pink) 75%,
+    #c96f4a 0%,
+    var(--filament-yellow) 25%,
+    var(--filament-green) 50%,
+    var(--filament-cyan) 75%,
     var(--filament-magenta) 100%
   );
 

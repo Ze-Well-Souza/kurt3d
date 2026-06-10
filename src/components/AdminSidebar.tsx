@@ -34,7 +34,7 @@ export function AdminSidebar() {
             className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-white"
             style={{
               background:
-                "linear-gradient(135deg,#00bcd4,#2dd47a,#ffd60a,#ff4d8d,#e91e63)",
+                "linear-gradient(135deg,#c96f4a,#e0a93b,#8aab6e,#5fa8a3,#8a3a52)",
             }}
           >
             <ThumbsUp className="h-4 w-4" />
