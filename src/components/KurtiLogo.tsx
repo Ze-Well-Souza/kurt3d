@@ -44,11 +44,11 @@ export function KurtiLogo({ className = "" }: { className?: string }) {
         />
         <defs>
           <linearGradient id="kurti-fill" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#00bcd4" />
-            <stop offset="35%" stopColor="#2dd47a" />
-            <stop offset="60%" stopColor="#ffd60a" />
-            <stop offset="85%" stopColor="#ff4d8d" />
-            <stop offset="100%" stopColor="#e91e63" />
+            <stop offset="0%" stopColor="#c96f4a" />
+            <stop offset="30%" stopColor="#e0a93b" />
+            <stop offset="55%" stopColor="#8aab6e" />
+            <stop offset="80%" stopColor="#5fa8a3" />
+            <stop offset="100%" stopColor="#8a3a52" />
           </linearGradient>
         </defs>
       </svg>
