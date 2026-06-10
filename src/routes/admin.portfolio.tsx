@@ -401,11 +401,11 @@ function NumberField({
 }
 
 const ACCENT_COLORS: Record<string, string> = {
-  cyan: "#00bcd4",
-  green: "#2dd47a",
-  yellow: "#ffd60a",
-  pink: "#ff4d8d",
-  magenta: "#e91e63",
+  cyan: "#5fa8a3",
+  green: "#8aab6e",
+  yellow: "#e0a93b",
+  pink: "#d98ca0",
+  magenta: "#8a3a52",
 };
 
 function ResultCard({
