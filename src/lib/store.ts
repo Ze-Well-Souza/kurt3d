@@ -29,10 +29,22 @@ export type Venda = {
 
 export type Filamento = {
   id: string;
-  nome: string;
+  sku: string;
+  marca: string;
+  cor: string;
+  nome: string; // derived: "PLA Marca Cor" — kept for backwards compat in UI
   material: string;
   pesoInicial: number;
   pesoAtual: number;
+  precoPago: number;
+  dataCompra: string; // ISO date (yyyy-mm-dd)
+};
+
+export type Insumo = {
+  id: string;
+  nome: string;
+  dataCompra: string;
+  quantidade: string; // free text: "500ml", "10 un.", etc.
   precoPago: number;
 };
 
@@ -94,12 +106,13 @@ const ordersStore = createStore<Order[]>("kurti:orders", INITIAL_ORDERS);
 const vendasStore = createStore<Venda[]>("kurti:vendas", []);
 
 const INITIAL_FILAMENTOS: Filamento[] = [
-  { id: "cyan",    nome: "PLA Cyan",    material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
-  { id: "magenta", nome: "PLA Magenta", material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
-  { id: "yellow",  nome: "PLA Yellow",  material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
+  { id: "cyan",    sku: "FIL-001", marca: "Bambu Lab", cor: "Cyan",    nome: "PLA Bambu Lab Cyan",    material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120, dataCompra: "" },
+  { id: "magenta", sku: "FIL-002", marca: "Bambu Lab", cor: "Magenta", nome: "PLA Bambu Lab Magenta", material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120, dataCompra: "" },
+  { id: "yellow",  sku: "FIL-003", marca: "Bambu Lab", cor: "Yellow",  nome: "PLA Bambu Lab Yellow",  material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120, dataCompra: "" },
 ];
 
 const filamentosStore = createStore<Filamento[]>("kurti:filamentos", INITIAL_FILAMENTOS);
+const insumosStore = createStore<Insumo[]>("kurti:insumos", []);
 const portfolioStore = createStore<PortfolioProject[]>("kurti:portfolio", []);
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
@@ -114,6 +127,10 @@ export function useVendas(): Venda[] {
 
 export function useFilamentos(): Filamento[] {
   return useSyncExternalStore(filamentosStore.subscribe, filamentosStore.get, filamentosStore.get);
+}
+
+export function useInsumos(): Insumo[] {
+  return useSyncExternalStore(insumosStore.subscribe, insumosStore.get, insumosStore.get);
 }
 
 export function usePortfolio(): PortfolioProject[] {
@@ -146,6 +163,23 @@ export function addFilamento(filamento: Filamento) {
 
 export function removeFilamento(id: string) {
   filamentosStore.set((prev) => prev.filter((f) => f.id !== id));
+}
+
+export function nextFilamentoSku(): string {
+  const nums = filamentosStore.get()
+    .map((f) => /^FIL-(\d+)$/i.exec(f.sku)?.[1])
+    .filter((n): n is string => !!n)
+    .map((n) => parseInt(n, 10));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `FIL-${String(next).padStart(3, "0")}`;
+}
+
+export function addInsumo(insumo: Insumo) {
+  insumosStore.set((prev) => [insumo, ...prev]);
+}
+
+export function removeInsumo(id: string) {
+  insumosStore.set((prev) => prev.filter((i) => i.id !== id));
 }
 
 export function setOrders(updater: Order[] | ((prev: Order[]) => Order[])) {
@@ -197,9 +231,7 @@ export function finalizarDestino(
     ]);
   }
 
-  // Deduct filament stock on failure (wasted print)
   if (destino === "Falha de Impressão") {
-    // Estimate ~5g per unit wasted, deduct from first matching color filament
     const wastedGrams = 5 * order.quantity;
     const matchedColor = order.colors.find((c) =>
       filamentosStore.get().some((f) => f.id === c),
@@ -210,10 +242,6 @@ export function finalizarDestino(
   }
 }
 
-/**
- * Simple cost estimate for an order based on time + filament assumptions.
- * Uses average filament cost R$120/kg and standard energy/depreciation rates.
- */
 function estimateOrderCost(order: Order) {
   const tempoH = order.timeMinutes / 60;
   const energia = tempoH * 0.095 * 0.75;
