@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { ArrowRight, Cpu, Layers, Zap } from "lucide-react";
+import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play } from "lucide-react";
 import { KurtiLogo } from "@/components/KurtiLogo";
+import { usePortfolio } from "@/lib/store";
 import heroImg from "@/assets/hero-printer.jpg";
 import work1 from "@/assets/work-1.jpg";
 import work2 from "@/assets/work-2.jpg";
@@ -28,7 +30,7 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const gallery = [
+const fallbackGallery = [
   { src: work1, alt: "Vaso 3D arco-íris", span: "row-span-2" },
   { src: work2, alt: "Corações multicoloridos", span: "" },
   { src: work3, alt: "Dragão articulado colorido", span: "row-span-2" },
@@ -64,6 +66,7 @@ function Nav() {
           <a href="#contact" className="transition-colors hover:text-foreground">Contato</a>
         </nav>
         <div className="flex items-center gap-2">
+          <SocialIcons className="hidden md:flex" />
           <Link to="/admin">
             <Button variant="ghost" size="sm">Admin</Button>
           </Link>
@@ -164,6 +167,11 @@ function Features() {
 }
 
 function Gallery() {
+  const portfolio = usePortfolio();
+
+  // If we have portfolio projects from the store, show them; otherwise fallback to static images
+  const hasProjects = portfolio.length > 0;
+
   return (
     <section id="work" className="mx-auto max-w-7xl px-6 py-24">
       <div className="mb-12 flex items-end justify-between">
@@ -175,24 +183,69 @@ function Gallery() {
           Uma amostra das peças, modelos e protótipos impressos no nosso estúdio.
         </p>
       </div>
-      <div className="grid auto-rows-[180px] grid-cols-2 gap-4 md:grid-cols-4">
-        {gallery.map((g) => (
-          <figure
-            key={g.alt}
-            className={`group relative overflow-hidden rounded-xl border border-border bg-muted ${g.span}`}
-          >
-            <img
-              src={g.src}
-              alt={g.alt}
-              loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-            <div className="absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-background/95 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-              <figcaption className="text-sm font-medium">{g.alt}</figcaption>
-            </div>
-          </figure>
-        ))}
-      </div>
+
+      {hasProjects ? (
+        <div className="grid auto-rows-[200px] grid-cols-2 gap-4 md:grid-cols-4">
+          {/* Video card placeholder — ready for MP4/Reels */}
+          <VideoCard />
+
+          {portfolio.map((p) => (
+            <figure
+              key={p.id}
+              className="group relative overflow-hidden rounded-xl border border-border bg-card"
+            >
+              <div className="flex h-full flex-col justify-between p-5">
+                <div>
+                  <Badge variant="secondary" className="mb-2">{p.categoria}</Badge>
+                  <p className="font-display text-lg font-bold leading-tight">{p.nome}</p>
+                </div>
+                <div className="flex items-end justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{p.quantidade}</span> un. · {p.tempoMin}min
+                  </div>
+                  <span
+                    className="font-display text-sm font-bold"
+                    style={{ color: "var(--filament-green)" }}
+                  >
+                    R$ {p.precoVenda.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              {/* Kurtido hover effect */}
+              <div className="pointer-events-none absolute inset-0 translate-y-full bg-gradient-to-t from-background/90 via-background/40 to-transparent transition-transform duration-500 group-hover:translate-y-0">
+                <div className="absolute inset-x-0 bottom-0 p-4">
+                  <p className="text-xs font-semibold filament-text">Kurtido com qualidade!</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {p.pesoPeca}g/un. · Filamento {p.pesoRolo}g
+                  </p>
+                </div>
+              </div>
+            </figure>
+          ))}
+        </div>
+      ) : (
+        <div className="grid auto-rows-[180px] grid-cols-2 gap-4 md:grid-cols-4">
+          {/* Video card placeholder */}
+          <VideoCard />
+
+          {fallbackGallery.map((g) => (
+            <figure
+              key={g.alt}
+              className={`group relative overflow-hidden rounded-xl border border-border bg-muted ${g.span}`}
+            >
+              <img
+                src={g.src}
+                alt={g.alt}
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-background/95 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                <figcaption className="text-sm font-medium">{g.alt}</figcaption>
+              </div>
+            </figure>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -256,10 +309,62 @@ function Footer() {
   return (
     <footer>
       <div className="filament-divider" />
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 text-xs text-muted-foreground md:flex-row">
-        <p>© {new Date().getFullYear()} Kurti 3D — Sociedade Zé &amp; Kurt. Todos os direitos reservados.</p>
-        <p>Feito com filamento multicor.</p>
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 md:flex-row">
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()} Kurti 3D — Sociedade Zé &amp; Kurt. Todos os direitos reservados.
+        </p>
+        <div className="flex items-center gap-4">
+          <SocialIcons />
+          <p className="text-xs text-muted-foreground">Feito com filamento multicor.</p>
+        </div>
       </div>
     </footer>
+  );
+}
+
+function SocialIcons({ className = "" }: { className?: string }) {
+  return (
+    <div className={`items-center gap-1 ${className}`}>
+      <a
+        href="https://instagram.com/kurti3d"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Instagram"
+        className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+      >
+        <Instagram className="h-4 w-4" />
+      </a>
+      <a
+        href="https://youtube.com/@kurti3d"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="YouTube"
+        className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+      >
+        <Youtube className="h-4 w-4" />
+      </a>
+    </div>
+  );
+}
+
+/** Video card placeholder — ready for MP4/Reels with Kurtido hover effect */
+function VideoCard() {
+  return (
+    <figure className="group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/60 p-6 text-center transition-all duration-300 hover:border-solid hover:shadow-lg">
+      <div className="grid h-14 w-14 place-items-center rounded-full transition-all duration-300 group-hover:scale-110" style={{ background: "var(--gradient-filament)", backgroundSize: "200% 100%" }}>
+        <Play className="h-6 w-6 text-white fill-white" />
+      </div>
+      <p className="mt-3 text-sm font-semibold text-foreground">Vídeo em breve</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Reels da Bambu Lab A1 trabalhando
+      </p>
+      {/* Kurtido hover overlay */}
+      <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-background/80 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+        <div className="pb-5">
+          <p className="text-xs font-bold filament-text">Kurtido ao vivo!</p>
+          <p className="text-[11px] text-muted-foreground">Em breve — vídeos dos prints</p>
+        </div>
+      </div>
+    </figure>
   );
 }

@@ -35,18 +35,40 @@ export type Filamento = {
   precoPago: number;
 };
 
+export type PortfolioProject = {
+  id: string;
+  nome: string;
+  categoria: string;
+  custoRolo: number;
+  pesoRolo: number;
+  pesoPeca: number;
+  tempoMin: number;
+  quantidade: number;
+  precoVenda: number;
+};
+
 // ─── Reactive store ─────────────────────────────────────────────────────────
 
 type Listener = () => void;
 
-function createStore<T>(initial: T) {
-  let state = initial;
+function loadLocal<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function createStore<T>(key: string, fallback: T) {
+  let state = loadLocal<T>(key, fallback);
   const listeners = new Set<Listener>();
 
   return {
     get: () => state,
     set(updater: T | ((prev: T) => T)) {
       state = typeof updater === "function" ? (updater as (p: T) => T)(state) : updater;
+      try { localStorage.setItem(key, JSON.stringify(state)); } catch { /* quota */ }
       listeners.forEach((l) => l());
     },
     subscribe(listener: Listener) {
@@ -66,8 +88,8 @@ const INITIAL_ORDERS: Order[] = [
   { id: "o5", client: "Lucas Pereira", project: "Coração Decorativo", quantity: 20, timeMinutes: 150, colors: ["pink", "magenta", "purple"], status: "done" },
 ];
 
-const ordersStore = createStore<Order[]>(INITIAL_ORDERS);
-const vendasStore = createStore<Venda[]>([]);
+const ordersStore = createStore<Order[]>("kurti:orders", INITIAL_ORDERS);
+const vendasStore = createStore<Venda[]>("kurti:vendas", []);
 
 const INITIAL_FILAMENTOS: Filamento[] = [
   { id: "cyan",    nome: "Filamento PLA Cyan",    pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
@@ -75,7 +97,8 @@ const INITIAL_FILAMENTOS: Filamento[] = [
   { id: "yellow",  nome: "Filamento PLA Yellow",  pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
 ];
 
-const filamentosStore = createStore<Filamento[]>(INITIAL_FILAMENTOS);
+const filamentosStore = createStore<Filamento[]>("kurti:filamentos", INITIAL_FILAMENTOS);
+const portfolioStore = createStore<PortfolioProject[]>("kurti:portfolio", []);
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
@@ -91,7 +114,19 @@ export function useFilamentos(): Filamento[] {
   return useSyncExternalStore(filamentosStore.subscribe, filamentosStore.get, filamentosStore.get);
 }
 
+export function usePortfolio(): PortfolioProject[] {
+  return useSyncExternalStore(portfolioStore.subscribe, portfolioStore.get, portfolioStore.get);
+}
+
 // ─── Actions ─────────────────────────────────────────────────────────────────
+
+export function addPortfolioProject(project: PortfolioProject) {
+  portfolioStore.set((prev) => [project, ...prev]);
+}
+
+export function removePortfolioProject(id: string) {
+  portfolioStore.set((prev) => prev.filter((p) => p.id !== id));
+}
 
 export function abaterEstoqueFilamento(filamentoId: string, gramas: number) {
   filamentosStore.set((prev) =>

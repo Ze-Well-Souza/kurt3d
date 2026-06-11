@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { useFilamentos, abaterEstoqueFilamento } from "@/lib/store";
+import { useFilamentos, abaterEstoqueFilamento, usePortfolio, addPortfolioProject, removePortfolioProject } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/portfolio")({
   component: Portfolio,
@@ -108,7 +108,7 @@ const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Portfolio() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const projects = usePortfolio();
   const [form, setForm] = useState<FormState>(initialForm);
   const filamentos = useFilamentos();
 
@@ -150,13 +150,12 @@ function Portfolio() {
       const gramas = parsed.data.pesoPeca * parsed.data.quantidade;
       abaterEstoqueFilamento(form.filamentoId, gramas);
     }
-    setProjects((list) => [{ ...parsed.data, id: crypto.randomUUID() }, ...list]);
+    addPortfolioProject({ ...parsed.data, id: crypto.randomUUID() });
     setForm(initialForm);
     toast.success("Projeto salvo no portfólio.");
   };
 
-  const remove = (id: string) =>
-    setProjects((list) => list.filter((p) => p.id !== id));
+  const remove = (id: string) => removePortfolioProject(id);
 
   const totals = useMemo(() => {
     return projects.reduce(
