@@ -29,11 +29,22 @@ export type Venda = {
 
 export type Filamento = {
   id: string;
-  nome: string;
+  sku: string;
+  marca: string;
+  cor: string;
   material: string;
   pesoInicial: number;
   pesoAtual: number;
   precoPago: number;
+  dataCompra: string;
+};
+
+export type Insumo = {
+  id: string;
+  nome: string;
+  dataCompra: string;
+  quantidade: string;
+  precoTotal: number;
 };
 
 export type PortfolioProject = {
@@ -94,13 +105,14 @@ const ordersStore = createStore<Order[]>("kurti:orders", INITIAL_ORDERS);
 const vendasStore = createStore<Venda[]>("kurti:vendas", []);
 
 const INITIAL_FILAMENTOS: Filamento[] = [
-  { id: "cyan",    nome: "PLA Cyan",    material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
-  { id: "magenta", nome: "PLA Magenta", material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
-  { id: "yellow",  nome: "PLA Yellow",  material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
+  { id: "cyan",    sku: "FIL-001", marca: "Creality", cor: "Cyan",    material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00, dataCompra: "2026-01-15" },
+  { id: "magenta", sku: "FIL-002", marca: "Creality", cor: "Magenta", material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00, dataCompra: "2026-01-15" },
+  { id: "yellow",  sku: "FIL-003", marca: "Creality", cor: "Yellow",  material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00, dataCompra: "2026-01-15" },
 ];
 
 const filamentosStore = createStore<Filamento[]>("kurti:filamentos", INITIAL_FILAMENTOS);
 const portfolioStore = createStore<PortfolioProject[]>("kurti:portfolio", []);
+const insumosStore = createStore<Insumo[]>("kurti:insumos", []);
 
 // ─── Hooks ───────────────────────────────────────────────────────────────────
 
@@ -118,6 +130,10 @@ export function useFilamentos(): Filamento[] {
 
 export function usePortfolio(): PortfolioProject[] {
   return useSyncExternalStore(portfolioStore.subscribe, portfolioStore.get, portfolioStore.get);
+}
+
+export function useInsumos(): Insumo[] {
+  return useSyncExternalStore(insumosStore.subscribe, insumosStore.get, insumosStore.get);
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -146,6 +162,14 @@ export function addFilamento(filamento: Filamento) {
 
 export function removeFilamento(id: string) {
   filamentosStore.set((prev) => prev.filter((f) => f.id !== id));
+}
+
+export function addInsumo(insumo: Insumo) {
+  insumosStore.set((prev) => [insumo, ...prev]);
+}
+
+export function removeInsumo(id: string) {
+  insumosStore.set((prev) => prev.filter((i) => i.id !== id));
 }
 
 export function setOrders(updater: Order[] | ((prev: Order[]) => Order[])) {
