@@ -253,7 +253,7 @@ function Portfolio() {
               <SelectContent>
                 {filamentos.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
-                    {f.nome} — {f.pesoAtual}g restantes
+                    {f.nome} (Restam {f.pesoAtual}g)
                   </SelectItem>
                 ))}
               </SelectContent>

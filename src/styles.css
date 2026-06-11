@@ -217,6 +217,16 @@
     border-radius: calc(1rem - 1.5px);
     background: var(--color-card);
   }
+
+  /* Progress bar color variants for stock alerts */
+  .progress-low [data-radix-progress-indicator],
+  .progress-low > [role="progressbar"] > div {
+    background: #ef4444 !important;
+  }
+  .progress-medium [data-radix-progress-indicator],
+  .progress-medium > [role="progressbar"] > div {
+    background: #e0a93b !important;
+  }
 }
 
 @keyframes filament-flow {

@@ -30,6 +30,7 @@ export type Venda = {
 export type Filamento = {
   id: string;
   nome: string;
+  material: string;
   pesoInicial: number;
   pesoAtual: number;
   precoPago: number;
@@ -93,9 +94,9 @@ const ordersStore = createStore<Order[]>("kurti:orders", INITIAL_ORDERS);
 const vendasStore = createStore<Venda[]>("kurti:vendas", []);
 
 const INITIAL_FILAMENTOS: Filamento[] = [
-  { id: "cyan",    nome: "Filamento PLA Cyan",    pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
-  { id: "magenta", nome: "Filamento PLA Magenta", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
-  { id: "yellow",  nome: "Filamento PLA Yellow",  pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
+  { id: "cyan",    nome: "PLA Cyan",    material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
+  { id: "magenta", nome: "PLA Magenta", material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
+  { id: "yellow",  nome: "PLA Yellow",  material: "PLA", pesoInicial: 1000, pesoAtual: 1000, precoPago: 120.00 },
 ];
 
 const filamentosStore = createStore<Filamento[]>("kurti:filamentos", INITIAL_FILAMENTOS);
@@ -137,6 +138,14 @@ export function abaterEstoqueFilamento(filamentoId: string, gramas: number) {
         : f,
     ),
   );
+}
+
+export function addFilamento(filamento: Filamento) {
+  filamentosStore.set((prev) => [...prev, filamento]);
+}
+
+export function removeFilamento(id: string) {
+  filamentosStore.set((prev) => prev.filter((f) => f.id !== id));
 }
 
 export function setOrders(updater: Order[] | ((prev: Order[]) => Order[])) {
