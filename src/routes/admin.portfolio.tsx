@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ExternalLink } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ type Category = (typeof CATEGORIES)[number];
 const schema = z.object({
   nome: z.string().trim().min(1, "Informe o nome do projeto").max(100),
   categoria: z.enum(CATEGORIES),
+  linkModelo: z.string().url("URL inválida").or(z.literal("")).optional(),
   custoRolo: z.number().min(0.01, "Custo do rolo inválido").max(100000),
   pesoRolo: z.number().min(1, "Peso do rolo inválido").max(100000),
   pesoPeca: z.number().min(0.1, "Peso da peça inválido").max(100000),
@@ -56,6 +57,7 @@ type Project = ProjectInput & { id: string };
 type FormState = {
   nome: string;
   categoria: Category;
+  linkModelo: string;
   filamentoId: string;
   custoRolo: string;
   pesoRolo: string;
@@ -68,6 +70,7 @@ type FormState = {
 const initialForm: FormState = {
   nome: "",
   categoria: "Chaveiro",
+  linkModelo: "",
   filamentoId: "",
   custoRolo: "",
   pesoRolo: "1000",
@@ -134,6 +137,7 @@ function Portfolio() {
     const parsed = schema.safeParse({
       nome: form.nome,
       categoria: form.categoria,
+      linkModelo: form.linkModelo || undefined,
       custoRolo: Number(form.custoRolo),
       pesoRolo: Number(form.pesoRolo),
       pesoPeca: Number(form.pesoPeca),
@@ -229,6 +233,14 @@ function Portfolio() {
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+          <Field label="Link do Modelo (MakerWorld/STL)" className="md:col-span-2">
+            <Input
+              value={form.linkModelo}
+              onChange={(e) => setField("linkModelo", e.target.value)}
+              placeholder="https://makerworld.com/en/models/..."
+              type="url"
+            />
           </Field>
           <Field label="Filamento (Rolo)" className="md:col-span-2">
             <Select
@@ -337,6 +349,7 @@ function Portfolio() {
               <TableRow>
                 <TableHead>Projeto</TableHead>
                 <TableHead>Categoria</TableHead>
+                <TableHead>Modelo</TableHead>
                 <TableHead className="text-right">Qtd.</TableHead>
                 <TableHead className="text-right">Custo/un.</TableHead>
                 <TableHead className="text-right">Custo lote</TableHead>
@@ -353,6 +366,22 @@ function Portfolio() {
                     <TableCell className="font-medium">{p.nome}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{p.categoria}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {p.linkModelo ? (
+                        <a
+                          href={p.linkModelo}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                          title={p.linkModelo}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Ver modelo</span>
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {p.quantidade}

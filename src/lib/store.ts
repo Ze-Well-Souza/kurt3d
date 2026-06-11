@@ -39,6 +39,7 @@ export type PortfolioProject = {
   id: string;
   nome: string;
   categoria: string;
+  linkModelo?: string;
   custoRolo: number;
   pesoRolo: number;
   pesoPeca: number;
