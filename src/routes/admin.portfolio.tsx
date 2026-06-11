@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { useFilamentos, abaterEstoqueFilamento } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/portfolio")({
   component: Portfolio,
@@ -55,6 +56,7 @@ type Project = ProjectInput & { id: string };
 type FormState = {
   nome: string;
   categoria: Category;
+  filamentoId: string;
   custoRolo: string;
   pesoRolo: string;
   pesoPeca: string;
@@ -66,6 +68,7 @@ type FormState = {
 const initialForm: FormState = {
   nome: "",
   categoria: "Chaveiro",
+  filamentoId: "",
   custoRolo: "",
   pesoRolo: "1000",
   pesoPeca: "",
@@ -78,14 +81,27 @@ function calc(p: {
   custoRolo: number;
   pesoRolo: number;
   pesoPeca: number;
+  tempoMin: number;
   quantidade: number;
   precoVenda: number;
 }) {
-  const custoUnidade = p.pesoRolo > 0 ? (p.custoRolo / p.pesoRolo) * p.pesoPeca : 0;
+  // Custo do Filamento por unidade
+  const custoFilamento = p.pesoRolo > 0 ? (p.custoRolo / p.pesoRolo) * p.pesoPeca : 0;
+
+  // Custo de Energia: (tempo em horas) * 0.095 kW (consumo A1) * R$ 0,75/kWh
+  const custoEnergia = (p.tempoMin / 60) * 0.095 * 0.75;
+
+  // Custo de Depreciação da Máquina: R$ 0,70 por hora de impressão
+  const custoDepreciacao = (p.tempoMin / 60) * 0.70;
+
+  // Custo fixo estimado (correntes de chaveiro + cola)
+  const custoFixo = 0.20;
+
+  const custoUnidade = custoFilamento + custoEnergia + custoDepreciacao + custoFixo;
   const custoLote = custoUnidade * p.quantidade;
   const receitaTotal = p.precoVenda * p.quantidade;
   const lucroLiquido = receitaTotal - custoLote;
-  return { custoUnidade, custoLote, receitaTotal, lucroLiquido };
+  return { custoUnidade, custoFilamento, custoEnergia, custoDepreciacao, custoFixo, custoLote, receitaTotal, lucroLiquido };
 }
 
 const brl = (n: number) =>
@@ -94,12 +110,14 @@ const brl = (n: number) =>
 function Portfolio() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState<FormState>(initialForm);
+  const filamentos = useFilamentos();
 
   const numeric = useMemo(
     () => ({
       custoRolo: Number(form.custoRolo) || 0,
       pesoRolo: Number(form.pesoRolo) || 0,
       pesoPeca: Number(form.pesoPeca) || 0,
+      tempoMin: Number(form.tempoMin) || 0,
       quantidade: Number(form.quantidade) || 0,
       precoVenda: Number(form.precoVenda) || 0,
     }),
@@ -126,6 +144,11 @@ function Portfolio() {
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
+    }
+    // Deduct filament stock: pesoPeca * quantidade from selected filament
+    if (form.filamentoId) {
+      const gramas = parsed.data.pesoPeca * parsed.data.quantidade;
+      abaterEstoqueFilamento(form.filamentoId, gramas);
     }
     setProjects((list) => [{ ...parsed.data, id: crypto.randomUUID() }, ...list]);
     setForm(initialForm);
@@ -208,6 +231,23 @@ function Portfolio() {
               </SelectContent>
             </Select>
           </Field>
+          <Field label="Filamento (Rolo)" className="md:col-span-2">
+            <Select
+              value={form.filamentoId}
+              onValueChange={(v) => setField("filamentoId", v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o rolo" />
+              </SelectTrigger>
+              <SelectContent>
+                {filamentos.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.nome} — {f.pesoAtual}g restantes
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
           <NumberField
             label="Custo do Rolo de Filamento (R$)"
@@ -251,18 +291,18 @@ function Portfolio() {
         {/* Dynamic Results */}
         <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-4">
           <ResultCard
-            label="Custo por Unidade"
-            value={brl(results.custoUnidade)}
+            label="Custo Filamento /un."
+            value={brl(results.custoFilamento)}
             accent="cyan"
+          />
+          <ResultCard
+            label="Energia + Depreciação"
+            value={brl(results.custoEnergia + results.custoDepreciacao)}
+            accent="yellow"
           />
           <ResultCard
             label="Custo Total do Lote"
             value={brl(results.custoLote)}
-            accent="yellow"
-          />
-          <ResultCard
-            label="Receita Total"
-            value={brl(results.receitaTotal)}
             accent="pink"
           />
           <ResultCard
