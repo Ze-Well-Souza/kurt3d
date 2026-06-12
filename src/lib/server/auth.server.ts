@@ -1,13 +1,10 @@
 import { randomBytes, randomUUID, scrypt } from "node:crypto";
 import { promisify } from "node:util";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-import { dataPath, nowIso } from "./db.server";
+import { nowIso } from "./db.server";
+import { getServerConfig } from "../config.server";
 import { usersRepo } from "./repositories.server";
 
 const scryptAsync = promisify(scrypt);
-
-const SESSION_SECRET_PATH = dataPath("session_secret.txt");
 
 type PasswordHash = {
   algo: "scrypt";
@@ -26,16 +23,10 @@ function decodeHash(raw: string): PasswordHash | null {
 }
 
 export async function ensureSessionPassword(): Promise<string> {
-  try {
-    const existing = await readFile(SESSION_SECRET_PATH, "utf-8");
-    const trimmed = existing.trim();
-    if (trimmed.length >= 32) return trimmed;
-  } catch {
+  const secret = getServerConfig().appSessionSecret.trim();
+  if (secret.length < 32) {
+    throw new Error("APP_SESSION_SECRET precisa ter pelo menos 32 caracteres");
   }
-
-  const secret = randomBytes(48).toString("base64url");
-  await mkdir(dirname(SESSION_SECRET_PATH), { recursive: true });
-  await writeFile(SESSION_SECRET_PATH, secret, "utf-8");
   return secret;
 }
 

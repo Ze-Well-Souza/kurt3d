@@ -17,10 +17,21 @@ import process from "node:process";
 //     VITE_ prefix. Never put secrets here — they ship to the browser.
 
 export function getServerConfig() {
+  const required = (name: string) => {
+    const value = process.env[name];
+    if (!value) {
+      throw new Error(`Missing required env var: ${name}`);
+    }
+    return value;
+  };
+
   return {
     nodeEnv: process.env.NODE_ENV,
-    // Add server-only values here, e.g.:
-    //   databaseUrl: process.env.DATABASE_URL,
-    //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    supabaseProjectRef: required("SUPABASE_PROJECT_REF"),
+    supabaseUrl: required("SUPABASE_URL"),
+    supabaseAnonKey: required("SUPABASE_ANON_KEY"),
+    supabaseServiceRoleKey: required("SUPABASE_SERVICE_ROLE_KEY"),
+    supabaseManagementToken: required("SUPABASE_MANAGEMENT_TOKEN"),
+    appSessionSecret: required("APP_SESSION_SECRET"),
   };
 }
