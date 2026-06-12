@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Wrench, TrendingUp, DollarSign, Package } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useVendas, useOrders, useFilamentos } from "@/lib/store";
+import { listSnapshot } from "@/lib/api/data.functions";
 
 export const Route = createFileRoute("/admin/finances")({
   component: Finances,
@@ -21,22 +22,25 @@ const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Finances() {
-  const vendas = useVendas();
-  const orders = useOrders();
-  const filamentos = useFilamentos();
+  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const vendas = snap.data?.vendas ?? [];
+  const orders = snap.data?.orders ?? [];
+  const filamentos = snap.data?.filamentos ?? [];
+  const expenses = snap.data?.expenses ?? [];
 
   const totals = useMemo(() => {
     const receita = vendas.reduce((s, v) => s + v.valor, 0);
     const custo = vendas.reduce((s, v) => s + v.custo, 0);
-    const lucro = receita - custo;
+    const despesas = expenses.reduce((s, e) => s + e.valor, 0);
+    const lucro = receita - custo - despesas;
     const depreciacaoAcumulada = vendas.reduce((s, v) => s + v.depreciacao, 0);
-    return { receita, custo, lucro, depreciacaoAcumulada };
-  }, [vendas]);
+    return { receita, custo, lucro, depreciacaoAcumulada, despesas };
+  }, [vendas, expenses]);
 
   // Stock summary
   const stockSummary = useMemo(() => {
     return filamentos.map((f) => ({
-      nome: f.nome,
+      nome: f.label ?? `[${f.sku}] ${f.marca} ${f.cor}`,
       used: f.pesoInicial - f.pesoAtual,
       remaining: f.pesoAtual,
       percent: f.pesoInicial > 0 ? ((f.pesoInicial - f.pesoAtual) / f.pesoInicial) * 100 : 0,
@@ -56,7 +60,7 @@ function Finances() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard
           icon={<DollarSign className="h-4 w-4" />}
           label="Receita Total"
@@ -74,6 +78,12 @@ function Finances() {
           label="Custo de Produção"
           value={brl(totals.custo)}
           color="var(--filament-yellow)"
+        />
+        <KpiCard
+          icon={<Wrench className="h-4 w-4" />}
+          label="Despesas (Insumos)"
+          value={brl(totals.despesas)}
+          color="var(--filament-magenta)"
         />
         <KpiCard
           icon={<Wrench className="h-4 w-4" />}

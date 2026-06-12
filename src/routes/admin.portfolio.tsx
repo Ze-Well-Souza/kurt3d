@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, ExternalLink } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -21,9 +22,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { useFilamentos, abaterEstoqueFilamento, usePortfolio, addPortfolioProject, removePortfolioProject } from "@/lib/store";
+import { addPortfolioProject, createOrderFromPortfolio, listSnapshot, removePortfolioProject } from "@/lib/api/data.functions";
 
 export const Route = createFileRoute("/admin/portfolio")({
   component: Portfolio,
@@ -111,9 +119,34 @@ const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Portfolio() {
-  const projects = usePortfolio();
+  const qc = useQueryClient();
+  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const projects = snap.data?.portfolio ?? [];
   const [form, setForm] = useState<FormState>(initialForm);
-  const filamentos = useFilamentos();
+  const filamentos = snap.data?.filamentos ?? [];
+
+  const mutateAddProject = useMutation({
+    mutationFn: (input: any) => addPortfolioProject({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const mutateRemoveProject = useMutation({
+    mutationFn: (id: string) => removePortfolioProject({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const mutateCreateOrder = useMutation({
+    mutationFn: (input: { portfolioProjectId: string; client: string; quantity: number }) =>
+      createOrderFromPortfolio({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const [orderDialog, setOrderDialog] = useState<{ open: boolean; projectId: string; client: string; quantity: string }>({
+    open: false,
+    projectId: "",
+    client: "",
+    quantity: "1",
+  });
 
   const numeric = useMemo(
     () => ({
@@ -149,17 +182,12 @@ function Portfolio() {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
-    // Deduct filament stock: pesoPeca * quantidade from selected filament
-    if (form.filamentoId) {
-      const gramas = parsed.data.pesoPeca * parsed.data.quantidade;
-      abaterEstoqueFilamento(form.filamentoId, gramas);
-    }
-    addPortfolioProject({ ...parsed.data, id: crypto.randomUUID() });
+    mutateAddProject.mutate({ ...parsed.data, filamentoId: form.filamentoId || undefined });
     setForm(initialForm);
     toast.success("Projeto salvo no portfólio.");
   };
 
-  const remove = (id: string) => removePortfolioProject(id);
+  const remove = (id: string) => mutateRemoveProject.mutate(id);
 
   const totals = useMemo(() => {
     return projects.reduce(
@@ -245,7 +273,14 @@ function Portfolio() {
           <Field label="Filamento (Rolo)" className="md:col-span-2">
             <Select
               value={form.filamentoId}
-              onValueChange={(v) => setField("filamentoId", v)}
+              onValueChange={(v) => {
+                setField("filamentoId", v);
+                const f = filamentos.find((x) => x.id === v);
+                if (f) {
+                  setField("custoRolo", String(f.precoPago));
+                  setField("pesoRolo", String(f.pesoInicial));
+                }
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o rolo" />
@@ -355,7 +390,7 @@ function Portfolio() {
                 <TableHead className="text-right">Custo lote</TableHead>
                 <TableHead className="text-right">Receita</TableHead>
                 <TableHead className="text-right">Lucro</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-32" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -403,14 +438,30 @@ function Portfolio() {
                       {brl(r.lucroLiquido)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => remove(p.id)}
-                        aria-label="Excluir projeto"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setOrderDialog({
+                              open: true,
+                              projectId: p.id,
+                              client: "",
+                              quantity: String(p.quantidade ?? 1),
+                            })
+                          }
+                        >
+                          Criar pedido
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => remove(p.id)}
+                          aria-label="Excluir projeto"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -419,6 +470,52 @@ function Portfolio() {
           </Table>
         )}
       </div>
+
+      <Dialog open={orderDialog.open} onOpenChange={(open) => setOrderDialog((s) => ({ ...s, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Criar pedido</DialogTitle>
+          </DialogHeader>
+          <form
+            className="grid gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              mutateCreateOrder.mutate({
+                portfolioProjectId: orderDialog.projectId,
+                client: orderDialog.client.trim() || "Cliente",
+                quantity: Number(orderDialog.quantity) || 1,
+              });
+              setOrderDialog((s) => ({ ...s, open: false }));
+              toast.success("Pedido criado na fila.");
+            }}
+          >
+            <div className="grid gap-2">
+              <Label>Cliente</Label>
+              <Input
+                value={orderDialog.client}
+                onChange={(e) => setOrderDialog((s) => ({ ...s, client: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Quantidade</Label>
+              <Input
+                type="number"
+                min={1}
+                value={orderDialog.quantity}
+                onChange={(e) => setOrderDialog((s) => ({ ...s, quantity: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOrderDialog((s) => ({ ...s, open: false }))}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="btn-filament">
+                Criar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

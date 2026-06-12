@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Package, Wrench } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -24,16 +25,8 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import {
-  useFilamentos,
-  useInsumos,
-  addFilamento,
-  removeFilamento,
-  addInsumo,
-  removeInsumo,
-  type Filamento,
-  type Insumo,
-} from "@/lib/store";
+import { addInsumo, listSnapshot, removeFilamento, removeInsumo, upsertFilamento } from "@/lib/api/data.functions";
+import type { Filamento, Insumo } from "@/lib/domain/types";
 
 export const Route = createFileRoute("/admin/stock")({
   component: Stock,
@@ -105,9 +98,33 @@ function generateSku(filamentos: Filamento[]): string {
   return `FIL-${String(max + 1).padStart(3, "0")}`;
 }
 
+type FilamentoView = Filamento & { reservedGrams?: number; disponivelGrams?: number; label?: string };
+
 function Stock() {
-  const filamentos = useFilamentos();
-  const insumos = useInsumos();
+  const qc = useQueryClient();
+  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const filamentos = (snap.data?.filamentos ?? []) as FilamentoView[];
+  const insumos = (snap.data?.insumos ?? []) as Insumo[];
+
+  const mutateFilamento = useMutation({
+    mutationFn: (input: z.infer<typeof filamentoSchema>) => upsertFilamento({ data: input as any }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const mutateRemoveFilamento = useMutation({
+    mutationFn: (id: string) => removeFilamento({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const mutateInsumo = useMutation({
+    mutationFn: (input: z.infer<typeof insumoSchema>) => addInsumo({ data: input as any }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const mutateRemoveInsumo = useMutation({
+    mutationFn: (id: string) => removeInsumo({ data: { id } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
 
   const [fForm, setFForm] = useState<FilamentoForm>(() => ({
     ...initialFilamentoForm,
@@ -138,25 +155,13 @@ function Stock() {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
-    const { sku, marca, cor, material, pesoInicial, precoPago, dataCompra } = parsed.data;
-    const filamento: Filamento = {
-      id: crypto.randomUUID(),
-      sku,
-      marca,
-      cor,
-      material,
-      pesoInicial,
-      pesoAtual: pesoInicial,
-      precoPago,
-      dataCompra,
-    };
-    addFilamento(filamento);
+    mutateFilamento.mutate(parsed.data);
     setFForm({
       ...initialFilamentoForm,
-      sku: generateSku([...filamentos, filamento]),
+      sku: generateSku(filamentos),
       dataCompra: new Date().toISOString().slice(0, 10),
     });
-    toast.success(`Rolo [${sku}] ${marca} ${cor} cadastrado.`);
+    toast.success(`Rolo [${parsed.data.sku}] cadastrado.`);
   };
 
   // ── Insumo submit ──
@@ -172,10 +177,9 @@ function Stock() {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
-    const insumo: Insumo = { id: crypto.randomUUID(), ...parsed.data };
-    addInsumo(insumo);
+    mutateInsumo.mutate(parsed.data);
     setIForm(initialInsumoForm);
-    toast.success(`Insumo "${insumo.nome}" cadastrado.`);
+    toast.success(`Insumo "${parsed.data.nome}" cadastrado.`);
   };
 
   // ── Summary stats ──
@@ -402,7 +406,7 @@ function Stock() {
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        removeFilamento(f.id);
+                        mutateRemoveFilamento.mutate(f.id);
                         toast.success("Filamento removido.");
                       }}
                       aria-label="Excluir filamento"
@@ -506,7 +510,7 @@ function Stock() {
                       size="icon"
                       variant="ghost"
                       onClick={() => {
-                        removeInsumo(i.id);
+                        mutateRemoveInsumo.mutate(i.id);
                         toast.success("Insumo removido.");
                       }}
                       aria-label="Excluir insumo"

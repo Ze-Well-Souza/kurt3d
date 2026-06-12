@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { useOrders, useVendas } from "@/lib/store";
+import { useQuery } from "@tanstack/react-query";
+import { listSnapshot } from "@/lib/api/data.functions";
 
 export const Route = createFileRoute("/admin/")({
   component: Dashboard,
@@ -10,8 +11,9 @@ const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Dashboard() {
-  const orders = useOrders();
-  const vendas = useVendas();
+  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const orders = snap.data?.orders ?? [];
+  const vendas = snap.data?.vendas ?? [];
 
   const stats = useMemo(() => {
     // Trabalhos ativos: orders with status todo or printing

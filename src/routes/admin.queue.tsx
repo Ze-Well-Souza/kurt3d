@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
   DragOverlay,
@@ -24,21 +25,23 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { listSnapshot, addOrder, finalizarDestino, updateOrderStatus } from "@/lib/api/data.functions";
+import type { Order, Status } from "@/lib/domain/types";
 import {
-  useOrders,
-  setOrders,
-  addOrder as addOrderAction,
-  finalizarDestino,
-  type Order,
-  type Status,
-} from "@/lib/store";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/admin/queue")({
   head: () => ({ meta: [{ title: "Fila de Pedidos — Kurti 3D" }] }),
   component: QueuePage,
 });
 
-const FILAMENT_SWATCHES: Record<string, string> = {  cyan: "var(--filament-cyan)",
+const FILAMENT_SWATCHES: Record<string, string> = {
+  cyan: "var(--filament-cyan)",
   magenta: "var(--filament-magenta)",
   yellow: "var(--filament-yellow)",
   pink: "var(--filament-pink)",
@@ -70,22 +73,28 @@ function formatTime(min: number) {
   return `${h}h ${m.toString().padStart(2, "0")}m`;
 }
 
-function ColorTags({ colors }: { colors: string[] }) {
+function FilamentTag({ label, color }: { label: string; color?: string }) {
   return (
-    <div className="flex items-center gap-1">
-      {colors.map((c, i) => (
-        <span
-          key={`${c}-${i}`}
-          title={c}
-          className="h-3.5 w-3.5 rounded-full border border-border shadow-sm"
-          style={{ background: FILAMENT_SWATCHES[c] ?? c }}
-        />
-      ))}
+    <div className="flex items-center gap-2">
+      <span
+        title={label}
+        className="h-3.5 w-3.5 rounded-full border border-border shadow-sm"
+        style={{ background: color ?? "var(--filament-cyan)" }}
+      />
+      <span className="text-[11px] text-muted-foreground">{label}</span>
     </div>
   );
 }
 
-function OrderCardView({ order, dragging = false }: { order: Order; dragging?: boolean }) {
+function OrderCardView({
+  order,
+  dragging = false,
+  onFinalizar,
+}: {
+  order: Order;
+  dragging?: boolean;
+  onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number }) => Promise<unknown>;
+}) {
   const [showDestino, setShowDestino] = useState(false);
   const [destinoValor, setDestinoValor] = useState("");
 
@@ -102,13 +111,18 @@ function OrderCardView({ order, dragging = false }: { order: Order; dragging?: b
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{order.project}</p>
+            <p className="truncate text-sm font-semibold text-foreground">{order.projectName}</p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <User className="h-3 w-3" />
               <span className="truncate">{order.client}</span>
             </p>
           </div>
-          <ColorTags colors={order.colors} />
+          <div className="shrink-0">
+            <FilamentTag
+              label={order.filamentoId ? `Filamento ${order.filamentoId}` : "Sem filamento"}
+              color={order.filamentoId ? FILAMENT_SWATCHES[order.filamentoId] : undefined}
+            />
+          </div>
         </div>
 
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
@@ -158,7 +172,7 @@ function OrderCardView({ order, dragging = false }: { order: Order; dragging?: b
       <Dialog open={showDestino} onOpenChange={setShowDestino}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Destino de "{order.project}"</DialogTitle>
+            <DialogTitle>Destino de "{order.projectName}"</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
@@ -169,7 +183,7 @@ function OrderCardView({ order, dragging = false }: { order: Order; dragging?: b
                 variant="outline"
                 className="justify-start gap-2"
                 onClick={() => {
-                  finalizarDestino(order.id, "Dado de Presente");
+                  onFinalizar({ orderId: order.id, destino: "Dado de Presente" });
                   setShowDestino(false);
                 }}
               >
@@ -179,7 +193,7 @@ function OrderCardView({ order, dragging = false }: { order: Order; dragging?: b
                 variant="outline"
                 className="justify-start gap-2"
                 onClick={() => {
-                  finalizarDestino(order.id, "Falha de Impressão");
+                  onFinalizar({ orderId: order.id, destino: "Falha de Impressão" });
                   setShowDestino(false);
                 }}
               >
@@ -202,7 +216,11 @@ function OrderCardView({ order, dragging = false }: { order: Order; dragging?: b
                 className="btn-filament w-full gap-2"
                 disabled={!destinoValor || Number(destinoValor) <= 0}
                 onClick={() => {
-                  finalizarDestino(order.id, "Kurtido e Vendido", Number(destinoValor));
+                  onFinalizar({
+                    orderId: order.id,
+                    destino: "Kurtido e Vendido",
+                    valorRecebido: Number(destinoValor),
+                  });
                   setShowDestino(false);
                 }}
               >
@@ -216,7 +234,13 @@ function OrderCardView({ order, dragging = false }: { order: Order; dragging?: b
   );
 }
 
-function DraggableCard({ order }: { order: Order }) {
+function DraggableCard({
+  order,
+  onFinalizar,
+}: {
+  order: Order;
+  onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number }) => Promise<unknown>;
+}) {
   const isTerminal = ["vendido", "presente", "falha"].includes(order.status);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: order.id,
@@ -229,12 +253,24 @@ function DraggableCard({ order }: { order: Order }) {
       {...listeners}
       className={cn("touch-none", isDragging && "opacity-40")}
     >
-      <OrderCardView order={order} />
+      <OrderCardView order={order} onFinalizar={onFinalizar} />
     </div>
   );
 }
 
-function Column({ id, title, hint, orders }: { id: Status; title: string; hint: string; orders: Order[] }) {
+function Column({
+  id,
+  title,
+  hint,
+  orders,
+  onFinalizar,
+}: {
+  id: Status;
+  title: string;
+  hint: string;
+  orders: Order[];
+  onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number }) => Promise<unknown>;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const totalTime = orders.reduce((s, o) => s + o.timeMinutes, 0);
 
@@ -265,7 +301,7 @@ function Column({ id, title, hint, orders }: { id: Status; title: string; hint: 
         )}
       >
         {orders.map((o) => (
-          <DraggableCard key={o.id} order={o} />
+          <DraggableCard key={o.id} order={o} onFinalizar={onFinalizar} />
         ))}
         {orders.length === 0 && (
           <p className="grid flex-1 place-items-center text-center text-xs text-muted-foreground">
@@ -278,9 +314,46 @@ function Column({ id, title, hint, orders }: { id: Status; title: string; hint: 
 }
 
 function QueuePage() {
-  const orders = useOrders();
+  const qc = useQueryClient();
+  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const orders = snap.data?.orders ?? [];
+  const filamentos = snap.data?.filamentos ?? [];
+
+  const mutateStatus = useMutation({
+    mutationFn: (input: { orderId: string; status: "todo" | "printing" | "done" }) =>
+      updateOrderStatus({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const mutateAddOrder = useMutation({
+    mutationFn: (input: {
+      client: string;
+      projectName: string;
+      quantity: number;
+      timeMinutes: number;
+      filamentoId?: string;
+      gramsPerUnit?: number;
+    }) => addOrder({ data: input }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
+  const mutateFinalizar = useMutation({
+    mutationFn: (input: { orderId: string; destino: string; valorRecebido?: number }) =>
+      finalizarDestino({ data: input as any }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
+
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const [showNewOrder, setShowNewOrder] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    client: "",
+    projectName: "",
+    quantity: "1",
+    timeMinutes: "60",
+    filamentoId: "",
+    gramsPerUnit: "5",
+  });
 
   const grouped = useMemo(() => {
     const g: Record<Status, Order[]> = { todo: [], printing: [], done: [], vendido: [], presente: [], falha: [] };
@@ -300,21 +373,21 @@ function QueuePage() {
     if (!over) return;
     const status = over.id as Status;
     if (!["todo", "printing", "done"].includes(status)) return;
-    setOrders((prev) =>
-      prev.map((o) => (o.id === active.id && o.status !== status ? { ...o, status } : o)),
-    );
+    mutateStatus.mutate({ orderId: String(active.id), status });
   }
 
-  function addNewOrder() {
-    addOrderAction({
-      id: `o${Date.now()}`,
-      client: "Novo cliente",
-      project: "Novo pedido",
-      quantity: 1,
-      timeMinutes: 60,
-      colors: ["cyan", "pink"],
-      status: "todo",
+  function submitNewOrder(e: React.FormEvent) {
+    e.preventDefault();
+    mutateAddOrder.mutate({
+      client: newOrder.client.trim() || "Cliente",
+      projectName: newOrder.projectName.trim() || "Pedido",
+      quantity: Number(newOrder.quantity) || 1,
+      timeMinutes: Number(newOrder.timeMinutes) || 60,
+      filamentoId: newOrder.filamentoId || undefined,
+      gramsPerUnit: newOrder.gramsPerUnit ? Number(newOrder.gramsPerUnit) : undefined,
     });
+    setShowNewOrder(false);
+    setNewOrder({ client: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5" });
   }
 
   const terminalOrders = [
@@ -332,23 +405,109 @@ function QueuePage() {
             Arraste os cartões entre as colunas para atualizar o status de cada pedido.
           </p>
         </div>
-        <Button onClick={addNewOrder} className="btn-filament gap-2">
+        <Button onClick={() => setShowNewOrder(true)} className="btn-filament gap-2">
           <Plus className="h-4 w-4" />
           Novo pedido
         </Button>
       </div>
 
+      <Dialog open={showNewOrder} onOpenChange={setShowNewOrder}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Novo pedido</DialogTitle>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={submitNewOrder}>
+            <div className="grid gap-2">
+              <Label>Cliente</Label>
+              <Input value={newOrder.client} onChange={(e) => setNewOrder((s) => ({ ...s, client: e.target.value }))} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Projeto</Label>
+              <Input
+                value={newOrder.projectName}
+                onChange={(e) => setNewOrder((s) => ({ ...s, projectName: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Quantidade</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={newOrder.quantity}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, quantity: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Tempo (min)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={newOrder.timeMinutes}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, timeMinutes: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Filamento</Label>
+                <Select value={newOrder.filamentoId} onValueChange={(v) => setNewOrder((s) => ({ ...s, filamentoId: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filamentos.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Gramas por unidade (estim.)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={newOrder.gramsPerUnit}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, gramsPerUnit: e.target.value }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowNewOrder(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="btn-filament">
+                Criar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {COLUMNS.map((col) => (
-            <Column key={col.id} id={col.id} title={col.title} hint={col.hint} orders={grouped[col.id]} />
+            <Column
+              key={col.id}
+              id={col.id}
+              title={col.title}
+              hint={col.hint}
+              orders={grouped[col.id]}
+              onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)}
+            />
           ))}
         </div>
 
         <DragOverlay>
           {activeOrder ? (
             <div className="w-[280px]">
-              <OrderCardView order={activeOrder} dragging />
+              <OrderCardView
+                order={activeOrder}
+                dragging
+                onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)}
+              />
             </div>
           ) : null}
         </DragOverlay>
@@ -362,7 +521,7 @@ function QueuePage() {
               <Card key={o.id} className="filament-top border-border bg-card p-3">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{o.project}</p>
+                    <p className="truncate text-sm font-semibold">{o.projectName}</p>
                     <p className="text-xs text-muted-foreground">{o.client}</p>
                   </div>
                   <span
