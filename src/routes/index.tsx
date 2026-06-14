@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play } from "lucide-react";
+import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle } from "lucide-react";
 import { KurtiLogo } from "@/components/KurtiLogo";
 import { usePortfolio } from "@/lib/store";
 import heroImg from "@/assets/hero-printer.jpg";
@@ -255,20 +255,15 @@ function Contact() {
   return (
     <section id="contact" className="bg-card/50">
       <div className="filament-divider" />
-      <div className="mx-auto grid max-w-7xl gap-12 px-6 py-24 lg:grid-cols-2">
-        <div>
+      <div className="mx-auto max-w-2xl px-6 py-24">
+        <div className="mb-10 text-center">
           <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-cyan)" }}>Contato</div>
           <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
             Tem uma peça em mente?
           </h2>
-          <p className="mt-4 max-w-md text-muted-foreground">
+          <p className="mt-4 text-muted-foreground">
             Envie seu STL ou apenas um esboço — retornamos com orçamento e prazo em até 24 horas.
           </p>
-          <dl className="mt-8 space-y-3 text-sm">
-            <div className="flex gap-3"><dt className="w-24 text-muted-foreground">E-mail</dt><dd>contato@kurti3d.com.br</dd></div>
-            <div className="flex gap-3"><dt className="w-24 text-muted-foreground">Estúdio</dt><dd>São Paulo, SP</dd></div>
-            <div className="flex gap-3"><dt className="w-24 text-muted-foreground">Horário</dt><dd>Seg–Sex · 9h–18h</dd></div>
-          </dl>
         </div>
         <form
           onSubmit={(e) => {
@@ -288,16 +283,16 @@ function Contact() {
               <Input id="name" required placeholder="Seu nome" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" required placeholder="voce@email.com" />
+              <Label htmlFor="whatsapp">WhatsApp</Label>
+              <Input id="whatsapp" type="tel" required placeholder="(11) 99999-9999" />
             </div>
           </div>
           <div className="mt-4 space-y-2">
-            <Label htmlFor="project">Projeto</Label>
+            <Label htmlFor="project">Mensagem</Label>
             <Textarea id="project" required rows={5} placeholder="Conte sobre a peça, material, quantidade…" />
           </div>
-          <button type="submit" disabled={loading} className="btn-filament mt-6 inline-flex h-12 w-full items-center justify-center text-sm font-semibold disabled:opacity-60">
-            {loading ? "Enviando…" : "Enviar mensagem"}
+          <button type="submit" disabled={loading} className="btn-filament mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-sm font-semibold disabled:opacity-60">
+            {loading ? "Enviando…" : <><MessageCircle className="h-4 w-4" />Enviar mensagem</>}
           </button>
         </form>
       </div>
