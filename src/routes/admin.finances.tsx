@@ -177,7 +177,7 @@ function Finances() {
                 const lucro = v.valor - v.custo;
                 return (
                   <TableRow key={v.id}>
-                    <TableCell className="font-medium">{v.project}</TableCell>
+                    <TableCell className="font-medium">{v.projectName}</TableCell>
                     <TableCell className="text-muted-foreground">{v.client}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {brl(v.valor)}

@@ -16,7 +16,28 @@ create table if not exists public.filamentos (
   peso_atual double precision not null,
   preco_pago double precision not null,
   data_compra text not null,
+  data_fim text null,
+  qualidade text null,
+  comentario text null,
+  link_produto text null,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.filamentos_history (
+  id text primary key,
+  sku text not null,
+  marca text not null,
+  cor text not null,
+  material text not null,
+  peso_inicial double precision not null,
+  peso_atual double precision not null,
+  preco_pago double precision not null,
+  data_compra text not null,
+  data_fim text null,
+  qualidade text null,
+  comentario text null,
+  link_produto text null,
+  arquivado_at timestamptz not null default now()
 );
 
 create table if not exists public.orders (
@@ -56,7 +77,8 @@ create table if not exists public.insumos (
   nome text not null,
   data_compra text not null,
   quantidade text not null,
-  preco_total double precision not null
+  preco_total double precision not null,
+  link_produto text null
 );
 
 create table if not exists public.vendas (
@@ -93,3 +115,4 @@ create index if not exists idx_orders_created_at on public.orders(created_at des
 create index if not exists idx_inventory_txns_film_order on public.inventory_txns(filament_id, order_id);
 create index if not exists idx_vendas_data on public.vendas(data desc);
 create index if not exists idx_expenses_data on public.expenses(data desc);
+create index if not exists idx_filamentos_history_arquivado on public.filamentos_history(arquivado_at desc);

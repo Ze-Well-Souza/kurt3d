@@ -2,10 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../domain/cost";
-import type { Expense, Filamento, Insumo, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
+import type { Expense, Filamento, FilamentoQualidade, Insumo, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
 import { clampGrams, computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "../server/db.server";
-import { expensesRepo, filamentosRepo, insumosRepo, inventoryRepo, ordersRepo, portfolioRepo, vendasRepo } from "../server/repositories.server";
+import { expensesRepo, filamentosHistoryRepo, filamentosRepo, insumosRepo, inventoryRepo, ordersRepo, portfolioRepo, vendasRepo } from "../server/repositories.server";
 
 function buildFilamentoLabel(f: Filamento) {
   return `[${f.sku}] ${f.marca} ${f.cor}`;
@@ -36,9 +36,10 @@ function computeOrderReservedGrams(txns: { orderId: string; filamentId: string; 
 }
 
 export const listSnapshot = createServerFn({ method: "GET" }).handler(async () => {
-  const [orders, filamentos, portfolio, insumos, vendas, inv, expenses] = await Promise.all([
+  const [orders, filamentos, filamentosHistory, portfolio, insumos, vendas, inv, expenses] = await Promise.all([
     ordersRepo(),
     filamentosRepo(),
+    filamentosHistoryRepo(),
     portfolioRepo(),
     insumosRepo(),
     vendasRepo(),
@@ -57,6 +58,7 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
   return {
     orders: orders.list,
     filamentos: filamentosView,
+    filamentosHistory: filamentosHistory.list,
     portfolio: portfolio.list,
     insumos: insumos.list,
     vendas: vendas.list,
@@ -75,6 +77,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       pesoInicial: z.number().min(1).max(100000),
       precoPago: z.number().min(0.01).max(100000),
       dataCompra: z.string().min(1).max(30),
+      linkProduto: z.string().url().max(500).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -91,6 +94,10 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       pesoAtual: existing ? existing.pesoAtual : data.pesoInicial,
       precoPago: data.precoPago,
       dataCompra: data.dataCompra,
+      dataFim: existing?.dataFim ?? null,
+      qualidade: existing?.qualidade ?? null,
+      comentario: existing?.comentario ?? null,
+      linkProduto: data.linkProduto ?? existing?.linkProduto ?? null,
     };
     const next = existing ? repo.list.map((f) => (f.id === id ? filamento : f)) : [...repo.list, filamento];
     await repo.save(next);
@@ -105,6 +112,54 @@ export const removeFilamento = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const archiveFilamento = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      id: z.string().min(1),
+      qualidade: z.enum(["bom", "medio", "ruim"]).optional(),
+      comentario: z.string().max(500).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const repo = await filamentosRepo();
+    const filamento = repo.list.find((f) => f.id === data.id);
+    if (!filamento) return { ok: false as const, reason: "not_found" as const };
+
+    const updatedFilamento: Filamento = {
+      ...filamento,
+      qualidade: (data.qualidade as FilamentoQualidade) ?? filamento.qualidade,
+      comentario: data.comentario ?? filamento.comentario,
+      dataFim: new Date().toISOString().slice(0, 10),
+    };
+
+    const historyRepo = await filamentosHistoryRepo();
+    await historyRepo.archive(updatedFilamento);
+    return { ok: true as const };
+  });
+
+export const updateFilamentoQualidade = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      id: z.string().min(1),
+      qualidade: z.enum(["bom", "medio", "ruim"]).optional(),
+      comentario: z.string().max(500).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const repo = await filamentosRepo();
+    const filamento = repo.list.find((f) => f.id === data.id);
+    if (!filamento) return { ok: false as const, reason: "not_found" as const };
+
+    const updated: Filamento = {
+      ...filamento,
+      qualidade: data.qualidade !== undefined ? (data.qualidade as FilamentoQualidade) : filamento.qualidade,
+      comentario: data.comentario !== undefined ? data.comentario : filamento.comentario,
+    };
+
+    await repo.save(repo.list.map((f) => (f.id === data.id ? updated : f)));
+    return { ok: true as const };
+  });
+
 export const addInsumo = createServerFn({ method: "POST" })
   .validator(
     z.object({
@@ -112,11 +167,19 @@ export const addInsumo = createServerFn({ method: "POST" })
       dataCompra: z.string().min(1).max(30),
       quantidade: z.string().trim().min(1).max(100),
       precoTotal: z.number().min(0.01).max(1000000),
+      linkProduto: z.string().url().max(500).optional(),
     }),
   )
   .handler(async ({ data }) => {
     const repo = await insumosRepo();
-    const insumo: Insumo = { id: randomUUID(), ...data };
+    const insumo: Insumo = {
+      id: randomUUID(),
+      nome: data.nome,
+      dataCompra: data.dataCompra,
+      quantidade: data.quantidade,
+      precoTotal: data.precoTotal,
+      linkProduto: data.linkProduto ?? null,
+    };
     await repo.save([insumo, ...repo.list]);
 
     const expRepo = await expensesRepo();

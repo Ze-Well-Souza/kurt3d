@@ -31,6 +31,8 @@ export type Venda = {
   data: string;
 };
 
+export type FilamentoQualidade = "bom" | "medio" | "ruim";
+
 export type Filamento = {
   id: string;
   sku: string;
@@ -41,6 +43,14 @@ export type Filamento = {
   pesoAtual: number;
   precoPago: number;
   dataCompra: string;
+  dataFim?: string | null;
+  qualidade?: FilamentoQualidade | null;
+  comentario?: string | null;
+  linkProduto?: string | null;
+};
+
+export type FilamentoHistory = Filamento & {
+  arquivadoAt: string;
 };
 
 export type Insumo = {
@@ -49,6 +59,7 @@ export type Insumo = {
   dataCompra: string;
   quantidade: string;
   precoTotal: number;
+  linkProduto?: string | null;
 };
 
 export type PortfolioProject = {

@@ -15,10 +15,10 @@ import {
 
 const items = [
   { title: "Painel", url: "/admin", icon: LayoutDashboard },
+  { title: "Estoque de Filamentos", url: "/admin/stock", icon: Layers },
   { title: "Fila de Pedidos", url: "/admin/queue", icon: ListChecks },
   { title: "Finanças", url: "/admin/finances", icon: Wallet },
   { title: "Gerenciar Portfólio", url: "/admin/portfolio", icon: Images },
-  { title: "Estoque de Filamentos", url: "/admin/stock", icon: Layers },
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 

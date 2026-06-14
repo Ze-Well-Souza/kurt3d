@@ -70,7 +70,7 @@ function Dashboard() {
             {recentActivity.map((o) => (
               <li key={o.id} className="flex items-center justify-between py-2.5 text-sm">
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{o.project}</p>
+                  <p className="truncate font-medium">{o.projectName}</p>
                   <p className="text-xs text-muted-foreground">{o.client}</p>
                 </div>
                 <div className="shrink-0 text-right">

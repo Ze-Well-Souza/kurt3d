@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { Expense, Filamento, Insumo, InventoryTxn, Order, PortfolioProject, Venda } from "../domain/types";
+import type { Expense, Filamento, FilamentoHistory, Insumo, InventoryTxn, Order, PortfolioProject, Venda } from "../domain/types";
 import { computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "./db.server";
 import { getSupabaseAdminClient } from "./supabase.server";
@@ -12,86 +12,6 @@ export type User = {
   createdAt: string;
   updatedAt: string;
 };
-
-function seedFilamentos(): Filamento[] {
-  return [
-    {
-      id: "cyan",
-      sku: "FIL-001",
-      marca: "Creality",
-      cor: "Cyan",
-      material: "PLA",
-      pesoInicial: 1000,
-      pesoAtual: 1000,
-      precoPago: 120,
-      dataCompra: "2026-01-15",
-    },
-    {
-      id: "magenta",
-      sku: "FIL-002",
-      marca: "Creality",
-      cor: "Magenta",
-      material: "PLA",
-      pesoInicial: 1000,
-      pesoAtual: 1000,
-      precoPago: 120,
-      dataCompra: "2026-01-15",
-    },
-    {
-      id: "yellow",
-      sku: "FIL-003",
-      marca: "Creality",
-      cor: "Yellow",
-      material: "PLA",
-      pesoInicial: 1000,
-      pesoAtual: 1000,
-      precoPago: 120,
-      dataCompra: "2026-01-15",
-    },
-  ];
-}
-
-function seedOrders(): Order[] {
-  const createdAt = nowIso();
-  return [
-    {
-      id: "o1",
-      client: "Marina Souza",
-      projectName: "Chaveiros Toy Story",
-      quantity: 12,
-      timeMinutes: 270,
-      status: "todo",
-      createdAt,
-      updatedAt: createdAt,
-      filamentoId: "yellow",
-      gramsPerUnit: 5,
-    },
-    {
-      id: "o2",
-      client: "Pedro Lima",
-      projectName: "Vaso Geométrico",
-      quantity: 2,
-      timeMinutes: 480,
-      status: "todo",
-      createdAt,
-      updatedAt: createdAt,
-      filamentoId: "cyan",
-      gramsPerUnit: 60,
-    },
-    {
-      id: "o3",
-      client: "Atelier Bambu",
-      projectName: "Suporte de Celular",
-      quantity: 6,
-      timeMinutes: 180,
-      status: "printing",
-      createdAt,
-      updatedAt: createdAt,
-      filamentoId: "magenta",
-      gramsPerUnit: 15,
-    },
-  ];
-}
 
 function unwrap<T>(result: { data: T | null; error: PostgrestError | null }): T {
   if (result.error) {
@@ -149,6 +69,10 @@ function fromFilamentoRow(row: any): Filamento {
     pesoAtual: row.peso_atual,
     precoPago: row.preco_pago,
     dataCompra: row.data_compra,
+    dataFim: row.data_fim ?? null,
+    qualidade: row.qualidade ?? null,
+    comentario: row.comentario ?? null,
+    linkProduto: row.link_produto ?? null,
   };
 }
 
@@ -163,6 +87,48 @@ function toFilamentoRow(row: Filamento) {
     peso_atual: row.pesoAtual,
     preco_pago: row.precoPago,
     data_compra: row.dataCompra,
+    data_fim: row.dataFim ?? null,
+    qualidade: row.qualidade ?? null,
+    comentario: row.comentario ?? null,
+    link_produto: row.linkProduto ?? null,
+  };
+}
+
+function fromFilamentoHistoryRow(row: any): FilamentoHistory {
+  return {
+    id: row.id,
+    sku: row.sku,
+    marca: row.marca,
+    cor: row.cor,
+    material: row.material,
+    pesoInicial: row.peso_inicial,
+    pesoAtual: row.peso_atual,
+    precoPago: row.preco_pago,
+    dataCompra: row.data_compra,
+    dataFim: row.data_fim ?? null,
+    qualidade: row.qualidade ?? null,
+    comentario: row.comentario ?? null,
+    linkProduto: row.link_produto ?? null,
+    arquivadoAt: row.arquivado_at,
+  };
+}
+
+function toFilamentoHistoryRow(row: FilamentoHistory) {
+  return {
+    id: row.id,
+    sku: row.sku,
+    marca: row.marca,
+    cor: row.cor,
+    material: row.material,
+    peso_inicial: row.pesoInicial,
+    peso_atual: row.pesoAtual,
+    preco_pago: row.precoPago,
+    data_compra: row.dataCompra,
+    data_fim: row.dataFim ?? null,
+    qualidade: row.qualidade ?? null,
+    comentario: row.comentario ?? null,
+    link_produto: row.linkProduto ?? null,
+    arquivado_at: row.arquivadoAt,
   };
 }
 
@@ -245,6 +211,7 @@ function fromInsumoRow(row: any): Insumo {
     dataCompra: row.data_compra,
     quantidade: row.quantidade,
     precoTotal: row.preco_total,
+    linkProduto: row.link_produto ?? null,
   };
 }
 
@@ -255,6 +222,7 @@ function toInsumoRow(row: Insumo) {
     data_compra: row.dataCompra,
     quantidade: row.quantidade,
     preco_total: row.precoTotal,
+    link_produto: row.linkProduto ?? null,
   };
 }
 
@@ -342,14 +310,8 @@ export async function usersRepo() {
 
 export async function filamentosRepo() {
   const supabase = getSupabaseAdminClient();
-  let rows = unwrap(await supabase.from("filamentos").select("*").order("created_at", { ascending: false }));
-  let list = (rows as any[]).map(fromFilamentoRow);
-  if (list.length === 0) {
-    list = seedFilamentos();
-    await replaceById("filamentos", list.map(toFilamentoRow));
-    rows = unwrap(await supabase.from("filamentos").select("*").order("created_at", { ascending: false }));
-    list = (rows as any[]).map(fromFilamentoRow);
-  }
+  const rows = unwrap(await supabase.from("filamentos").select("*").order("created_at", { ascending: false }));
+  const list = (rows as any[]).map(fromFilamentoRow);
   return {
     list,
     async save(next: Filamento[]) {
@@ -358,16 +320,33 @@ export async function filamentosRepo() {
   };
 }
 
+export async function filamentosHistoryRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrap(await supabase.from("filamentos_history").select("*").order("arquivado_at", { ascending: false }));
+  const list = (rows as any[]).map(fromFilamentoHistoryRow);
+  return {
+    list,
+    async save(next: FilamentoHistory[]) {
+      await replaceById("filamentos_history", next.map(toFilamentoHistoryRow));
+    },
+    async archive(filamento: Filamento) {
+      const historyRow: FilamentoHistory = {
+        ...filamento,
+        arquivadoAt: nowIso(),
+      };
+      unwrap(await supabase.from("filamentos_history").insert(toFilamentoHistoryRow(historyRow)));
+      // Remove from active filamentos
+      const fRepo = await filamentosRepo();
+      await fRepo.save(fRepo.list.filter((f) => f.id !== filamento.id));
+      return historyRow;
+    },
+  };
+}
+
 export async function ordersRepo() {
   const supabase = getSupabaseAdminClient();
-  let rows = unwrap(await supabase.from("orders").select("*").order("created_at", { ascending: false }));
-  let list = (rows as any[]).map(fromOrderRow);
-  if (list.length === 0) {
-    list = seedOrders();
-    await replaceById("orders", list.map(toOrderRow));
-    rows = unwrap(await supabase.from("orders").select("*").order("created_at", { ascending: false }));
-    list = (rows as any[]).map(fromOrderRow);
-  }
+  const rows = unwrap(await supabase.from("orders").select("*").order("created_at", { ascending: false }));
+  const list = (rows as any[]).map(fromOrderRow);
   return {
     list,
     async save(next: Order[]) {
