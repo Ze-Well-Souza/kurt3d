@@ -53,7 +53,12 @@ create table if not exists public.orders (
   filamento_id text null,
   grams_per_unit double precision null,
   valor_recebido double precision null,
-  destino text null
+  destino text null,
+  link_projeto text null,
+  multi_part boolean null default false,
+  preco_venda double precision null,
+  forma_pagamento text null,
+  data_pagamento text null
 );
 
 create table if not exists public.portfolio_projects (
@@ -68,6 +73,7 @@ create table if not exists public.portfolio_projects (
   tempo_min double precision not null,
   quantidade integer not null,
   preco_venda double precision not null,
+  perda_percent double precision null default 0,
   created_at timestamptz not null,
   updated_at timestamptz not null
 );
@@ -109,6 +115,21 @@ create table if not exists public.expenses (
   data text not null,
   descricao text not null
 );
+
+create table if not exists public.app_settings (
+  id text primary key default 'main',
+  studio_nome text not null default 'Kurti 3D',
+  impressora_modelo text not null default 'Bambu Lab A1',
+  consumo_kw double precision not null default 0.095,
+  tarifa_energia_kwh double precision not null default 0.75,
+  depreciacao_hora double precision not null default 0.70,
+  custo_fixo_unidade double precision not null default 0.20,
+  default_peso_rolo double precision not null default 1000,
+  default_quantidade integer not null default 10,
+  check (id = 'main')
+);
+
+insert into public.app_settings (id) values ('main') on conflict (id) do nothing;
 
 create index if not exists idx_orders_status on public.orders(status);
 create index if not exists idx_orders_created_at on public.orders(created_at desc);

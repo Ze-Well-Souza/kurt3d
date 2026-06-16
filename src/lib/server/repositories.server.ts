@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { Expense, Filamento, FilamentoHistory, Insumo, InventoryTxn, Order, PortfolioProject, Venda } from "../domain/types";
+import type { AppSettings, Expense, Filamento, FilamentoHistory, Insumo, InventoryTxn, Order, PortfolioProject, Venda } from "../domain/types";
+import { DEFAULT_APP_SETTINGS } from "../domain/types";
 import { computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "./db.server";
 import { getSupabaseAdminClient } from "./supabase.server";
@@ -147,6 +148,11 @@ function fromOrderRow(row: any): Order {
     gramsPerUnit: row.grams_per_unit ?? undefined,
     valorRecebido: row.valor_recebido ?? undefined,
     destino: row.destino ?? undefined,
+    linkProjeto: row.link_projeto ?? null,
+    multiPart: row.multi_part ?? false,
+    precoVenda: row.preco_venda ?? null,
+    formaPagamento: row.forma_pagamento ?? null,
+    dataPagamento: row.data_pagamento ?? null,
   };
 }
 
@@ -165,6 +171,11 @@ function toOrderRow(row: Order) {
     grams_per_unit: row.gramsPerUnit ?? null,
     valor_recebido: row.valorRecebido ?? null,
     destino: row.destino ?? null,
+    link_projeto: row.linkProjeto ?? null,
+    multi_part: row.multiPart ?? false,
+    preco_venda: row.precoVenda ?? null,
+    forma_pagamento: row.formaPagamento ?? null,
+    data_pagamento: row.dataPagamento ?? null,
   };
 }
 
@@ -181,6 +192,7 @@ function fromPortfolioRow(row: any): PortfolioProject {
     tempoMin: row.tempo_min,
     quantidade: row.quantidade,
     precoVenda: row.preco_venda,
+    perdaPercent: row.perda_percent ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -199,6 +211,7 @@ function toPortfolioRow(row: PortfolioProject) {
     tempo_min: row.tempoMin,
     quantidade: row.quantidade,
     preco_venda: row.precoVenda,
+    perda_percent: row.perdaPercent ?? 0,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   };
@@ -416,6 +429,47 @@ export async function expensesRepo() {
     list,
     async save(next: Expense[]) {
       await replaceById("expenses", next.map(toExpenseRow));
+    },
+  };
+}
+
+function fromSettingsRow(row: any): AppSettings {
+  return {
+    studioNome: row.studio_nome ?? DEFAULT_APP_SETTINGS.studioNome,
+    impressoraModelo: row.impressora_modelo ?? DEFAULT_APP_SETTINGS.impressoraModelo,
+    consumoKw: row.consumo_kw ?? DEFAULT_APP_SETTINGS.consumoKw,
+    tarifaEnergiaKwh: row.tarifa_energia_kwh ?? DEFAULT_APP_SETTINGS.tarifaEnergiaKwh,
+    depreciacaoHora: row.depreciacao_hora ?? DEFAULT_APP_SETTINGS.depreciacaoHora,
+    custoFixoUnidade: row.custo_fixo_unidade ?? DEFAULT_APP_SETTINGS.custoFixoUnidade,
+    defaultPesoRolo: row.default_peso_rolo ?? DEFAULT_APP_SETTINGS.defaultPesoRolo,
+    defaultQuantidade: row.default_quantidade ?? DEFAULT_APP_SETTINGS.defaultQuantidade,
+  };
+}
+
+function toSettingsRow(row: AppSettings) {
+  return {
+    id: "main",
+    studio_nome: row.studioNome,
+    impressora_modelo: row.impressoraModelo,
+    consumo_kw: row.consumoKw,
+    tarifa_energia_kwh: row.tarifaEnergiaKwh,
+    depreciacao_hora: row.depreciacaoHora,
+    custo_fixo_unidade: row.custoFixoUnidade,
+    default_peso_rolo: row.defaultPesoRolo,
+    default_quantidade: row.defaultQuantidade,
+  };
+}
+
+export async function settingsRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrap(await supabase.from("app_settings").select("*").eq("id", "main").limit(1));
+  const list = rows as any[];
+  const settings: AppSettings = list.length > 0 ? fromSettingsRow(list[0]) : { ...DEFAULT_APP_SETTINGS };
+  return {
+    settings,
+    async save(next: AppSettings) {
+      const supabase2 = getSupabaseAdminClient();
+      unwrap(await supabase2.from("app_settings").upsert(toSettingsRow(next), { onConflict: "id" }));
     },
   };
 }

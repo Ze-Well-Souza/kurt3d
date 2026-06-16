@@ -18,6 +18,13 @@ export type Order = {
 
   valorRecebido?: number;
   destino?: OrderDestino;
+
+  linkProjeto?: string | null;
+  multiPart?: boolean;
+  precoVenda?: number | null;
+
+  formaPagamento?: string | null;
+  dataPagamento?: string | null;
 };
 
 export type Venda = {
@@ -74,6 +81,7 @@ export type PortfolioProject = {
   tempoMin: number;
   quantidade: number;
   precoVenda: number;
+  perdaPercent?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -96,5 +104,31 @@ export type Expense = {
   valor: number;
   data: string;
   descricao: string;
+};
+
+export type AppSettings = {
+  // Perfil do Estúdio
+  studioNome: string;
+  // Impressora
+  impressoraModelo: string;
+  // Parâmetros de Custo
+  consumoKw: number;
+  tarifaEnergiaKwh: number;
+  depreciacaoHora: number;
+  custoFixoUnidade: number;
+  // Valores Padrão
+  defaultPesoRolo: number;
+  defaultQuantidade: number;
+};
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  studioNome: "Kurti 3D",
+  impressoraModelo: "Bambu Lab A1",
+  consumoKw: 0.095,
+  tarifaEnergiaKwh: 0.75,
+  depreciacaoHora: 0.70,
+  custoFixoUnidade: 0.20,
+  defaultPesoRolo: 1000,
+  defaultQuantidade: 10,
 };
 

@@ -2,10 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../domain/cost";
-import type { Expense, Filamento, FilamentoQualidade, Insumo, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
+import type { AppSettings, Expense, Filamento, FilamentoQualidade, Insumo, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
 import { clampGrams, computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "../server/db.server";
-import { expensesRepo, filamentosHistoryRepo, filamentosRepo, insumosRepo, inventoryRepo, ordersRepo, portfolioRepo, vendasRepo } from "../server/repositories.server";
+import { expensesRepo, filamentosHistoryRepo, filamentosRepo, insumosRepo, inventoryRepo, ordersRepo, portfolioRepo, settingsRepo, vendasRepo } from "../server/repositories.server";
 
 function buildFilamentoLabel(f: Filamento) {
   return `[${f.sku}] ${f.marca} ${f.cor}`;
@@ -36,7 +36,7 @@ function computeOrderReservedGrams(txns: { orderId: string; filamentId: string; 
 }
 
 export const listSnapshot = createServerFn({ method: "GET" }).handler(async () => {
-  const [orders, filamentos, filamentosHistory, portfolio, insumos, vendas, inv, expenses] = await Promise.all([
+  const [orders, filamentos, filamentosHistory, portfolio, insumos, vendas, inv, expenses, settingsData] = await Promise.all([
     ordersRepo(),
     filamentosRepo(),
     filamentosHistoryRepo(),
@@ -45,6 +45,7 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     vendasRepo(),
     inventoryRepo(),
     expensesRepo(),
+    settingsRepo(),
   ]);
 
   const reservedMap = computeReservedByFilament(inv.list);
@@ -63,6 +64,7 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     insumos: insumos.list,
     vendas: vendas.list,
     expenses: expenses.list,
+    settings: settingsData.settings,
   };
 });
 
@@ -218,6 +220,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       tempoMin: z.number().min(0).max(100000),
       quantidade: z.number().int().min(1).max(100000),
       precoVenda: z.number().min(0).max(1000000),
+      perdaPercent: z.number().min(0).max(100).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -227,6 +230,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       id: randomUUID(),
       createdAt: now,
       updatedAt: now,
+      perdaPercent: data.perdaPercent ?? 0,
       ...data,
     };
     await repo.save([p, ...repo.list]);
@@ -266,6 +270,8 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
       portfolioProjectId: proj.id,
       filamentoId: proj.filamentoId,
       gramsPerUnit: proj.pesoPeca,
+      precoVenda: proj.precoVenda,
+      linkProjeto: proj.linkModelo ?? null,
     };
     await orders.save([order, ...orders.list]);
     return { ok: true as const };
@@ -280,6 +286,11 @@ export const addOrder = createServerFn({ method: "POST" })
       timeMinutes: z.number().min(1).max(100000),
       filamentoId: z.string().min(1).optional(),
       gramsPerUnit: z.number().min(0.1).max(100000).optional(),
+      linkProjeto: z.string().url().max(500).optional(),
+      multiPart: z.boolean().optional(),
+      precoVenda: z.number().min(0).max(1000000).optional(),
+      formaPagamento: z.string().trim().max(100).optional(),
+      dataPagamento: z.string().max(30).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -290,9 +301,27 @@ export const addOrder = createServerFn({ method: "POST" })
       status: "todo",
       createdAt: now,
       updatedAt: now,
-      ...data,
+      client: data.client,
+      projectName: data.projectName,
+      quantity: data.quantity,
+      timeMinutes: data.timeMinutes,
+      filamentoId: data.filamentoId,
+      gramsPerUnit: data.gramsPerUnit,
+      linkProjeto: data.linkProjeto ?? null,
+      multiPart: data.multiPart ?? false,
+      precoVenda: data.precoVenda ?? null,
+      formaPagamento: data.formaPagamento ?? null,
+      dataPagamento: data.dataPagamento ?? null,
     };
     await repo.save([order, ...repo.list]);
+    return { ok: true };
+  });
+
+export const removeOrder = createServerFn({ method: "POST" })
+  .validator(z.object({ orderId: z.string().min(1), reason: z.string().trim().min(1, "Informe o motivo").max(500) }))
+  .handler(async ({ data }) => {
+    const repo = await ordersRepo();
+    await repo.save(repo.list.filter((o) => o.id !== data.orderId));
     return { ok: true };
   });
 
@@ -350,6 +379,8 @@ export const finalizarDestino = createServerFn({ method: "POST" })
       orderId: z.string().min(1),
       destino: z.enum(["Kurtido e Vendido", "Dado de Presente", "Falha de Impressão"]),
       valorRecebido: z.number().min(0).optional(),
+      formaPagamento: z.string().trim().max(100).optional(),
+      dataPagamento: z.string().max(30).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -370,6 +401,8 @@ export const finalizarDestino = createServerFn({ method: "POST" })
       ...order,
       destino,
       valorRecebido: data.valorRecebido,
+      formaPagamento: data.formaPagamento ?? order.formaPagamento ?? null,
+      dataPagamento: data.dataPagamento ?? order.dataPagamento ?? null,
       status: statusMap[destino],
       updatedAt: now,
     };
@@ -395,5 +428,39 @@ export const finalizarDestino = createServerFn({ method: "POST" })
     }
 
     return { ok: true as const };
+  });
+
+export const getSettings = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await settingsRepo();
+  return repo.settings;
+});
+
+export const saveSettings = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      studioNome: z.string().trim().min(1).max(100),
+      impressoraModelo: z.string().trim().min(1).max(100),
+      consumoKw: z.number().min(0.001).max(100),
+      tarifaEnergiaKwh: z.number().min(0.01).max(100),
+      depreciacaoHora: z.number().min(0).max(1000),
+      custoFixoUnidade: z.number().min(0).max(1000),
+      defaultPesoRolo: z.number().min(1).max(100000),
+      defaultQuantidade: z.number().int().min(1).max(100000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const settings: AppSettings = {
+      studioNome: data.studioNome,
+      impressoraModelo: data.impressoraModelo,
+      consumoKw: data.consumoKw,
+      tarifaEnergiaKwh: data.tarifaEnergiaKwh,
+      depreciacaoHora: data.depreciacaoHora,
+      custoFixoUnidade: data.custoFixoUnidade,
+      defaultPesoRolo: data.defaultPesoRolo,
+      defaultQuantidade: data.defaultQuantidade,
+    };
+    const repo = await settingsRepo();
+    await repo.save(settings);
+    return { ok: true };
   });
 

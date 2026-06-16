@@ -1,4 +1,5 @@
-import type { Filamento, Order, PortfolioProject } from "./types";
+import type { Filamento, Order, PortfolioProject, AppSettings } from "./types";
+import { DEFAULT_APP_SETTINGS } from "./types";
 
 export type CostBreakdown = {
   custoFilamento: number;
@@ -11,10 +12,10 @@ export type CostBreakdown = {
   lucroLiquido: number;
 };
 
-const CONSUMO_A1_KW = 0.095;
-const TARIFA_ENERGIA = 0.75;
-const DEPRECIACAO_HORA = 0.7;
-const CUSTO_FIXO_UNIDADE = 0.2;
+const CONSUMO_A1_KW = DEFAULT_APP_SETTINGS.consumoKw;
+const TARIFA_ENERGIA = DEFAULT_APP_SETTINGS.tarifaEnergiaKwh;
+const DEPRECIACAO_HORA = DEFAULT_APP_SETTINGS.depreciacaoHora;
+const CUSTO_FIXO_UNIDADE = DEFAULT_APP_SETTINGS.custoFixoUnidade;
 
 function clampNumber(n: number) {
   return Number.isFinite(n) ? n : 0;
@@ -33,7 +34,9 @@ export function calcCostFromInputs(input: {
   tempoMin: number;
   quantidade: number;
   precoVenda: number;
+  settings?: AppSettings;
 }): CostBreakdown {
+  const s = input.settings ?? DEFAULT_APP_SETTINGS;
   const custoRolo = clampNumber(input.custoRolo);
   const pesoRolo = clampNumber(input.pesoRolo);
   const pesoPeca = clampNumber(input.pesoPeca);
@@ -42,9 +45,9 @@ export function calcCostFromInputs(input: {
   const precoVenda = clampNumber(input.precoVenda);
 
   const custoFilamento = pesoRolo > 0 ? (custoRolo / pesoRolo) * pesoPeca : 0;
-  const custoEnergia = (tempoMin / 60) * CONSUMO_A1_KW * TARIFA_ENERGIA;
-  const custoDepreciacao = (tempoMin / 60) * DEPRECIACAO_HORA;
-  const custoFixo = CUSTO_FIXO_UNIDADE;
+  const custoEnergia = (tempoMin / 60) * s.consumoKw * s.tarifaEnergiaKwh;
+  const custoDepreciacao = (tempoMin / 60) * s.depreciacaoHora;
+  const custoFixo = s.custoFixoUnidade;
 
   const custoUnidade = custoFilamento + custoEnergia + custoDepreciacao + custoFixo;
   const custoLote = custoUnidade * quantidade;
@@ -75,11 +78,13 @@ export function calcOrderCostHybrid(input: {
   portfolio?: PortfolioProject;
   filamento?: Filamento;
   precoVendaUnit?: number;
+  settings?: AppSettings;
 }): {
   breakdown: CostBreakdown;
   depreciacao: number;
   total: number;
 } {
+  const s = input.settings ?? DEFAULT_APP_SETTINGS;
   const { order, portfolio, filamento } = input;
   const tempoMin = portfolio?.tempoMin ?? order.timeMinutes;
   const pesoPeca = portfolio?.pesoPeca ?? order.gramsPerUnit ?? 0;
@@ -94,11 +99,12 @@ export function calcOrderCostHybrid(input: {
     tempoMin: 0,
     quantidade: 1,
     precoVenda: 0,
+    settings: s,
   }).custoFilamento;
 
-  const custoEnergia = (tempoMin / 60) * CONSUMO_A1_KW * TARIFA_ENERGIA;
-  const custoDepreciacao = (tempoMin / 60) * DEPRECIACAO_HORA;
-  const custoFixo = CUSTO_FIXO_UNIDADE;
+  const custoEnergia = (tempoMin / 60) * s.consumoKw * s.tarifaEnergiaKwh;
+  const custoDepreciacao = (tempoMin / 60) * s.depreciacaoHora;
+  const custoFixo = s.custoFixoUnidade;
 
   const custoUnidade = custoFilamento + custoEnergia + custoDepreciacao + custoFixo;
   const custoLote = custoUnidade * quantidade;
