@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info } from "lucide-react";
+import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ type SettingsForm = {
   custoFixoUnidade: string;
   defaultPesoRolo: string;
   defaultQuantidade: string;
+  whatsappNumero: string;
 };
 
 function toForm(s: AppSettings): SettingsForm {
@@ -39,6 +40,7 @@ function toForm(s: AppSettings): SettingsForm {
     custoFixoUnidade: String(s.custoFixoUnidade),
     defaultPesoRolo: String(s.defaultPesoRolo),
     defaultQuantidade: String(s.defaultQuantidade),
+    whatsappNumero: s.whatsappNumero,
   };
 }
 
@@ -77,6 +79,7 @@ function SettingsPage() {
       custoFixoUnidade: Number(form.custoFixoUnidade) || 0,
       defaultPesoRolo: Number(form.defaultPesoRolo) || DEFAULT_APP_SETTINGS.defaultPesoRolo,
       defaultQuantidade: Number(form.defaultQuantidade) || DEFAULT_APP_SETTINGS.defaultQuantidade,
+      whatsappNumero: form.whatsappNumero.trim() || DEFAULT_APP_SETTINGS.whatsappNumero,
     };
     mutate.mutate(parsed);
   }
@@ -173,6 +176,13 @@ function SettingsPage() {
           </SettingsField>
           <SettingsField label="Quantidade Padrão do Lote" hint="Quantidade de peças sugerida ao criar novo projeto.">
             <Input type="number" inputMode="decimal" min={1} step={1} value={form.defaultQuantidade} onChange={(e) => setField("defaultQuantidade", e.target.value)} placeholder="10" />
+          </SettingsField>
+        </SectionCard>
+
+        {/* ── Section: Contato ── */}
+        <SectionCard icon={MessageCircle} title="Contato" description="Configurações de contato da landing page.">
+          <SettingsField label="Número do WhatsApp" hint="Número com código do país e DDD. Ex: 5511999999999. Usado pelo formulário de contato da landing page." className="sm:col-span-2">
+            <Input value={form.whatsappNumero} onChange={(e) => setField("whatsappNumero", e.target.value)} placeholder="5511999999999" maxLength={30} />
           </SettingsField>
         </SectionCard>
 

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { listSnapshot } from "@/lib/api/data.functions";
 
 export const Route = createFileRoute("/admin/")({
@@ -14,30 +15,32 @@ function Dashboard() {
   const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
   const orders = snap.data?.orders ?? [];
   const vendas = snap.data?.vendas ?? [];
+  const [period, setPeriod] = useState<"month" | "all">("month");
+
+  const periodLabel = period === "month" ? "este mês" : "total";
+
+  const filteredVendas = useMemo(() => {
+    if (period === "all") return vendas;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    return vendas.filter((v) => v.data >= monthStart);
+  }, [vendas, period]);
 
   const stats = useMemo(() => {
-    // Trabalhos ativos: orders with status todo or printing
     const trabalhosAtivos = orders.filter(
       (o) => o.status === "todo" || o.status === "printing",
     ).length;
-
-    // Receita (Mês): sum of valor from vendas
-    const receita = vendas.reduce((sum, v) => sum + v.valor, 0);
-
-    // Lucro Líquido: receita - custo total
-    const custoTotal = vendas.reduce((sum, v) => sum + v.custo, 0);
+    const receita = filteredVendas.reduce((sum, v) => sum + v.valor, 0);
+    const custoTotal = filteredVendas.reduce((sum, v) => sum + v.custo, 0);
     const lucro = receita - custoTotal;
-
-    // Impressoras online (placeholder)
     const impressorasOnline = "6/6";
-
     return [
       { label: "Trabalhos ativos", value: String(trabalhosAtivos), delta: `de ${orders.length} pedidos` },
-      { label: "Receita (Mês)", value: brl(receita), delta: `${vendas.length} vendas` },
-      { label: "Lucro Líquido", value: brl(lucro), delta: lucro >= 0 ? "positivo" : "negativo" },
+      { label: `Receita (${periodLabel})`, value: brl(receita), delta: `${filteredVendas.length} vendas` },
+      { label: `Lucro Líquido (${periodLabel})`, value: brl(lucro), delta: lucro >= 0 ? "positivo" : "negativo" },
       { label: "Impressoras online", value: impressorasOnline, delta: "100%" },
     ];
-  }, [orders, vendas]);
+  }, [orders, filteredVendas, periodLabel]);
 
   // Recent terminal orders for activity section
   const recentActivity = useMemo(() => {
@@ -48,9 +51,15 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight">Painel</h1>
-        <p className="text-sm text-muted-foreground">Visão geral da sua fábrica de impressão.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold tracking-tight">Painel</h1>
+          <p className="text-sm text-muted-foreground">Visão geral da sua fábrica de impressão.</p>
+        </div>
+        <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
+          <button className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", period === "month" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} onClick={() => setPeriod("month")}>Este Mês</button>
+          <button className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", period === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} onClick={() => setPeriod("all")}>Todo Período</button>
+        </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((s) => (

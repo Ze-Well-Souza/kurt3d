@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink } from "lucide-react";
+import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Scale } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,9 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { archiveFilamento, addInsumo, listSnapshot, removeFilamento, removeInsumo, upsertFilamento } from "@/lib/api/data.functions";
+import { archiveFilamento, addInsumo, listSnapshot, removeFilamento, removeInsumo, upsertFilamento, updateFilamentoPeso } from "@/lib/api/data.functions";
 import type { Filamento, FilamentoHistory, FilamentoQualidade, Insumo } from "@/lib/domain/types";
+import { SearchInput } from "@/components/SearchInput";
 
 export const Route = createFileRoute("/admin/stock")({
   component: Stock,
@@ -154,12 +155,21 @@ function Stock() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
   });
 
+  const mutatePeso = useMutation({
+    mutationFn: (input: { id: string; pesoAtual: number }) => updateFilamentoPeso({ data: input }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Peso atualizado."); setWeightAdj(null); },
+  });
+
   const [fForm, setFForm] = useState<FilamentoForm>(() => ({
     ...initialFilamentoForm,
     sku: generateSku(filamentos),
     dataCompra: new Date().toISOString().slice(0, 10),
   }));
   const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
+
+  const [filSearch, setFilSearch] = useState("");
+  const [insSearch, setInsSearch] = useState("");
+  const [weightAdj, setWeightAdj] = useState<{ id: string; nome: string; pesoAtual: number } | null>(null);
 
   const [archiveDialog, setArchiveDialog] = useState<{
     open: boolean;
@@ -243,6 +253,19 @@ function Stock() {
   const totalInsumos = insumos.reduce((sum, i) => sum + i.precoTotal, 0);
   const totalInvestido = totalFilamentos + totalInsumos;
   const percentualGeral = totalInicial > 0 ? (totalGramas / totalInicial) * 100 : 0;
+
+  // ── Filtered lists ──
+  const filteredFilamentos = useMemo(() => {
+    if (!filSearch.trim()) return filamentos;
+    const s = filSearch.toLowerCase().trim();
+    return filamentos.filter((f) => f.sku.toLowerCase().includes(s) || f.marca.toLowerCase().includes(s) || f.cor.toLowerCase().includes(s) || f.material.toLowerCase().includes(s));
+  }, [filamentos, filSearch]);
+
+  const filteredInsumos = useMemo(() => {
+    if (!insSearch.trim()) return insumos;
+    const s = insSearch.toLowerCase().trim();
+    return insumos.filter((i) => i.nome.toLowerCase().includes(s));
+  }, [insumos, insSearch]);
 
   return (
     <div className="space-y-8">
@@ -371,9 +394,12 @@ function Stock() {
       <div className="filament-top rounded-2xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="font-display text-lg font-semibold">Estoque Atual de Filamentos</h2>
-          <span className="text-xs text-muted-foreground">
-            {totalGramas}g de {totalInicial}g restantes
-          </span>
+          <div className="flex items-center gap-3">
+            <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
+            <span className="text-xs text-muted-foreground">
+              {totalGramas}g de {totalInicial}g restantes
+            </span>
+          </div>
         </div>
         {filamentos.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
@@ -381,7 +407,7 @@ function Stock() {
           </div>
         ) : (
           <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
-            {filamentos.map((f) => {
+            {filteredFilamentos.map((f) => {
               const percent = f.pesoInicial > 0 ? (f.pesoAtual / f.pesoInicial) * 100 : 0;
               const custoPorGrama = f.pesoInicial > 0 ? f.precoPago / f.pesoInicial : 0;
               const isLow = percent < 20;
@@ -500,6 +526,15 @@ function Stock() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 text-xs"
+                        onClick={() => setWeightAdj({ id: f.id, nome: `${f.marca} ${f.cor}`, pesoAtual: f.pesoAtual })}
+                      >
+                        <Scale className="h-3.5 w-3.5" />
+                        Ajustar peso
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
@@ -743,9 +778,12 @@ function Stock() {
       <div className="filament-top rounded-2xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="font-display text-lg font-semibold">Insumos Cadastrados</h2>
-          <span className="text-xs text-muted-foreground">
-            {insumos.length} item(ns) · {brl(totalInsumos)}
-          </span>
+          <div className="flex items-center gap-3">
+            <SearchInput value={insSearch} onChange={setInsSearch} placeholder="Buscar insumo..." />
+            <span className="text-xs text-muted-foreground">
+              {filteredInsumos.length} item(ns) · {brl(totalInsumos)}
+            </span>
+          </div>
         </div>
         {insumos.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
@@ -764,7 +802,7 @@ function Stock() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {insumos.map((i) => (
+              {filteredInsumos.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.nome}</TableCell>
                   <TableCell>{i.quantidade}</TableCell>
@@ -803,6 +841,58 @@ function Stock() {
           </Table>
         )}
       </div>
+
+      {/* Weight Adjustment Dialog */}
+      <Dialog open={!!weightAdj} onOpenChange={(o) => !o && setWeightAdj(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajustar Peso do Filamento</DialogTitle>
+          </DialogHeader>
+          {weightAdj && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const fd = new FormData(e.currentTarget);
+                const novo = Number(fd.get("pesoNovo"));
+                if (isNaN(novo) || novo < 0) return;
+                const wa = weightAdj;
+                mutatePeso.mutate({ id: wa.id, pesoAtual: novo });
+              }}
+              className="space-y-4"
+            >
+              {(() => { const wa = weightAdj; return (
+              <>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Filamento</p>
+                <p className="font-medium">{wa.nome}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Peso atual</p>
+                <p className="font-semibold tabular-nums">{wa.pesoAtual.toFixed(0)} g</p>
+              </div>
+              <Field label="Novo peso (g)">
+                <Input
+                  name="pesoNovo"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="1"
+                  defaultValue={wa.pesoAtual}
+                  autoFocus
+                />
+              </Field>
+              </>
+              ); })()}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setWeightAdj(null)}>Cancelar</Button>
+                <Button type="submit" disabled={mutatePeso.isPending}>
+                  {mutatePeso.isPending ? "Salvando…" : "Salvar"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

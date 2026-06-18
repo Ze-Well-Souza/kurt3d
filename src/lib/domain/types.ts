@@ -25,6 +25,7 @@ export type Order = {
 
   formaPagamento?: string | null;
   dataPagamento?: string | null;
+  clientId?: string | null;
 };
 
 export type Venda = {
@@ -97,13 +98,34 @@ export type InventoryTxn = {
   createdAt: string;
 };
 
+export type ExpenseSource = "insumo" | "manual" | "falha";
+
 export type Expense = {
   id: string;
-  source: "insumo";
+  source: ExpenseSource;
   refId: string;
   valor: number;
   data: string;
   descricao: string;
+  categoria?: string | null;
+};
+
+export type Lead = {
+  id: string;
+  nome: string;
+  whatsapp: string;
+  mensagem: string;
+  createdAt: string;
+};
+
+export type Client = {
+  id: string;
+  nome: string;
+  whatsapp?: string | null;
+  email?: string | null;
+  notas?: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AppSettings = {
@@ -119,6 +141,8 @@ export type AppSettings = {
   // Valores Padrão
   defaultPesoRolo: number;
   defaultQuantidade: number;
+  // Contato
+  whatsappNumero: string;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -130,5 +154,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   custoFixoUnidade: 0.20,
   defaultPesoRolo: 1000,
   defaultQuantidade: 10,
+  whatsappNumero: "5511999999999",
 };
 

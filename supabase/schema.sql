@@ -58,7 +58,8 @@ create table if not exists public.orders (
   multi_part boolean null default false,
   preco_venda double precision null,
   forma_pagamento text null,
-  data_pagamento text null
+  data_pagamento text null,
+  client_id text null
 );
 
 create table if not exists public.portfolio_projects (
@@ -113,7 +114,26 @@ create table if not exists public.expenses (
   ref_id text not null,
   valor double precision not null,
   data text not null,
-  descricao text not null
+  descricao text not null,
+  categoria text null
+);
+
+create table if not exists public.leads (
+  id text primary key,
+  nome text not null,
+  whatsapp text not null,
+  mensagem text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.clients (
+  id text primary key,
+  nome text not null,
+  whatsapp text null,
+  email text null,
+  notas text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.app_settings (
@@ -126,6 +146,7 @@ create table if not exists public.app_settings (
   custo_fixo_unidade double precision not null default 0.20,
   default_peso_rolo double precision not null default 1000,
   default_quantidade integer not null default 10,
+  whatsapp_numero text not null default '5511999999999',
   check (id = 'main')
 );
 
@@ -137,3 +158,5 @@ create index if not exists idx_inventory_txns_film_order on public.inventory_txn
 create index if not exists idx_vendas_data on public.vendas(data desc);
 create index if not exists idx_expenses_data on public.expenses(data desc);
 create index if not exists idx_filamentos_history_arquivado on public.filamentos_history(arquivado_at desc);
+create index if not exists idx_leads_created_at on public.leads(created_at desc);
+create index if not exists idx_clients_nome on public.clients(nome);

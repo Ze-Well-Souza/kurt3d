@@ -7,7 +7,7 @@ import {
 } from "@dnd-kit/core";
 import {
   Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays,
-  Trash2, Calculator, ListChecks, Eye, AlertTriangle,
+  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search,
 } from "lucide-react";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -31,9 +31,11 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   listSnapshot, addOrder, finalizarDestino, updateOrderStatus, removeOrder,
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
+  updateOrder, updatePortfolioProject,
 } from "@/lib/api/data.functions";
-import type { Order, Status, Filamento, AppSettings } from "@/lib/domain/types";
+import type { Order, Status, Filamento, AppSettings, PortfolioProject, Client } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
+import { SearchInput } from "@/components/SearchInput";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
 
 export const Route = createFileRoute("/admin/portfolio")({
@@ -115,6 +117,7 @@ function CalcPedidos() {
   const orders = snap.data?.orders ?? [];
   const filamentos = snap.data?.filamentos ?? [];
   const projects = snap.data?.portfolio ?? [];
+  const clients = snap.data?.clients ?? [];
   const settings = snap.data?.settings ?? DEFAULT_APP_SETTINGS;
   const [activeTab, setActiveTab] = useState<"calc" | "orders">("calc");
   const [form, setForm] = useState<FormState>({ ...initialForm, pesoRolo: String(settings.defaultPesoRolo), quantidade: String(settings.defaultQuantidade) });
@@ -127,6 +130,8 @@ function CalcPedidos() {
   const mutateAddOrder = useMutation({ mutationFn: (input: any) => addOrder({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateFinalizar = useMutation({ mutationFn: (input: any) => finalizarDestino({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateRemoveOrder = useMutation({ mutationFn: (input: { orderId: string; reason: string }) => removeOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido excluído."); } });
+  const mutateUpdateOrder = useMutation({ mutationFn: (input: any) => updateOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido atualizado."); }, onError: (err: any) => toast.error(err?.message ?? "Erro ao atualizar.") });
+  const mutateUpdateProject = useMutation({ mutationFn: (input: any) => updatePortfolioProject({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Projeto atualizado."); }, onError: (err: any) => toast.error(err?.message ?? "Erro ao atualizar.") });
 
   /* ── calculator state ── */
   const numeric = useMemo(() => ({
@@ -149,15 +154,28 @@ function CalcPedidos() {
   const [newOrder, setNewOrder] = useState({ client: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; orderId: string; reason: string }>({ open: false, orderId: "", reason: "" });
+  const [editOrder, setEditOrder] = useState<Order | null>(null);
+  const [editProject, setEditProject] = useState<PortfolioProject | null>(null);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
 
   /* ── drag state ── */
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const grouped = useMemo(() => {
     const g: Record<Status, Order[]> = { todo: [], printing: [], done: [], vendido: [], presente: [], falha: [] };
-    for (const o of orders) g[o.status]?.push(o);
+    const searchLower = orderSearch.toLowerCase().trim();
+    for (const o of orders) {
+      if (searchLower && !o.projectName.toLowerCase().includes(searchLower) && !o.client.toLowerCase().includes(searchLower)) continue;
+      g[o.status]?.push(o);
+    }
     return g;
-  }, [orders]);
+  }, [orders, orderSearch]);
+  const filteredProjects = useMemo(() => {
+    if (!projectSearch.trim()) return projects;
+    const s = projectSearch.toLowerCase().trim();
+    return projects.filter((p) => p.nome.toLowerCase().includes(s) || p.categoria.toLowerCase().includes(s));
+  }, [projects, projectSearch]);
   const activeOrder = activeId ? orders.find((o) => o.id === activeId) ?? null : null;
   const terminalOrders = [...(grouped.vendido ?? []), ...(grouped.presente ?? []), ...(grouped.falha ?? [])];
 
@@ -335,6 +353,128 @@ function CalcPedidos() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Edit Order dialog ── */}
+      <Dialog open={!!editOrder} onOpenChange={(open) => { if (!open) setEditOrder(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Editar Pedido</DialogTitle></DialogHeader>
+          {editOrder && (
+            <form className="grid gap-4" onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              mutateUpdateOrder.mutate({
+                orderId: editOrder.id,
+                client: (fd.get("client") as string)?.trim() || editOrder.client,
+                projectName: (fd.get("projectName") as string)?.trim() || editOrder.projectName,
+                quantity: Number(fd.get("quantity")) || editOrder.quantity,
+                timeMinutes: Number(fd.get("timeMinutes")) || editOrder.timeMinutes,
+                filamentoId: (fd.get("filamentoId") as string) || null,
+                gramsPerUnit: Number(fd.get("gramsPerUnit")) || null,
+                precoVenda: Number(fd.get("precoVenda")) || null,
+                linkProjeto: (fd.get("linkProjeto") as string) || null,
+                multiPart: fd.get("multiPart") === "on",
+                formaPagamento: (fd.get("formaPagamento") as string) || null,
+                dataPagamento: (fd.get("dataPagamento") as string) || null,
+                clientId: (fd.get("clientId") as string) || null,
+              });
+              setEditOrder(null);
+            }}>
+              <div className="grid gap-2"><Label>Cliente</Label>
+                <Input name="client" defaultValue={editOrder.client} />
+              </div>
+              <div className="grid gap-2"><Label>Projeto</Label>
+                <Input name="projectName" defaultValue={editOrder.projectName} />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2"><Label>Quantidade</Label><Input name="quantity" type="number" min={1} defaultValue={editOrder.quantity} /></div>
+                <div className="grid gap-2"><Label>Tempo (min)</Label><Input name="timeMinutes" type="number" min={1} defaultValue={editOrder.timeMinutes} /></div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2"><Label>Filamento</Label>
+                  <Select name="filamentoId" defaultValue={editOrder.filamentoId ?? ""}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>))}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2"><Label>Gramas / unidade</Label><Input name="gramsPerUnit" type="number" min={0} defaultValue={editOrder.gramsPerUnit ?? ""} /></div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2"><Label>Preço de Venda (R$)</Label><Input name="precoVenda" type="number" min={0} step={0.01} defaultValue={editOrder.precoVenda ?? ""} /></div>
+                <div className="grid gap-2"><Label>Link do Projeto</Label><Input name="linkProjeto" type="url" defaultValue={editOrder.linkProjeto ?? ""} /></div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2"><Label>Forma de Pagamento</Label>
+                  <Select name="formaPagamento" defaultValue={editOrder.formaPagamento ?? ""}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>{PAYMENT_METHODS.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2"><Label>Data do Pagamento</Label><Input name="dataPagamento" type="date" defaultValue={editOrder.dataPagamento ?? ""} /></div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditOrder(null)}>Cancelar</Button>
+                <Button type="submit" className="btn-filament" disabled={mutateUpdateOrder.isPending}>{mutateUpdateOrder.isPending ? "Salvando..." : "Salvar"}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Project dialog ── */}
+      <Dialog open={!!editProject} onOpenChange={(open) => { if (!open) setEditProject(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Editar Projeto</DialogTitle></DialogHeader>
+          {editProject && (
+            <form className="grid gap-4" onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              mutateUpdateProject.mutate({
+                id: editProject.id,
+                nome: (fd.get("nome") as string)?.trim() || editProject.nome,
+                categoria: (fd.get("categoria") as string) || editProject.categoria,
+                linkModelo: (fd.get("linkModelo") as string) || null,
+                filamentoId: (fd.get("filamentoId") as string) || null,
+                custoRolo: Number(fd.get("custoRolo")) || editProject.custoRolo,
+                pesoRolo: Number(fd.get("pesoRolo")) || editProject.pesoRolo,
+                pesoPeca: Number(fd.get("pesoPeca")) || editProject.pesoPeca,
+                tempoMin: Number(fd.get("tempoMin")) || editProject.tempoMin,
+                quantidade: Number(fd.get("quantidade")) || editProject.quantidade,
+                precoVenda: Number(fd.get("precoVenda")) || editProject.precoVenda,
+                perdaPercent: Number(fd.get("perdaPercent")) || 0,
+              });
+              setEditProject(null);
+            }}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2"><Label>Nome</Label><Input name="nome" defaultValue={editProject.nome} /></div>
+                <div className="grid gap-2"><Label>Categoria</Label>
+                  <Select name="categoria" defaultValue={editProject.categoria}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{CATEGORIES.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-2"><Label>Link do Modelo</Label><Input name="linkModelo" type="url" defaultValue={editProject.linkModelo ?? ""} /></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2"><Label>Custo do Rolo (R$)</Label><Input name="custoRolo" type="number" step={0.01} defaultValue={editProject.custoRolo} /></div>
+                <div className="grid gap-2"><Label>Peso do Rolo (g)</Label><Input name="pesoRolo" type="number" defaultValue={editProject.pesoRolo} /></div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-2"><Label>Peso Peça (g)</Label><Input name="pesoPeca" type="number" step={0.01} defaultValue={editProject.pesoPeca} /></div>
+                <div className="grid gap-2"><Label>Tempo (min)</Label><Input name="tempoMin" type="number" defaultValue={editProject.tempoMin} /></div>
+                <div className="grid gap-2"><Label>Quantidade</Label><Input name="quantidade" type="number" min={1} defaultValue={editProject.quantidade} /></div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2"><Label>Preço Venda (R$)</Label><Input name="precoVenda" type="number" step={0.01} defaultValue={editProject.precoVenda} /></div>
+                <div className="grid gap-2"><Label>% Desperdício</Label><Input name="perdaPercent" type="number" step={1} defaultValue={editProject.perdaPercent ?? 0} /></div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditProject(null)}>Cancelar</Button>
+                <Button type="submit" className="btn-filament" disabled={mutateUpdateProject.isPending}>{mutateUpdateProject.isPending ? "Salvando..." : "Salvar"}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 
@@ -386,10 +526,15 @@ function CalcPedidos() {
         <div className="filament-top rounded-2xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <h2 className="font-display text-lg font-semibold">Projetos salvos</h2>
-            <span className="text-xs text-muted-foreground">{projects.length} no total</span>
+            <div className="flex items-center gap-3">
+              <SearchInput value={projectSearch} onChange={setProjectSearch} placeholder="Buscar projeto..." />
+              <span className="text-xs text-muted-foreground">{filteredProjects.length} de {projects.length}</span>
+            </div>
           </div>
           {projects.length === 0 ? (
             <div className="px-6 py-16 text-center text-sm text-muted-foreground">Nenhum projeto ainda. Calcule e salve seu primeiro lote acima.</div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="px-6 py-16 text-center text-sm text-muted-foreground">Nenhum projeto encontrado para “{projectSearch}”.</div>
           ) : (
             <Table>
               <TableHeader>
@@ -402,7 +547,7 @@ function CalcPedidos() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projects.map((p) => {
+                {filteredProjects.map((p) => {
                   const r = calc({ ...p, perdaPercent: p.perdaPercent ?? 0, settings });
                   return (
                     <TableRow key={p.id}>
@@ -418,6 +563,7 @@ function CalcPedidos() {
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="outline" onClick={() => setOrderDialog({ open: true, projectId: p.id, client: "", quantity: String(p.quantidade ?? 1) })}>Criar pedido</Button>
+                          <Button size="icon" variant="ghost" onClick={() => setEditProject(p)} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => mutateRemoveProject.mutate(p.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </TableCell>
@@ -436,16 +582,17 @@ function CalcPedidos() {
   function OrdersTab() {
     return (
       <div className="space-y-6">
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SearchInput value={orderSearch} onChange={setOrderSearch} placeholder="Buscar pedido..." />
           <Button onClick={() => setShowNewOrder(true)} className="btn-filament gap-2"><Plus className="h-4 w-4" />Novo pedido</Button>
         </div>
-        <DndContext sensors={sensors} onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={(e: DragEndEvent) => { setActiveId(null); const { active, over } = e; if (!over) return; const st = over.id as Status; if (!["todo","printing","done"].includes(st)) return; mutateStatus.mutate({ orderId: String(active.id), status: st }); }}>
+        <DndContext sensors={sensors} onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={(e: DragEndEvent) => { setActiveId(null); const { active, over } = e; if (!over) return; const st = String(over.id); if (!["todo","printing","done"].includes(st)) return; mutateStatus.mutate({ orderId: String(active.id), status: st as "todo" | "printing" | "done" }); }}>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {COLUMNS.map((col) => (
               <KanbanColumn key={col.id} id={col.id} title={col.title} hint={col.hint} orders={grouped[col.id]}
                 onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)} filamentos={filamentos}
                 onDelete={(id) => setDeleteDialog({ open: true, orderId: id, reason: "" })}
-                onDetail={(o) => setDetailOrder(o)} orderSettings={settings} />
+                onDetail={(o) => setDetailOrder(o)} onEdit={(o) => setEditOrder(o)} orderSettings={settings} />
             ))}
           </div>
           <DragOverlay>{activeOrder ? (<div className="w-[280px]"><OrderCardView order={activeOrder} dragging onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)} filamentos={filamentos} onDelete={(id) => setDeleteDialog({ open: true, orderId: id, reason: "" })} onDetail={(o) => setDetailOrder(o)} orderSettings={settings} /></div>) : null}</DragOverlay>
@@ -514,12 +661,13 @@ function FilamentTag({ label, color }: { label: string; color?: string }) {
   );
 }
 
-function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDelete, onDetail, orderSettings }: {
+function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings }: {
   order: Order; dragging?: boolean;
   onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>;
   filamentos?: Filamento[];
   onDelete?: (orderId: string) => void;
   onDetail?: (order: Order) => void;
+  onEdit?: (order: Order) => void;
   orderSettings?: AppSettings;
 }) {
   const [showDestino, setShowDestino] = useState(false);
@@ -542,6 +690,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <FilamentTag label={order.filamentoId ? `Filamento ${order.filamentoId}` : "Sem filamento"} color={order.filamentoId ? FILAMENT_SWATCHES[order.filamentoId] : undefined} />
+            {!badge && onEdit && <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); onEdit(order); }} aria-label="Editar pedido"><Pencil className="h-3.5 w-3.5" /></Button>}
             <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete?.(order.id); }} aria-label="Excluir pedido"><Trash2 className="h-3.5 w-3.5" /></Button>
           </div>
         </div>
@@ -591,13 +740,13 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
   );
 }
 
-function DraggableCard({ order, onFinalizar, filamentos, onDelete, onDetail, orderSettings }: { order: Order; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; orderSettings?: AppSettings }) {
+function DraggableCard({ order, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings }: { order: Order; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; onEdit?: (order: Order) => void; orderSettings?: AppSettings }) {
   const isTerminal = ["vendido", "presente", "falha"].includes(order.status);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: order.id, disabled: isTerminal });
-  return <div ref={setNodeRef} {...attributes} {...listeners} className={cn("touch-none", isDragging && "opacity-40")}><OrderCardView order={order} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} orderSettings={orderSettings} /></div>;
+  return <div ref={setNodeRef} {...attributes} {...listeners} className={cn("touch-none", isDragging && "opacity-40")}><OrderCardView order={order} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} orderSettings={orderSettings} /></div>;
 }
 
-function KanbanColumn({ id, title, hint, orders, onFinalizar, filamentos, onDelete, onDetail, orderSettings }: { id: Status; title: string; hint: string; orders: Order[]; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; orderSettings?: AppSettings }) {
+function KanbanColumn({ id, title, hint, orders, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings }: { id: Status; title: string; hint: string; orders: Order[]; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; onEdit?: (order: Order) => void; orderSettings?: AppSettings }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const totalTime = orders.reduce((s, o) => s + o.timeMinutes, 0);
   return (
@@ -611,7 +760,7 @@ function KanbanColumn({ id, title, hint, orders, onFinalizar, filamentos, onDele
         {orders.length > 0 && (<p className="mt-1 text-[11px] text-muted-foreground">Tempo total: <span className="font-medium text-foreground">{formatTime(totalTime)}</span></p>)}
       </div>
       <div ref={setNodeRef} className={cn("flex min-h-[400px] flex-1 flex-col gap-2 rounded-lg border border-dashed p-2 transition-colors", isOver ? "border-ring bg-secondary/60" : "border-border bg-secondary/30")}>
-        {orders.map((o) => (<DraggableCard key={o.id} order={o} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} orderSettings={orderSettings} />))}
+        {orders.map((o) => (<DraggableCard key={o.id} order={o} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} orderSettings={orderSettings} />))}
         {orders.length === 0 && (<p className="grid flex-1 place-items-center text-center text-xs text-muted-foreground">Solte um pedido aqui</p>)}
       </div>
     </div>

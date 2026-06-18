@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { AppSettings, Expense, Filamento, FilamentoHistory, Insumo, InventoryTxn, Order, PortfolioProject, Venda } from "../domain/types";
+import type { AppSettings, Client, Expense, ExpenseSource, Filamento, FilamentoHistory, Insumo, InventoryTxn, Lead, Order, PortfolioProject, Venda } from "../domain/types";
 import { DEFAULT_APP_SETTINGS } from "../domain/types";
 import { computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "./db.server";
@@ -153,6 +153,7 @@ function fromOrderRow(row: any): Order {
     precoVenda: row.preco_venda ?? null,
     formaPagamento: row.forma_pagamento ?? null,
     dataPagamento: row.data_pagamento ?? null,
+    clientId: row.client_id ?? null,
   };
 }
 
@@ -176,6 +177,7 @@ function toOrderRow(row: Order) {
     preco_venda: row.precoVenda ?? null,
     forma_pagamento: row.formaPagamento ?? null,
     data_pagamento: row.dataPagamento ?? null,
+    client_id: row.clientId ?? null,
   };
 }
 
@@ -290,11 +292,12 @@ function toInventoryRow(row: InventoryTxn) {
 function fromExpenseRow(row: any): Expense {
   return {
     id: row.id,
-    source: row.source,
+    source: row.source as ExpenseSource,
     refId: row.ref_id,
     valor: row.valor,
     data: row.data,
     descricao: row.descricao,
+    categoria: row.categoria ?? null,
   };
 }
 
@@ -306,6 +309,51 @@ function toExpenseRow(row: Expense) {
     valor: row.valor,
     data: row.data,
     descricao: row.descricao,
+    categoria: row.categoria ?? null,
+  };
+}
+
+function fromLeadRow(row: any): Lead {
+  return {
+    id: row.id,
+    nome: row.nome,
+    whatsapp: row.whatsapp,
+    mensagem: row.mensagem,
+    createdAt: row.created_at,
+  };
+}
+
+function toLeadRow(row: Lead) {
+  return {
+    id: row.id,
+    nome: row.nome,
+    whatsapp: row.whatsapp,
+    mensagem: row.mensagem,
+    created_at: row.createdAt,
+  };
+}
+
+function fromClientRow(row: any): Client {
+  return {
+    id: row.id,
+    nome: row.nome,
+    whatsapp: row.whatsapp ?? null,
+    email: row.email ?? null,
+    notas: row.notas ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toClientRow(row: Client) {
+  return {
+    id: row.id,
+    nome: row.nome,
+    whatsapp: row.whatsapp ?? null,
+    email: row.email ?? null,
+    notas: row.notas ?? null,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
   };
 }
 
@@ -433,6 +481,33 @@ export async function expensesRepo() {
   };
 }
 
+export async function leadsRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrap(await supabase.from("leads").select("*").order("created_at", { ascending: false }));
+  const list = (rows as any[]).map(fromLeadRow);
+  return {
+    list,
+    async save(next: Lead[]) {
+      await replaceById("leads", next.map(toLeadRow));
+    },
+    async insert(lead: Lead) {
+      unwrap(await supabase.from("leads").insert(toLeadRow(lead)));
+    },
+  };
+}
+
+export async function clientsRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrap(await supabase.from("clients").select("*").order("nome", { ascending: true }));
+  const list = (rows as any[]).map(fromClientRow);
+  return {
+    list,
+    async save(next: Client[]) {
+      await replaceById("clients", next.map(toClientRow));
+    },
+  };
+}
+
 function fromSettingsRow(row: any): AppSettings {
   return {
     studioNome: row.studio_nome ?? DEFAULT_APP_SETTINGS.studioNome,
@@ -443,6 +518,7 @@ function fromSettingsRow(row: any): AppSettings {
     custoFixoUnidade: row.custo_fixo_unidade ?? DEFAULT_APP_SETTINGS.custoFixoUnidade,
     defaultPesoRolo: row.default_peso_rolo ?? DEFAULT_APP_SETTINGS.defaultPesoRolo,
     defaultQuantidade: row.default_quantidade ?? DEFAULT_APP_SETTINGS.defaultQuantidade,
+    whatsappNumero: row.whatsapp_numero ?? DEFAULT_APP_SETTINGS.whatsappNumero,
   };
 }
 
@@ -457,6 +533,7 @@ function toSettingsRow(row: AppSettings) {
     custo_fixo_unidade: row.custoFixoUnidade,
     default_peso_rolo: row.defaultPesoRolo,
     default_quantidade: row.defaultQuantidade,
+    whatsapp_numero: row.whatsappNumero,
   };
 }
 

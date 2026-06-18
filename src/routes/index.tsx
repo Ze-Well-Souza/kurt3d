@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle } from "lucide-react";
+import { listSnapshot, submitLead } from "@/lib/api/data.functions";
 import { KurtiLogo } from "@/components/KurtiLogo";
 import { usePortfolio } from "@/lib/store";
 import heroImg from "@/assets/hero-printer.jpg";
@@ -252,6 +254,32 @@ function Gallery() {
 
 function Contact() {
   const [loading, setLoading] = useState(false);
+  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const whatsappNumero = snap.data?.settings?.whatsappNumero ?? "5511999999999";
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const nome = formData.get("name") as string;
+    const whatsapp = formData.get("whatsapp") as string;
+    const mensagem = formData.get("project") as string;
+
+    setLoading(true);
+    try {
+      await submitLead({ data: { nome, whatsapp, mensagem } });
+      toast.success("Mensagem enviada — responderemos em até 24h.");
+      form.reset();
+      // Open WhatsApp with pre-formatted message
+      const text = encodeURIComponent(`Olá! Meu nome é ${nome}.\n\n${mensagem}\n\n(WhatsApp: ${whatsapp})`);
+      window.open(`https://wa.me/${whatsappNumero}?text=${text}`, "_blank");
+    } catch {
+      toast.error("Erro ao enviar. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <section id="contact" className="bg-card/50">
       <div className="filament-divider" />
@@ -266,30 +294,22 @@ function Contact() {
           </p>
         </div>
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setLoading(true);
-            setTimeout(() => {
-              setLoading(false);
-              toast.success("Mensagem enviada — responderemos em até 24h.");
-              (e.target as HTMLFormElement).reset();
-            }, 600);
-          }}
+          onSubmit={handleSubmit}
           className="rounded-2xl border border-border bg-card p-6 md:p-8"
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Nome</Label>
-              <Input id="name" required placeholder="Seu nome" />
+              <Input id="name" name="name" required placeholder="Seu nome" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input id="whatsapp" type="tel" required placeholder="(11) 99999-9999" />
+              <Input id="whatsapp" name="whatsapp" type="tel" required placeholder="(11) 99999-9999" />
             </div>
           </div>
           <div className="mt-4 space-y-2">
             <Label htmlFor="project">Mensagem</Label>
-            <Textarea id="project" required rows={5} placeholder="Conte sobre a peça, material, quantidade…" />
+            <Textarea id="project" name="project" required rows={5} placeholder="Conte sobre a peça, material, quantidade…" />
           </div>
           <button type="submit" disabled={loading} className="btn-filament mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-sm font-semibold disabled:opacity-60">
             {loading ? "Enviando…" : <><MessageCircle className="h-4 w-4" />Enviar mensagem</>}
