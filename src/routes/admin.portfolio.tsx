@@ -7,8 +7,9 @@ import {
 } from "@dnd-kit/core";
 import {
   Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays,
-  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search,
+  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search, Info, Wand2,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,18 @@ const FILAMENT_SWATCHES: Record<string, string> = {
   white: "#f5f5f5", orange: "#ff8a3d", purple: "#8b5cf6",
 };
 
+/* Bambu Lab printer presets — wattagem média durante impressão.
+   Fonte: bambucostpro.com / specs oficiais Bambu Lab. */
+const BAMBU_PRESETS = [
+  { id: "X1C",     label: "X1-Carbon",    watts: 350 },
+  { id: "X1E",     label: "X1E",          watts: 350 },
+  { id: "P1S",     label: "P1S",          watts: 190 },
+  { id: "P1P",     label: "P1P",          watts: 190 },
+  { id: "A1",      label: "A1",           watts: 150 },
+  { id: "A1Mini",  label: "A1 Mini",      watts:  60 },
+] as const;
+type BambuPresetId = (typeof BAMBU_PRESETS)[number]["id"];
+
 const projectSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome").max(100),
   categoria: z.enum(CATEGORIES),
@@ -80,18 +93,34 @@ type FormState = {
   nome: string; categoria: Category; linkModelo: string; filamentoId: string;
   custoRolo: string; pesoRolo: string; pesoPeca: string; tempoMin: string;
   quantidade: string; precoVenda: string; perdaPercent: string;
+  // novos — espelham BambuCost Pro
+  modeloPreset: BambuPresetId; precoImpressora: string; vidaUtilHoras: string; margemPercent: string;
 };
 const initialForm: FormState = {
   nome: "", categoria: "Chaveiro", linkModelo: "", filamentoId: "",
   custoRolo: "", pesoRolo: "1000", pesoPeca: "", tempoMin: "",
   quantidade: "10", precoVenda: "", perdaPercent: "0",
+  modeloPreset: "A1", precoImpressora: "2999", vidaUtilHoras: "2000", margemPercent: "30",
 };
 
-function calc(p: { custoRolo: number; pesoRolo: number; pesoPeca: number; tempoMin: number; quantidade: number; precoVenda: number; perdaPercent: number; settings?: AppSettings }) {
+function calc(p: {
+  custoRolo: number; pesoRolo: number; pesoPeca: number; tempoMin: number;
+  quantidade: number; precoVenda: number; perdaPercent: number;
+  settings?: AppSettings;
+  modeloPreset?: BambuPresetId; precoImpressora?: number; vidaUtilHoras?: number; margemPercent?: number;
+}) {
   const s = p.settings ?? DEFAULT_APP_SETTINGS;
+  // Energia: usa wattagem do preset (kW = W/1000) — se preset informado, sobrescreve settings
+  const preset = p.modeloPreset ? BAMBU_PRESETS.find((m) => m.id === p.modeloPreset) : undefined;
+  const consumoKw = preset ? preset.watts / 1000 : s.consumoKw;
+  // Amortização: preço ÷ vida útil = R$/h; se não informados, usa settings
+  const amortHoraCalc = (p.precoImpressora && p.vidaUtilHoras && p.vidaUtilHoras > 0)
+    ? p.precoImpressora / p.vidaUtilHoras
+    : s.depreciacaoHora;
+
   const custoFilamento = p.pesoRolo > 0 ? (p.custoRolo / p.pesoRolo) * p.pesoPeca : 0;
-  const custoEnergia = (p.tempoMin / 60) * s.consumoKw * s.tarifaEnergiaKwh;
-  const custoDepreciacao = (p.tempoMin / 60) * s.depreciacaoHora;
+  const custoEnergia = (p.tempoMin / 60) * consumoKw * s.tarifaEnergiaKwh;
+  const custoDepreciacao = (p.tempoMin / 60) * amortHoraCalc;
   const custoFixo = s.custoFixoUnidade;
   const custoBase = custoFilamento + custoEnergia + custoDepreciacao + custoFixo;
   const custoPerda = custoBase * ((p.perdaPercent || 0) / 100);
@@ -99,7 +128,10 @@ function calc(p: { custoRolo: number; pesoRolo: number; pesoPeca: number; tempoM
   const custoLote = custoUnidade * p.quantidade;
   const receitaTotal = p.precoVenda * p.quantidade;
   const lucroLiquido = receitaTotal - custoLote;
-  return { custoUnidade, custoFilamento, custoEnergia, custoDepreciacao, custoFixo, custoPerda, custoLote, receitaTotal, lucroLiquido };
+  // Preço sugerido pela margem
+  const margem = p.margemPercent ?? 0;
+  const precoSugerido = custoUnidade * (1 + margem / 100);
+  return { custoUnidade, custoFilamento, custoEnergia, custoDepreciacao, custoFixo, custoPerda, custoLote, receitaTotal, lucroLiquido, precoSugerido, consumoKw, amortHora: amortHoraCalc };
 }
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -139,6 +171,10 @@ function CalcPedidos() {
     pesoPeca: Number(form.pesoPeca) || 0, tempoMin: Number(form.tempoMin) || 0,
     quantidade: Number(form.quantidade) || 0, precoVenda: Number(form.precoVenda) || 0,
     perdaPercent: Number(form.perdaPercent) || 0,
+    modeloPreset: form.modeloPreset,
+    precoImpressora: Number(form.precoImpressora) || 0,
+    vidaUtilHoras: Number(form.vidaUtilHoras) || 0,
+    margemPercent: Number(form.margemPercent) || 0,
   }), [form]);
   const results = useMemo(() => calc({ ...numeric, settings }), [numeric, settings]);
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -477,40 +513,80 @@ function CalcPedidos() {
   /* ═══════════ CALCULATOR TAB ═══════════ */
   function renderCalculatorTab() {
     return (
+      <TooltipProvider delayDuration={150}>
       <div className="space-y-8">
+
         {/* Form + Results */}
         <form onSubmit={submitProject} className="filament-top space-y-6 rounded-2xl border border-border bg-card p-6">
+          {/* ── Bloco 1: Identificação do projeto ── */}
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            <Field label="Nome do Projeto" className="md:col-span-2"><Input value={form.nome} onChange={(e) => setField("nome", e.target.value)} placeholder="Chaveiro logo Bambu" maxLength={100} /></Field>
-            <Field label="Categoria" className="md:col-span-2">
+            <Field label="Nome do Projeto" tip="Como esse modelo será identificado nos pedidos e relatórios. Ex.: 'Chaveiro logo Bambu'." className="md:col-span-2"><Input value={form.nome} onChange={(e) => setField("nome", e.target.value)} placeholder="Chaveiro logo Bambu" maxLength={100} /></Field>
+            <Field label="Categoria" tip="Tipo da peça — usado para agrupar nos relatórios. Ex.: Chaveiro, Miniatura, Decoração." className="md:col-span-2">
               <Select value={form.categoria} onValueChange={(v) => setField("categoria", v as Category)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{CATEGORIES.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
               </Select>
             </Field>
-            <Field label="Link do Modelo (MakerWorld/STL)" className="md:col-span-2"><Input value={form.linkModelo} onChange={(e) => setField("linkModelo", e.target.value)} placeholder="https://makerworld.com/en/models/..." type="url" /></Field>
-            <Field label="Filamento (Rolo)" className="md:col-span-2">
+            <Field label="Link do Modelo (MakerWorld/STL)" tip="URL do modelo 3D (MakerWorld, Printables, Thingiverse). Opcional — facilita reimprimir depois." className="md:col-span-2"><Input value={form.linkModelo} onChange={(e) => setField("linkModelo", e.target.value)} placeholder="https://makerworld.com/en/models/..." type="url" /></Field>
+            <Field label="Filamento (Rolo)" tip="Selecione um rolo do seu estoque para preencher automaticamente Custo do Rolo e Peso do Rolo." className="md:col-span-2">
               <Select value={form.filamentoId} onValueChange={(v) => { setField("filamentoId", v); const f = filamentos.find((x) => x.id === v); if (f) { setField("custoRolo", String(f.precoPago)); setField("pesoRolo", String(f.pesoInicial)); } }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o rolo" /></SelectTrigger>
                 <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>[{f.sku}] {f.marca} - {f.cor} (Restam {f.pesoAtual}g)</SelectItem>))}</SelectContent>
               </Select>
             </Field>
-            <NumberField label="Custo do Rolo (R$)" value={form.custoRolo} onChange={(v) => setField("custoRolo", v)} placeholder="120,00" />
-            <NumberField label="Peso do Rolo (g)" value={form.pesoRolo} onChange={(v) => setField("pesoRolo", v)} placeholder="1000" />
-            <NumberField label="Peso da Peça (g)" value={form.pesoPeca} onChange={(v) => setField("pesoPeca", v)} placeholder="6" />
-            <NumberField label="Tempo de Impressão (min)" value={form.tempoMin} onChange={(v) => setField("tempoMin", v)} placeholder="35" />
-            <NumberField label="Quantidade do Lote" value={form.quantidade} onChange={(v) => setField("quantidade", v)} placeholder="20" step="1" />
-            <NumberField label="% Desperdício" value={form.perdaPercent} onChange={(v) => setField("perdaPercent", v)} placeholder="0" step="1" />
-            <NumberField label="Preço de Venda Sugerido (R$)" value={form.precoVenda} onChange={(v) => setField("precoVenda", v)} placeholder="15,00" />
+          </div>
+
+          {/* ── Bloco 2: Impressora (preset Bambu Lab) ── */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Calculator className="h-3.5 w-3.5" /> Impressora e Amortização
+            </div>
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <Field label="Modelo Bambu Lab" tip="Preset oficial Bambu Lab. Define a wattagem usada no cálculo de energia. Ex.: A1 = 150W, X1-Carbon = 350W.">
+                <Select value={form.modeloPreset} onValueChange={(v) => setField("modeloPreset", v as BambuPresetId)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{BAMBU_PRESETS.map((m) => (<SelectItem key={m.id} value={m.id}>{m.label} — {m.watts}W</SelectItem>))}</SelectContent>
+                </Select>
+              </Field>
+              <NumberField label="Preço da Impressora (R$)" value={form.precoImpressora} onChange={(v) => setField("precoImpressora", v)} placeholder="2999,00" tip="Quanto você pagou pela impressora. Usado para calcular a amortização (desgaste) por hora. Ex.: A1 ≈ R$ 2.999." />
+              <NumberField label="Vida Útil (horas)" value={form.vidaUtilHoras} onChange={(v) => setField("vidaUtilHoras", v)} placeholder="2000" step="100" tip="Quantas horas você espera que a impressora dure antes de precisar trocar partes principais. Padrão: 2000h (~2-3 anos de uso intenso)." />
+              <NumberField label="% Margem de Lucro" value={form.margemPercent} onChange={(v) => setField("margemPercent", v)} placeholder="30" step="1" tip="Percentual de lucro sobre o custo. Ex.: custo R$ 2, margem 30% → preço sugerido R$ 2,60. O bambucostpro.com usa 30% como padrão." />
+            </div>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Amortização calculada: <strong className="filament-text">{brl(results.amortHora)}/h</strong> (Preço ÷ Vida útil) · Consumo: <strong>{(results.consumoKw * 1000).toFixed(0)}W</strong>
+            </p>
+          </div>
+
+          {/* ── Bloco 3: Filamento, peça e lote ── */}
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            <NumberField label="Custo do Rolo (R$)" value={form.custoRolo} onChange={(v) => setField("custoRolo", v)} placeholder="120,00" tip="Quanto você pagou pelo rolo inteiro de filamento. Ex.: R$ 120 por um rolo Creality PLA de 1kg." />
+            <NumberField label="Peso do Rolo (g)" value={form.pesoRolo} onChange={(v) => setField("pesoRolo", v)} placeholder="1000" tip="Peso total do rolo cheio. Padrão: 1000g (1kg). Verifique a embalagem do filamento." />
+            <NumberField label="Peso da Peça (g)" value={form.pesoPeca} onChange={(v) => setField("pesoPeca", v)} placeholder="6" tip="Quanto pesa UMA peça depois de impressa. Olhe no Bambu Studio / OrcaSlicer no painel à direita, em 'Filament'. Ex.: chaveiro = 6g." />
+            <NumberField label="Tempo de Impressão (min)" value={form.tempoMin} onChange={(v) => setField("tempoMin", v)} placeholder="35" tip="Tempo total de UMA impressão (não importa se é 1 peça ou várias na mesma placa). Veja no Bambu Studio, canto inferior direito, antes de enviar. Ex.: 35min." />
+            <NumberField label="Quantidade do Lote" value={form.quantidade} onChange={(v) => setField("quantidade", v)} placeholder="20" step="1" tip="Quantas peças TOTAIS você vai produzir desse projeto (somando todas as sessões de impressão, se forem várias). Ex.: 20 chaveiros vendidos = quantidade 20, mesmo que você imprima 5 por vez em 4 sessões." />
+            <NumberField label="% Desperdício" value={form.perdaPercent} onChange={(v) => setField("perdaPercent", v)} placeholder="0" step="1" tip="Percentual estimado de impressões que falham, descolam ou saem com defeito. Comece com 0%. Depois de imprimir um tempo, se 1 em 20 falha = 5%. Cobre prejuízos no preço final." />
+            <div className="lg:col-span-2">
+              <NumberField label="Preço de Venda (R$)" value={form.precoVenda} onChange={(v) => setField("precoVenda", v)} placeholder="15,00" tip="Quanto você cobra por UMA peça. Use o 'Aplicar sugerido' ao lado para preencher automaticamente com base na sua margem." />
+            </div>
           </div>
 
           {/* Results */}
-          <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-5">
-            <ResultCard label="Custo Filamento /un." value={brl(results.custoFilamento)} accent="cyan" />
-            <ResultCard label="Energia + Depreciação" value={brl(results.custoEnergia + results.custoDepreciacao)} accent="yellow" />
-            <ResultCard label="Desperdício" value={brl(results.custoPerda)} accent="pink" />
-            <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" />
-            <ResultCard label="Lucro Líquido" value={brl(results.lucroLiquido)} accent={results.lucroLiquido >= 0 ? "green" : "magenta"} emphasize />
+          <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <ResultCard label="Custo Filamento /un." value={brl(results.custoFilamento)} accent="cyan" tip="Filamento usado em UMA peça × preço por grama. Fórmula: (Custo do Rolo ÷ Peso do Rolo) × Peso da Peça." />
+            <ResultCard label="Energia + Depreciação" value={brl(results.custoEnergia + results.custoDepreciacao)} accent="yellow" tip="Energia elétrica gasta na impressão + desgaste da máquina (amortização). Por peça." />
+            <ResultCard label="Desperdício" value={brl(results.custoPerda)} accent="pink" tip="Acréscimo de custo para cobrir as impressões que falham. Calculado como % do custo base." />
+            <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" tip="Custo por peça × Quantidade do Lote. É o quanto você gasta para produzir o lote inteiro." />
+            <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4">
+              <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: ACCENT_COLORS.green }} />
+              <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
+                Preço Sugerido <InfoTip text={`Custo por unidade + ${form.margemPercent || 0}% de margem. Clique em Aplicar para usar como Preço de Venda.`} />
+              </div>
+              <div className="mt-2 font-display text-2xl font-bold tabular-nums" style={{ color: ACCENT_COLORS.green }}>{brl(results.precoSugerido)}</div>
+              <Button type="button" size="sm" variant="outline" className="mt-2 h-7 gap-1 text-xs" onClick={() => setField("precoVenda", results.precoSugerido.toFixed(2))}>
+                <Wand2 className="h-3 w-3" /> Aplicar
+              </Button>
+            </div>
+            <ResultCard label="Lucro Líquido" value={brl(results.lucroLiquido)} accent={results.lucroLiquido >= 0 ? "green" : "magenta"} emphasize tip="Receita Total − Custo Total do Lote. Negativo = você está pagando para trabalhar." />
           </div>
 
           <div className="flex justify-end">
@@ -571,6 +647,7 @@ function CalcPedidos() {
           )}
         </div>
       </div>
+      </TooltipProvider>
     );
   }
 
@@ -625,22 +702,46 @@ function CalcPedidos() {
 
 /* ═══════════════════════ SHARED COMPONENTS ═══════════════════════ */
 
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return <div className={`space-y-2 ${className}`}><Label>{label}</Label>{children}</div>;
+function InfoTip({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" className="inline-flex items-center text-muted-foreground/70 hover:text-foreground" aria-label="Mais informações">
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-left leading-relaxed">{text}</TooltipContent>
+    </Tooltip>
+  );
 }
 
-function NumberField({ label, value, onChange, placeholder, step = "0.01" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; step?: string }) {
-  return <Field label={label}><Input type="number" inputMode="decimal" min={0} step={step} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></Field>;
+function Field({ label, children, className = "", tip }: { label: string; children: React.ReactNode; className?: string; tip?: string }) {
+  return (
+    <div className={`space-y-2 ${className}`}>
+      <div className="flex items-center gap-1.5">
+        <Label>{label}</Label>
+        {tip && <InfoTip text={tip} />}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function NumberField({ label, value, onChange, placeholder, step = "0.01", tip }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; step?: string; tip?: string }) {
+  return <Field label={label} tip={tip}><Input type="number" inputMode="decimal" min={0} step={step} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></Field>;
 }
 
 const ACCENT_COLORS: Record<string, string> = { cyan: "#5fa8a3", green: "#8aab6e", yellow: "#e0a93b", pink: "#d98ca0", magenta: "#8a3a52" };
 
-function ResultCard({ label, value, accent, emphasize = false }: { label: string; value: string; accent: keyof typeof ACCENT_COLORS; emphasize?: boolean }) {
+function ResultCard({ label, value, accent, emphasize = false, tip }: { label: string; value: string; accent: keyof typeof ACCENT_COLORS; emphasize?: boolean; tip?: string }) {
   const color = ACCENT_COLORS[accent];
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4" style={{ boxShadow: `0 8px 24px -16px ${color}` }}>
       <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: color }} />
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+        {tip && <InfoTip text={tip} />}
+      </div>
       <div className={`mt-2 font-display font-bold tabular-nums ${emphasize ? "text-3xl" : "text-2xl"}`} style={emphasize ? undefined : { color }}>
         {emphasize ? <span className="filament-text">{value}</span> : value}
       </div>
