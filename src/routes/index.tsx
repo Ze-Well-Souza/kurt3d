@@ -10,8 +10,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle } from "lucide-react";
 import { listSnapshot, submitLead } from "@/lib/api/data.functions";
+import { getSiteContent } from "@/lib/api/auth.functions";
 import { KurtiLogo } from "@/components/KurtiLogo";
-import { usePortfolio } from "@/lib/store";
+import { DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
 import heroImg from "@/assets/hero-printer.jpg";
 import work1 from "@/assets/work-1.jpg";
 import work2 from "@/assets/work-2.jpg";
@@ -83,6 +84,11 @@ function Nav() {
 }
 
 function Hero() {
+  const contentQ = useQuery({ queryKey: ["siteContent"], queryFn: () => getSiteContent() });
+  const c = contentQ.data ?? DEFAULT_SITE_CONTENT;
+
+  const heroLines = c.heroTitulo.split("\n");
+
   return (
     <section className="relative overflow-hidden">
       <div className="mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center lg:py-28">
@@ -92,21 +98,23 @@ function Hero() {
             Tecnologia Bambu Lab com AMS
           </div>
           <h1 className="font-display text-5xl font-extrabold leading-[1.05] tracking-tighter md:text-7xl">
-            Rápido. Colorido.<br />
-            <span
-              style={{
-                backgroundImage: "var(--gradient-filament)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              Perfeito.
-            </span>{" "}
-            <span className="text-foreground">Quem vê, curte!</span>
+            {heroLines[0]}{heroLines.length > 1 ? <><br /></> : null}
+            {heroLines.length > 1 && (
+              <span
+                style={{
+                  backgroundImage: "var(--gradient-filament)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                }}
+              >
+                {heroLines[1]}
+              </span>
+            )}
+            {heroLines.length > 2 && <>{" "}<span className="text-foreground">{heroLines.slice(2).join(" ")}</span></>}
           </h1>
           <p className="mt-6 max-w-lg text-lg text-muted-foreground">
-            Sociedade Zé &amp; Kurt | Tecnologia Bambu Lab com AMS | Impressão multicor de alta qualidade
+            {c.heroSubtitulo}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="#contact" className="btn-filament inline-flex h-12 items-center gap-2 px-6 text-sm font-semibold">
@@ -115,14 +123,10 @@ function Hero() {
             <a href="#work"><Button size="lg" variant="outline">Ver portfólio</Button></a>
           </div>
           <div className="mt-12 grid grid-cols-3 gap-6 pt-6">
-            {[
-              { k: "0,05mm", v: "Camada", c: "var(--filament-cyan)" },
-              { k: "<24h", v: "Entrega", c: "var(--filament-pink)" },
-              { k: "12+", v: "Cores", c: "var(--filament-yellow)" },
-            ].map((s) => (
-              <div key={s.v}>
-                <div className="font-display text-2xl font-extrabold" style={{ color: s.c }}>{s.k}</div>
-                <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.v}</div>
+            {c.heroStats.map((s) => (
+              <div key={s.label}>
+                <div className="font-display text-2xl font-extrabold" style={{ color: s.label === "Camada" ? "var(--filament-cyan)" : s.label === "Entrega" ? "var(--filament-pink)" : "var(--filament-yellow)" }}>{s.valor}</div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</div>
               </div>
             ))}
           </div>
@@ -144,24 +148,28 @@ function Hero() {
 }
 
 function Features() {
-  const items = [
-    { icon: Cpu, title: "Qualidade Bambu", desc: "Impressoras Bambu Lab com AMS para multicor pixel-perfect.", color: "var(--filament-cyan)" },
-    { icon: Zap, title: "Entrega expressa", desc: "A maioria dos pedidos sai em até 24 horas.", color: "var(--filament-pink)" },
-    { icon: Layers, title: "Multimaterial", desc: "PLA, PETG, ABS, TPU e filamentos especiais em qualquer cor.", color: "var(--filament-green)" },
-  ];
+  const contentQ = useQuery({ queryKey: ["siteContent"], queryFn: () => getSiteContent() });
+  const c = contentQ.data ?? DEFAULT_SITE_CONTENT;
+  const colors = ["var(--filament-cyan)", "var(--filament-pink)", "var(--filament-green)"];
+  const icons = [Cpu, Zap, Layers];
+
   return (
     <section id="services" className="bg-card/50">
       <div className="filament-divider" />
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-16 md:grid-cols-3">
-        {items.map(({ icon: Icon, title, desc, color }) => (
-          <div key={title} className="group rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-lg">
-            <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl text-white" style={{ background: color }}>
-              <Icon className="h-5 w-5" />
+        {c.features.map((f, i) => {
+          const Icon = icons[i] ?? Cpu;
+          const color = colors[i] ?? "var(--filament-cyan)";
+          return (
+            <div key={f.titulo} className="group rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-lg">
+              <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl text-white" style={{ background: color }}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-semibold">{f.titulo}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{f.descricao}</p>
             </div>
-            <h3 className="text-lg font-semibold">{title}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="filament-divider" />
     </section>
@@ -169,9 +177,9 @@ function Features() {
 }
 
 function Gallery() {
-  const portfolio = usePortfolio();
+  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const portfolio = snap.data?.portfolio ?? [];
 
-  // If we have portfolio projects from the store, show them; otherwise fallback to static images
   const hasProjects = portfolio.length > 0;
 
   return (
@@ -338,10 +346,13 @@ function Footer() {
 }
 
 function SocialIcons({ className = "" }: { className?: string }) {
+  const contentQ = useQuery({ queryKey: ["siteContent"], queryFn: () => getSiteContent() });
+  const c = contentQ.data ?? DEFAULT_SITE_CONTENT;
+
   return (
     <div className={`items-center gap-1 ${className}`}>
       <a
-        href="https://instagram.com/kurti3d"
+        href={c.instagramUrl}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Instagram"
@@ -350,7 +361,7 @@ function SocialIcons({ className = "" }: { className?: string }) {
         <Instagram className="h-4 w-4" />
       </a>
       <a
-        href="https://youtube.com/@kurti3d"
+        href={c.youtubeUrl}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="YouTube"

@@ -128,6 +128,42 @@ export type Client = {
   updatedAt: string;
 };
 
+export type AdminUser = {
+  id: string;
+  username: string;
+  phone?: string | null;
+  nome?: string | null;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SiteContent = {
+  heroTitulo: string;
+  heroSubtitulo: string;
+  heroStats: { valor: string; label: string }[];
+  features: { titulo: string; descricao: string }[];
+  instagramUrl: string;
+  youtubeUrl: string;
+};
+
+export const DEFAULT_SITE_CONTENT: SiteContent = {
+  heroTitulo: "Rápido. Colorido.\nPerfeito.",
+  heroSubtitulo: "Sociedade Zé & Kurt | Tecnologia Bambu Lab com AMS | Impressão multicor de alta qualidade",
+  heroStats: [
+    { valor: "0,05mm", label: "Camada" },
+    { valor: "<24h", label: "Entrega" },
+    { valor: "12+", label: "Cores" },
+  ],
+  features: [
+    { titulo: "Qualidade Bambu", descricao: "Impressoras Bambu Lab com AMS para multicor pixel-perfect." },
+    { titulo: "Entrega expressa", descricao: "A maioria dos pedidos sai em até 24 horas." },
+    { titulo: "Multimaterial", descricao: "PLA, PETG, ABS, TPU e filamentos especiais em qualquer cor." },
+  ],
+  instagramUrl: "https://instagram.com/kurti3d",
+  youtubeUrl: "https://youtube.com/@kurti3d",
+};
+
 export type AppSettings = {
   // Perfil do Estúdio
   studioNome: string;

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle } from "lucide-react";
+import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { listSnapshot, saveSettings } from "@/lib/api/data.functions";
-import type { AppSettings } from "@/lib/domain/types";
-import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
+import { changePassword, listUsers, createUser, deleteUser, getSiteContent, saveSiteContent } from "@/lib/api/auth.functions";
+import type { AppSettings, SiteContent } from "@/lib/domain/types";
+import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Configurações — Kurti 3D" }] }),
@@ -185,35 +189,16 @@ function SettingsPage() {
             <Input value={form.whatsappNumero} onChange={(e) => setField("whatsappNumero", e.target.value)} placeholder="5511999999999" maxLength={30} />
           </SettingsField>
         </SectionCard>
-
-        {/* ── Preview Section ── */}
-        <Card className="filament-top overflow-hidden border-border bg-card">
-          <div className="border-b border-border px-6 py-4">
-            <h2 className="font-display text-base font-semibold tracking-tight">Pré-visualização de Custo</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Estimativa baseada em: 1h de impressão, peça de 10g, rolo de R$120/kg.</p>
-          </div>
-          <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-5">
-            <PreviewCard label="Filamento /un." value={`R$ ${previewCost.custoFilamento.toFixed(4)}`} color="var(--filament-cyan)" />
-            <PreviewCard label="Energia /un." value={`R$ ${previewCost.custoEnergia.toFixed(4)}`} color="var(--filament-yellow)" />
-            <PreviewCard label="Depreciação /un." value={`R$ ${previewCost.custoDepreciacao.toFixed(4)}`} color="var(--filament-pink)" />
-            <PreviewCard label="Custo Fixo /un." value={`R$ ${previewCost.custoFixo.toFixed(4)}`} color="var(--filament-green)" />
-            <PreviewCard label="Custo Total /un." value={`R$ ${previewCost.custoUnidade.toFixed(4)}`} color="var(--filament-magenta)" bold />
-          </div>
-        </Card>
-
-        {/* ── Actions ── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4">
-          <Button type="button" variant="outline" size="sm" className="gap-2 text-muted-foreground" onClick={resetToDefaults}>
-            <RotateCcw className="h-4 w-4" /> Restaurar padrões
-          </Button>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={resetToCurrent} disabled={!hasChanges}>Cancelar</Button>
-            <Button type="submit" size="sm" className="btn-filament gap-2 px-6" disabled={mutate.isPending || !hasChanges}>
-              <Save className="h-4 w-4" /> {mutate.isPending ? "Salvando..." : "Salvar Configurações"}
-            </Button>
-          </div>
-        </div>
       </form>
+
+      {/* ── Section: Senha ── */}
+      <ChangePasswordCard />
+
+      {/* ── Section: Usuários Admin ── */}
+      <UserManagementCard />
+
+      {/* ── Section: Conteúdo do Site ── */}
+      <SiteContentCard />
     </div>
   );
 }
@@ -264,5 +249,262 @@ function PreviewCard({ label, value, color, bold = false }: { label: string; val
         {value}
       </div>
     </div>
+  );
+}
+
+function ChangePasswordCard() {
+  const qc = useQueryClient();
+  const [newPass, setNewPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const mutate = useMutation({
+    mutationFn: () => changePassword({ data: { newPassword: newPass } }),
+    onSuccess: () => {
+      toast.success("Senha alterada com sucesso.");
+      setNewPass("");
+      setConfirm("");
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao alterar senha."),
+  });
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPass.length < 8) { toast.error("Senha deve ter pelo menos 8 caracteres."); return; }
+    if (newPass !== confirm) { toast.error("As senhas não conferem."); return; }
+    mutate.mutate();
+  }
+
+  return (
+    <Card className="filament-top overflow-hidden border-border bg-card">
+      <div className="border-b border-border px-6 py-4">
+        <div className="flex items-center gap-2">
+          <Lock className="h-4 w-4 text-muted-foreground" />
+          <h2 className="font-display text-base font-semibold tracking-tight">Alterar Senha</h2>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">Altere a senha de acesso ao painel.</p>
+      </div>
+      <form onSubmit={submit} className="grid gap-5 p-6 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">Nova senha</Label>
+          <Input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="mínimo 8 caracteres" />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">Confirmar nova senha</Label>
+          <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="repita a senha" />
+        </div>
+        <div className="sm:col-span-2">
+          <Button type="submit" size="sm" className="btn-filament gap-2" disabled={mutate.isPending}>
+            <Lock className="h-4 w-4" /> {mutate.isPending ? "Salvando..." : "Alterar Senha"}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+function UserManagementCard() {
+  const qc = useQueryClient();
+  const usersQ = useQuery({ queryKey: ["adminUsers"], queryFn: () => listUsers() });
+  const [showDialog, setShowDialog] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "" });
+
+  const mutateCreate = useMutation({
+    mutationFn: () => createUser({ data: { nome: form.nome, phone: form.phone, username: form.username, password: form.password } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      toast.success("Usuário criado.");
+      setForm({ nome: "", phone: "", username: "", password: "" });
+      setShowDialog(false);
+    },
+    onError: (err: any) => toast.error(err?.message === "phone_exists" ? "Telefone já cadastrado." : err?.message === "username_exists" ? "Usuário já existe." : err?.message ?? "Erro ao criar."),
+  });
+
+  const mutateDelete = useMutation({
+    mutationFn: (userId: string) => deleteUser({ data: { userId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      toast.success("Usuário removido.");
+      setDeleteId(null);
+    },
+    onError: (err: any) => toast.error(err?.message === "cannot_delete_self" ? "Não é possível remover a si mesmo." : err?.message === "cannot_delete_last_user" ? "Não é possível remover o último usuário." : err?.message ?? "Erro."),
+  });
+
+  const users = usersQ.data ?? [];
+
+  return (
+    <>
+      <Card className="filament-top overflow-hidden border-border bg-card">
+        <div className="border-b border-border px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <h2 className="font-display text-base font-semibold tracking-tight">Usuários Admin</h2>
+            </div>
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowDialog(true)}>
+              <Plus className="h-4 w-4" /> Novo Usuário
+            </Button>
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">Gerencie os administradores com acesso ao painel.</p>
+        </div>
+        <div className="p-6">
+          {users.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum usuário encontrado.</p>
+          ) : (
+            <div className="space-y-3">
+              {users.map((u) => (
+                <div key={u.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+                  <div>
+                    <p className="font-medium">{u.nome ?? u.username}</p>
+                    <p className="text-xs text-muted-foreground">{u.phone ?? u.username} · {u.role}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Create user dialog */}
+      <Dialog open={showDialog} onOpenChange={(o) => !o && setShowDialog(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Novo Usuário Admin</DialogTitle></DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); if (form.password.length < 8) { toast.error("Senha deve ter pelo menos 8 caracteres."); return; } mutateCreate.mutate(); }} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Nome do usuário" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Telefone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="11967428594" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Usuário (login alternativo)</Label>
+              <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="nome_usuario" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Senha</Label>
+              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="mínimo 8 caracteres" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
+              <Button type="submit" className="btn-filament" disabled={mutateCreate.isPending}>{mutateCreate.isPending ? "Criando..." : "Criar"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Remover Usuário</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Tem certeza que deseja remover este usuário? Esta ação não pode ser desfeita.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => { if (deleteId) mutateDelete.mutate(deleteId); }} disabled={mutateDelete.isPending}>{mutateDelete.isPending ? "Removendo..." : "Remover"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function SiteContentCard() {
+  const qc = useQueryClient();
+  const contentQ = useQuery({ queryKey: ["siteContent"], queryFn: () => getSiteContent() });
+  const [form, setForm] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
+  const [dirty, setDirty] = useState(false);
+
+  // Sync form when data loads
+  useEffect(() => {
+    if (contentQ.data && !dirty) {
+      setForm(contentQ.data);
+    }
+  }, [contentQ.data, dirty]);
+
+  const mutate = useMutation({
+    mutationFn: () => saveSiteContent({ data: form }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["siteContent"] });
+      setDirty(false);
+      toast.success("Conteúdo do site salvo.");
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao salvar."),
+  });
+
+  function set<K extends keyof SiteContent>(key: K, value: SiteContent[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+    setDirty(true);
+  }
+
+  return (
+    <Card className="filament-top overflow-hidden border-border bg-card">
+      <div className="border-b border-border px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-display text-base font-semibold tracking-tight">Conteúdo do Site</h2>
+          </div>
+          <Button size="sm" className="btn-filament gap-2" disabled={mutate.isPending || !dirty} onClick={() => mutate.mutate()}>
+            <Save className="h-4 w-4" /> {mutate.isPending ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">Edite os textos e links exibidos na landing page.</p>
+      </div>
+      <div className="grid gap-5 p-6 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-sm font-medium">Título do Hero</Label>
+          <Input value={form.heroTitulo} onChange={(e) => set("heroTitulo", e.target.value)} placeholder="Rápido. Colorido.\nPerfeito." />
+          <p className="text-[11px] text-muted-foreground">Use \n para quebra de linha. Linha 2 recebe gradiente colorido.</p>
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-sm font-medium">Subtítulo do Hero</Label>
+          <Input value={form.heroSubtitulo} onChange={(e) => set("heroSubtitulo", e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">Instagram URL</Label>
+          <Input value={form.instagramUrl} onChange={(e) => set("instagramUrl", e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">YouTube URL</Label>
+          <Input value={form.youtubeUrl} onChange={(e) => set("youtubeUrl", e.target.value)} />
+        </div>
+        {form.heroStats.map((s, i) => (
+          <div key={i} className="space-y-1.5">
+            <Label className="text-sm font-medium">Stat {i + 1}: Valor</Label>
+            <Input value={s.valor} onChange={(e) => {
+              const next = [...form.heroStats];
+              next[i] = { ...next[i], valor: e.target.value };
+              set("heroStats", next);
+            }} />
+            <Label className="text-[11px] text-muted-foreground">Label</Label>
+            <Input value={s.label} onChange={(e) => {
+              const next = [...form.heroStats];
+              next[i] = { ...next[i], label: e.target.value };
+              set("heroStats", next);
+            }} />
+          </div>
+        ))}
+        {form.features.map((f, i) => (
+          <div key={i} className="space-y-1.5 sm:col-span-2">
+            <Label className="text-sm font-medium">Feature {i + 1}: Título</Label>
+            <Input value={f.titulo} onChange={(e) => {
+              const next = [...form.features];
+              next[i] = { ...next[i], titulo: e.target.value };
+              set("features", next);
+            }} />
+            <Label className="text-[11px] text-muted-foreground">Descrição</Label>
+            <Input value={f.descricao} onChange={(e) => {
+              const next = [...form.features];
+              next[i] = { ...next[i], descricao: e.target.value };
+              set("features", next);
+            }} />
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }

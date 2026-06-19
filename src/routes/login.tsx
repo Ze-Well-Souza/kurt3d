@@ -21,10 +21,12 @@ export const Route = createFileRoute("/login")({
 const setupSchema = z.object({
   username: z.string().min(1).max(50),
   password: z.string().min(8).max(200),
+  phone: z.string().min(1).max(20),
+  nome: z.string().min(1).max(100),
 });
 
 const loginSchema = z.object({
-  username: z.string().min(1).max(50),
+  phone: z.string().min(1).max(20),
   password: z.string().min(1).max(200),
 });
 
@@ -32,35 +34,38 @@ function LoginPage() {
   const navigate = useNavigate();
   const ctx = Route.useRouteContext();
 
-  const [username, setUsername] = useState("admin");
+  const [phone, setPhone] = useState("11967428594");
   const [password, setPassword] = useState("");
-
-  useEffect(() => {
-    if (ctx.setupRequired) setUsername("admin");
-  }, [ctx.setupRequired]);
+  const [nome, setNome] = useState("");
+  const [username, setUsername] = useState("admin");
 
   const isSetup = ctx.setupRequired;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = (isSetup ? setupSchema : loginSchema).safeParse({ username, password });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
-      return;
-    }
     if (isSetup) {
-      await setupAdmin(parsed.data);
+      const parsed = setupSchema.safeParse({ username, password, phone, nome });
+      if (!parsed.success) {
+        toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
+        return;
+      }
+      await setupAdmin({ data: parsed.data });
       toast.success("Admin configurado.");
       navigate({ to: "/admin" });
-      return;
+    } else {
+      const parsed = loginSchema.safeParse({ phone, password });
+      if (!parsed.success) {
+        toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
+        return;
+      }
+      const res = await login({ data: parsed.data });
+      if (!res.ok) {
+        toast.error("Telefone ou senha inválidos.");
+        return;
+      }
+      toast.success("Bem-vindo.");
+      navigate({ to: "/admin" });
     }
-    const res = await login(parsed.data);
-    if (!res.ok) {
-      toast.error("Usuário ou senha inválidos.");
-      return;
-    }
-    toast.success("Bem-vindo.");
-    navigate({ to: "/admin" });
   }
 
   return (
@@ -72,25 +77,53 @@ function LoginPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isSetup
-            ? "Defina o usuário e uma senha forte para acessar o painel."
+            ? "Configure o primeiro administrador do sistema."
             : "Acesse o painel de gestão da Kurti 3D."}
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={submit}>
-          <div className="space-y-2">
-            <Label htmlFor="username">Usuário</Label>
-            <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={isSetup ? "mínimo 8 caracteres" : ""}
-            />
-          </div>
+          {isSetup ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="nome">Seu nome</Label>
+                <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone-setup">Telefone</Label>
+                <Input id="phone-setup" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="11967428594" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="username">Usuário (login alternativo)</Label>
+                <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="mínimo 8 caracteres"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Telefone</Label>
+                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="11967428594" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </>
+          )}
           <Button type="submit" className="btn-filament w-full">
             {isSetup ? "Criar Admin" : "Entrar"}
           </Button>

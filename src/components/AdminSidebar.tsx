@@ -1,9 +1,11 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, Settings, ThumbsUp, Layers, Calculator, Users } from "lucide-react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { LayoutDashboard, Wallet, Settings, ThumbsUp, Layers, Calculator, Users, UserCheck, LogOut, MessageSquare } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -12,20 +14,30 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { logout } from "@/lib/api/auth.functions";
 
 const items = [
   { title: "Painel", url: "/admin", icon: LayoutDashboard },
   { title: "Estoque de Filamentos", url: "/admin/stock", icon: Layers },
   { title: "Calculadora e Pedidos", url: "/admin/portfolio", icon: Calculator },
   { title: "Clientes", url: "/admin/clients", icon: Users },
+  { title: "Leads", url: "/admin/leads", icon: MessageSquare },
   { title: "Finanças", url: "/admin/finances", icon: Wallet },
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 
 export function AdminSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const navigate = useNavigate();
   const isActive = (url: string) =>
     url === "/admin" ? pathname === "/admin" : pathname.startsWith(url);
+
+  async function handleLogout() {
+    await logout();
+    toast.success("Sessão encerrada.");
+    navigate({ to: "/login" });
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -44,7 +56,6 @@ export function AdminSidebar() {
             Kurti 3D
           </span>
         </Link>
-
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -73,6 +84,18 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground group-data-[collapsible=icon]:justify-center"
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="group-data-[collapsible=icon]:hidden">Sair</span>
+        </Button>
+      </SidebarFooter>
     </Sidebar>
   );
 }
+

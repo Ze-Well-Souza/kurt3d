@@ -1,9 +1,16 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { requireAuth } from "@/lib/api/auth.functions";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — Kurti 3D" }] }),
+  beforeLoad: async () => {
+    const auth = await requireAuth();
+    if (auth.setupRequired) throw redirect({ to: "/login" });
+    if (!auth.userId) throw redirect({ to: "/login" });
+    return auth;
+  },
   component: AdminLayout,
 });
 

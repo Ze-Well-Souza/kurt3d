@@ -2,6 +2,9 @@ create table if not exists public.users (
   id text primary key,
   username text not null unique,
   password_hash text not null,
+  phone text null,
+  nome text null,
+  role text not null default 'admin',
   created_at timestamptz not null,
   updated_at timestamptz not null
 );
@@ -158,5 +161,13 @@ create index if not exists idx_inventory_txns_film_order on public.inventory_txn
 create index if not exists idx_vendas_data on public.vendas(data desc);
 create index if not exists idx_expenses_data on public.expenses(data desc);
 create index if not exists idx_filamentos_history_arquivado on public.filamentos_history(arquivado_at desc);
+create table if not exists public.site_content (
+  id text primary key default 'main',
+  content jsonb not null default '{}',
+  updated_at timestamptz not null default now()
+);
+
+insert into public.site_content (id) values ('main') on conflict (id) do nothing;
+
 create index if not exists idx_leads_created_at on public.leads(created_at desc);
 create index if not exists idx_clients_nome on public.clients(nome);

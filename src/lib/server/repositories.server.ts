@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { AppSettings, Client, Expense, ExpenseSource, Filamento, FilamentoHistory, Insumo, InventoryTxn, Lead, Order, PortfolioProject, Venda } from "../domain/types";
+import type { AdminUser, AppSettings, Client, Expense, ExpenseSource, Filamento, FilamentoHistory, Insumo, InventoryTxn, Lead, Order, PortfolioProject, SiteContent, Venda } from "../domain/types";
 import { DEFAULT_APP_SETTINGS } from "../domain/types";
+import { DEFAULT_SITE_CONTENT } from "../domain/types";
 import { computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "./db.server";
 import { getSupabaseAdminClient } from "./supabase.server";
@@ -10,6 +11,9 @@ export type User = {
   id: string;
   username: string;
   passwordHash: string;
+  phone?: string | null;
+  nome?: string | null;
+  role: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,6 +48,9 @@ function fromUserRow(row: any): User {
     id: row.id,
     username: row.username,
     passwordHash: row.password_hash,
+    phone: row.phone ?? null,
+    nome: row.nome ?? null,
+    role: row.role ?? "admin",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -54,6 +61,9 @@ function toUserRow(user: User) {
     id: user.id,
     username: user.username,
     password_hash: user.passwordHash,
+    phone: user.phone ?? null,
+    nome: user.nome ?? null,
+    role: user.role ?? "admin",
     created_at: user.createdAt,
     updated_at: user.updatedAt,
   };
@@ -547,6 +557,30 @@ export async function settingsRepo() {
     async save(next: AppSettings) {
       const supabase2 = getSupabaseAdminClient();
       unwrap(await supabase2.from("app_settings").upsert(toSettingsRow(next), { onConflict: "id" }));
+    },
+  };
+}
+
+export async function siteContentRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrap(await supabase.from("site_content").select("*").eq("id", "main").limit(1));
+  const list = rows as any[];
+  let content: SiteContent;
+  if (list.length > 0 && list[0].content) {
+    content = { ...DEFAULT_SITE_CONTENT, ...(list[0].content as Partial<SiteContent>) };
+  } else {
+    content = { ...DEFAULT_SITE_CONTENT };
+  }
+  return {
+    content,
+    async save(next: SiteContent) {
+      const supabase2 = getSupabaseAdminClient();
+      unwrap(
+        await supabase2.from("site_content").upsert(
+          { id: "main", content: next, updated_at: new Date().toISOString() },
+          { onConflict: "id" },
+        ),
+      );
     },
   };
 }

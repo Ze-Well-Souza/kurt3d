@@ -77,14 +77,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Kurti 3D — Impressão 3D Multicor" },
+      { name: "description", content: "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS. Protótipos, peças personalizadas e projetos criativos." },
+      { name: "author", content: "Kurti 3D" },
+      { property: "og:title", content: "Kurti 3D — Impressão 3D Multicor" },
+      { property: "og:description", content: "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@kurti3d" },
     ],
     links: [
       {
@@ -101,7 +101,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>
