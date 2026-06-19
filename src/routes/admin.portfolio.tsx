@@ -514,39 +514,79 @@ function CalcPedidos() {
   function renderCalculatorTab() {
     return (
       <div className="space-y-8">
+      <TooltipProvider delayDuration={150}>
+      <div className="space-y-8">
         {/* Form + Results */}
         <form onSubmit={submitProject} className="filament-top space-y-6 rounded-2xl border border-border bg-card p-6">
+          {/* ── Bloco 1: Identificação do projeto ── */}
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            <Field label="Nome do Projeto" className="md:col-span-2"><Input value={form.nome} onChange={(e) => setField("nome", e.target.value)} placeholder="Chaveiro logo Bambu" maxLength={100} /></Field>
-            <Field label="Categoria" className="md:col-span-2">
+            <Field label="Nome do Projeto" tip="Como esse modelo será identificado nos pedidos e relatórios. Ex.: 'Chaveiro logo Bambu'." className="md:col-span-2"><Input value={form.nome} onChange={(e) => setField("nome", e.target.value)} placeholder="Chaveiro logo Bambu" maxLength={100} /></Field>
+            <Field label="Categoria" tip="Tipo da peça — usado para agrupar nos relatórios. Ex.: Chaveiro, Miniatura, Decoração." className="md:col-span-2">
               <Select value={form.categoria} onValueChange={(v) => setField("categoria", v as Category)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{CATEGORIES.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
               </Select>
             </Field>
-            <Field label="Link do Modelo (MakerWorld/STL)" className="md:col-span-2"><Input value={form.linkModelo} onChange={(e) => setField("linkModelo", e.target.value)} placeholder="https://makerworld.com/en/models/..." type="url" /></Field>
-            <Field label="Filamento (Rolo)" className="md:col-span-2">
+            <Field label="Link do Modelo (MakerWorld/STL)" tip="URL do modelo 3D (MakerWorld, Printables, Thingiverse). Opcional — facilita reimprimir depois." className="md:col-span-2"><Input value={form.linkModelo} onChange={(e) => setField("linkModelo", e.target.value)} placeholder="https://makerworld.com/en/models/..." type="url" /></Field>
+            <Field label="Filamento (Rolo)" tip="Selecione um rolo do seu estoque para preencher automaticamente Custo do Rolo e Peso do Rolo." className="md:col-span-2">
               <Select value={form.filamentoId} onValueChange={(v) => { setField("filamentoId", v); const f = filamentos.find((x) => x.id === v); if (f) { setField("custoRolo", String(f.precoPago)); setField("pesoRolo", String(f.pesoInicial)); } }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o rolo" /></SelectTrigger>
                 <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>[{f.sku}] {f.marca} - {f.cor} (Restam {f.pesoAtual}g)</SelectItem>))}</SelectContent>
               </Select>
             </Field>
-            <NumberField label="Custo do Rolo (R$)" value={form.custoRolo} onChange={(v) => setField("custoRolo", v)} placeholder="120,00" />
-            <NumberField label="Peso do Rolo (g)" value={form.pesoRolo} onChange={(v) => setField("pesoRolo", v)} placeholder="1000" />
-            <NumberField label="Peso da Peça (g)" value={form.pesoPeca} onChange={(v) => setField("pesoPeca", v)} placeholder="6" />
-            <NumberField label="Tempo de Impressão (min)" value={form.tempoMin} onChange={(v) => setField("tempoMin", v)} placeholder="35" />
-            <NumberField label="Quantidade do Lote" value={form.quantidade} onChange={(v) => setField("quantidade", v)} placeholder="20" step="1" />
-            <NumberField label="% Desperdício" value={form.perdaPercent} onChange={(v) => setField("perdaPercent", v)} placeholder="0" step="1" />
-            <NumberField label="Preço de Venda Sugerido (R$)" value={form.precoVenda} onChange={(v) => setField("precoVenda", v)} placeholder="15,00" />
+          </div>
+
+          {/* ── Bloco 2: Impressora (preset Bambu Lab) ── */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Calculator className="h-3.5 w-3.5" /> Impressora e Amortização
+            </div>
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <Field label="Modelo Bambu Lab" tip="Preset oficial Bambu Lab. Define a wattagem usada no cálculo de energia. Ex.: A1 = 150W, X1-Carbon = 350W.">
+                <Select value={form.modeloPreset} onValueChange={(v) => setField("modeloPreset", v as BambuPresetId)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{BAMBU_PRESETS.map((m) => (<SelectItem key={m.id} value={m.id}>{m.label} — {m.watts}W</SelectItem>))}</SelectContent>
+                </Select>
+              </Field>
+              <NumberField label="Preço da Impressora (R$)" value={form.precoImpressora} onChange={(v) => setField("precoImpressora", v)} placeholder="2999,00" tip="Quanto você pagou pela impressora. Usado para calcular a amortização (desgaste) por hora. Ex.: A1 ≈ R$ 2.999." />
+              <NumberField label="Vida Útil (horas)" value={form.vidaUtilHoras} onChange={(v) => setField("vidaUtilHoras", v)} placeholder="2000" step="100" tip="Quantas horas você espera que a impressora dure antes de precisar trocar partes principais. Padrão: 2000h (~2-3 anos de uso intenso)." />
+              <NumberField label="% Margem de Lucro" value={form.margemPercent} onChange={(v) => setField("margemPercent", v)} placeholder="30" step="1" tip="Percentual de lucro sobre o custo. Ex.: custo R$ 2, margem 30% → preço sugerido R$ 2,60. O bambucostpro.com usa 30% como padrão." />
+            </div>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Amortização calculada: <strong className="filament-text">{brl(results.amortHora)}/h</strong> (Preço ÷ Vida útil) · Consumo: <strong>{(results.consumoKw * 1000).toFixed(0)}W</strong>
+            </p>
+          </div>
+
+          {/* ── Bloco 3: Filamento, peça e lote ── */}
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            <NumberField label="Custo do Rolo (R$)" value={form.custoRolo} onChange={(v) => setField("custoRolo", v)} placeholder="120,00" tip="Quanto você pagou pelo rolo inteiro de filamento. Ex.: R$ 120 por um rolo Creality PLA de 1kg." />
+            <NumberField label="Peso do Rolo (g)" value={form.pesoRolo} onChange={(v) => setField("pesoRolo", v)} placeholder="1000" tip="Peso total do rolo cheio. Padrão: 1000g (1kg). Verifique a embalagem do filamento." />
+            <NumberField label="Peso da Peça (g)" value={form.pesoPeca} onChange={(v) => setField("pesoPeca", v)} placeholder="6" tip="Quanto pesa UMA peça depois de impressa. Olhe no Bambu Studio / OrcaSlicer no painel à direita, em 'Filament'. Ex.: chaveiro = 6g." />
+            <NumberField label="Tempo de Impressão (min)" value={form.tempoMin} onChange={(v) => setField("tempoMin", v)} placeholder="35" tip="Tempo total de UMA impressão (não importa se é 1 peça ou várias na mesma placa). Veja no Bambu Studio, canto inferior direito, antes de enviar. Ex.: 35min." />
+            <NumberField label="Quantidade do Lote" value={form.quantidade} onChange={(v) => setField("quantidade", v)} placeholder="20" step="1" tip="Quantas peças TOTAIS você vai produzir desse projeto (somando todas as sessões de impressão, se forem várias). Ex.: 20 chaveiros vendidos = quantidade 20, mesmo que você imprima 5 por vez em 4 sessões." />
+            <NumberField label="% Desperdício" value={form.perdaPercent} onChange={(v) => setField("perdaPercent", v)} placeholder="0" step="1" tip="Percentual estimado de impressões que falham, descolam ou saem com defeito. Comece com 0%. Depois de imprimir um tempo, se 1 em 20 falha = 5%. Cobre prejuízos no preço final." />
+            <div className="lg:col-span-2">
+              <NumberField label="Preço de Venda (R$)" value={form.precoVenda} onChange={(v) => setField("precoVenda", v)} placeholder="15,00" tip="Quanto você cobra por UMA peça. Use o 'Aplicar sugerido' ao lado para preencher automaticamente com base na sua margem." />
+            </div>
           </div>
 
           {/* Results */}
-          <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-5">
-            <ResultCard label="Custo Filamento /un." value={brl(results.custoFilamento)} accent="cyan" />
-            <ResultCard label="Energia + Depreciação" value={brl(results.custoEnergia + results.custoDepreciacao)} accent="yellow" />
-            <ResultCard label="Desperdício" value={brl(results.custoPerda)} accent="pink" />
-            <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" />
-            <ResultCard label="Lucro Líquido" value={brl(results.lucroLiquido)} accent={results.lucroLiquido >= 0 ? "green" : "magenta"} emphasize />
+          <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <ResultCard label="Custo Filamento /un." value={brl(results.custoFilamento)} accent="cyan" tip="Filamento usado em UMA peça × preço por grama. Fórmula: (Custo do Rolo ÷ Peso do Rolo) × Peso da Peça." />
+            <ResultCard label="Energia + Depreciação" value={brl(results.custoEnergia + results.custoDepreciacao)} accent="yellow" tip="Energia elétrica gasta na impressão + desgaste da máquina (amortização). Por peça." />
+            <ResultCard label="Desperdício" value={brl(results.custoPerda)} accent="pink" tip="Acréscimo de custo para cobrir as impressões que falham. Calculado como % do custo base." />
+            <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" tip="Custo por peça × Quantidade do Lote. É o quanto você gasta para produzir o lote inteiro." />
+            <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4">
+              <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: ACCENT_COLORS.green }} />
+              <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
+                Preço Sugerido <InfoTip text={`Custo por unidade + ${form.margemPercent || 0}% de margem. Clique em Aplicar para usar como Preço de Venda.`} />
+              </div>
+              <div className="mt-2 font-display text-2xl font-bold tabular-nums" style={{ color: ACCENT_COLORS.green }}>{brl(results.precoSugerido)}</div>
+              <Button type="button" size="sm" variant="outline" className="mt-2 h-7 gap-1 text-xs" onClick={() => setField("precoVenda", results.precoSugerido.toFixed(2))}>
+                <Wand2 className="h-3 w-3" /> Aplicar
+              </Button>
+            </div>
+            <ResultCard label="Lucro Líquido" value={brl(results.lucroLiquido)} accent={results.lucroLiquido >= 0 ? "green" : "magenta"} emphasize tip="Receita Total − Custo Total do Lote. Negativo = você está pagando para trabalhar." />
           </div>
 
           <div className="flex justify-end">
