@@ -90,6 +90,22 @@ export const upsertFilamento = createServerFn({ method: "POST" })
     const repo = await filamentosRepo();
     const id = data.id ?? randomUUID();
     const existing = repo.list.find((f) => f.id === id);
+    const skuNorm = data.sku.trim().toLowerCase();
+    const duplicate = repo.list.find(
+      (f) => f.sku.trim().toLowerCase() === skuNorm && f.id !== id,
+    );
+    if (duplicate) {
+      throw new Error(`SKU "${data.sku}" já está cadastrado em outro filamento ativo.`);
+    }
+    if (!existing) {
+      const history = await filamentosHistoryRepo();
+      const inHistory = history.list.find(
+        (f) => f.sku.trim().toLowerCase() === skuNorm,
+      );
+      if (inHistory) {
+        throw new Error(`SKU "${data.sku}" já foi utilizado em um filamento arquivado.`);
+      }
+    }
     const filamento: Filamento = {
       id,
       sku: data.sku,
@@ -109,6 +125,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
     await repo.save(next);
     return { ok: true };
   });
+
 
 export const removeFilamento = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string().min(1) }))
