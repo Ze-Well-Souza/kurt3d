@@ -111,14 +111,15 @@ const QUALIDADE_CONFIG: Record<FilamentoQualidade, { label: string; color: strin
   ruim: { label: "Ruim", color: "var(--filament-magenta)", icon: ThumbsDown },
 };
 
-function generateSku(filamentos: Filamento[]): string {
+function generateSku(usedSkus: string[]): string {
   let max = 0;
-  for (const f of filamentos) {
-    const match = f.sku.match(/^FIL-(\d+)$/);
+  for (const sku of usedSkus) {
+    const match = sku.match(/^FIL-(\d+)$/i);
     if (match) max = Math.max(max, Number(match[1]));
   }
   return `FIL-${String(max + 1).padStart(3, "0")}`;
 }
+
 
 type FilamentoView = Filamento & { reservedGrams?: number; disponivelGrams?: number; label?: string };
 
