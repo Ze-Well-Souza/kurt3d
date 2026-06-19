@@ -647,6 +647,7 @@ function CalcPedidos() {
           )}
         </div>
       </div>
+      </TooltipProvider>
     );
   }
 
