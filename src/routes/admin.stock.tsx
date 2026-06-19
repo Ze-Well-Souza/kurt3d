@@ -411,6 +411,14 @@ function Stock() {
               onChange={(e) => setFField("dataCompra", e.target.value)}
             />
           </Field>
+          <NumberField
+            label="Quantidade (rolos)"
+            value={fForm.quantidade}
+            onChange={(v) => setFField("quantidade", v)}
+            placeholder="1"
+            step="1"
+          />
+
           <Field label="Link do Produto (opcional)" className="md:col-span-2 lg:col-span-4">
             <Input
               type="url"
