@@ -63,6 +63,7 @@ type FilamentoForm = {
   precoPago: string;
   dataCompra: string;
   linkProduto: string;
+  quantidade: string;
 };
 
 const initialFilamentoForm: FilamentoForm = {
@@ -74,7 +75,9 @@ const initialFilamentoForm: FilamentoForm = {
   precoPago: "",
   dataCompra: "",
   linkProduto: "",
+  quantidade: "1",
 };
+
 
 const insumoSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome do item").max(200),
