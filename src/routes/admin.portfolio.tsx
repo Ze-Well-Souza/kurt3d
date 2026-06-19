@@ -7,8 +7,9 @@ import {
 } from "@dnd-kit/core";
 import {
   Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays,
-  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search,
+  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search, Info, Wand2,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
