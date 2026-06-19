@@ -171,6 +171,10 @@ function CalcPedidos() {
     pesoPeca: Number(form.pesoPeca) || 0, tempoMin: Number(form.tempoMin) || 0,
     quantidade: Number(form.quantidade) || 0, precoVenda: Number(form.precoVenda) || 0,
     perdaPercent: Number(form.perdaPercent) || 0,
+    modeloPreset: form.modeloPreset,
+    precoImpressora: Number(form.precoImpressora) || 0,
+    vidaUtilHoras: Number(form.vidaUtilHoras) || 0,
+    margemPercent: Number(form.margemPercent) || 0,
   }), [form]);
   const results = useMemo(() => calc({ ...numeric, settings }), [numeric, settings]);
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
