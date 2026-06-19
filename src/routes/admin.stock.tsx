@@ -399,11 +399,12 @@ function Stock() {
             step="1"
           />
           <NumberField
-            label="Preço Pago (R$)"
+            label="Preço Pago por Rolo (R$)"
             value={fForm.precoPago}
             onChange={(v) => setFField("precoPago", v)}
             placeholder="120,00"
           />
+
           <Field label="Data da Compra">
             <Input
               type="date"
