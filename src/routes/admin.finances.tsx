@@ -91,6 +91,95 @@ function Finances() {
         </p>
       </div>
 
+      {/* Manual / Como funciona */}
+      <Accordion type="single" collapsible className="filament-top rounded-2xl border border-border bg-card px-6">
+        <AccordionItem value="manual" className="border-0">
+          <AccordionTrigger className="py-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" style={{ color: "var(--filament-cyan)" }} />
+              <span className="font-display text-base font-semibold">Como funciona o seu Financeiro (manual rápido)</span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pb-6 text-sm text-muted-foreground">
+            <div className="space-y-5 leading-relaxed">
+              <p>
+                Este módulo calcula o seu <strong className="text-foreground">lucro real</strong> a partir de três entradas:
+                vendas finalizadas, despesas registradas e o custo de produção de cada peça.
+              </p>
+
+              <div>
+                <h4 className="mb-1 font-semibold text-foreground" style={{ color: "var(--filament-cyan)" }}>
+                  1. Receita Total (entradas)
+                </h4>
+                <p>
+                  Só conta como receita quando você <strong className="text-foreground">finaliza um pedido</strong> em{" "}
+                  <em>Calculadora e Pedidos → coluna Concluído → botão Finalizar → "Kurtido e Vendido"</em> e informa o
+                  valor recebido. ⚠️ Apenas arrastar o card para "Concluído" no Kanban <strong>não</strong> gera receita —
+                  isso é só o status de impressão.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="mb-1 font-semibold text-foreground" style={{ color: "var(--filament-magenta)" }}>
+                  2. Despesas (saídas)
+                </h4>
+                <ul className="ml-4 list-disc space-y-1">
+                  <li><strong className="text-foreground">Insumo</strong> — todo item cadastrado em <em>Estoque → Outros Insumos</em> vira despesa automática com o valor pago.</li>
+                  <li><strong className="text-foreground">Manual</strong> — despesas fixas (aluguel, internet, marketing) adicionadas pelo botão "Nova despesa".</li>
+                  <li><strong className="text-foreground">Falha</strong> — pedidos finalizados como "Falha de Impressão" geram despesa automática com o custo do filamento desperdiçado.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="mb-1 font-semibold text-foreground" style={{ color: "var(--filament-yellow)" }}>
+                  3. Custo de Produção (por venda)
+                </h4>
+                <p>
+                  Calculado peça a peça com a fórmula:{" "}
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                    filamento consumido (R$/g × g) + energia (kWh × tarifa) + depreciação (R$/h) + custo fixo por unidade
+                  </code>. Esses parâmetros vêm de <em>Configurações</em>.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="mb-1 font-semibold text-foreground" style={{ color: "var(--filament-green)" }}>
+                  4. Lucro Líquido (resultado)
+                </h4>
+                <p className="rounded-md bg-muted/50 p-3 font-mono text-xs text-foreground">
+                  Lucro = Receita Total − Custo de Produção − Despesas (insumos + manuais + falhas)
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <h4 className="mb-2 font-semibold text-foreground">Exemplo prático</h4>
+                <ul className="ml-4 list-disc space-y-1 text-xs">
+                  <li>Você comprou 1 rolo PLA por <strong>R$ 120</strong> e 1 frasco de álcool por <strong>R$ 25</strong>.</li>
+                  <li>→ Despesas automáticas: <strong>R$ 145</strong> (origem Insumo).</li>
+                  <li>Vendeu 10 chaveiros por <strong>R$ 150</strong> (Kurtido e Vendido).</li>
+                  <li>→ Receita: <strong>R$ 150</strong>. Custo calculado (filamento + energia + depreciação): <strong>R$ 18</strong>.</li>
+                  <li>→ <strong className="filament-text">Lucro Líquido = 150 − 18 − 145 = −R$ 13</strong> (no vermelho até diluir o investimento do rolo nas próximas vendas).</li>
+                </ul>
+                <p className="mt-2 text-xs italic">
+                  Dica: o rolo de filamento é despesa única no mês da compra, mas rende ~166 chaveiros de 6g. A partir da
+                  segunda dúzia de vendas o lucro fica positivo.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="mb-1 font-semibold text-foreground">Checklist diário</h4>
+                <ol className="ml-4 list-decimal space-y-1 text-xs">
+                  <li>Cadastrou compra de filamento ou insumo? → vai direto para Despesas.</li>
+                  <li>Imprimiu e entregou um pedido? → finalize como "Kurtido e Vendido" com o valor recebido.</li>
+                  <li>Print falhou? → finalize como "Falha de Impressão" para contabilizar a perda.</li>
+                  <li>Pagou algo fora do estoque (luz, internet)? → "Nova despesa" aqui em Finanças.</li>
+                </ol>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard
