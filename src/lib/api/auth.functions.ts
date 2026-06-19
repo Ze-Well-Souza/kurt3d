@@ -102,7 +102,7 @@ export const listUsers = createServerFn({ method: "GET" }).handler(async () => {
 });
 
 export const createUser = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       username: z.string().min(1).max(50),
       password: z.string().min(8).max(200),
@@ -117,7 +117,7 @@ export const createUser = createServerFn({ method: "POST" })
   });
 
 export const deleteUser = createServerFn({ method: "POST" })
-  .validator(z.object({ userId: z.string().min(1) }))
+  .inputValidator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data }) => {
     const userId = await requireSession();
     if (data.userId === userId) throw new Error("cannot_delete_self");
@@ -131,7 +131,7 @@ export const getSiteContent = createServerFn({ method: "GET" }).handler(async ()
 });
 
 export const saveSiteContent = createServerFn({ method: "POST" })
-  .validator(z.any())
+  .inputValidator(z.any())
   .handler(async ({ data }) => {
     await requireSession();
     const repo = await siteContentRepo();
