@@ -702,22 +702,46 @@ function CalcPedidos() {
 
 /* ═══════════════════════ SHARED COMPONENTS ═══════════════════════ */
 
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return <div className={`space-y-2 ${className}`}><Label>{label}</Label>{children}</div>;
+function InfoTip({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" className="inline-flex items-center text-muted-foreground/70 hover:text-foreground" aria-label="Mais informações">
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-left leading-relaxed">{text}</TooltipContent>
+    </Tooltip>
+  );
 }
 
-function NumberField({ label, value, onChange, placeholder, step = "0.01" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; step?: string }) {
-  return <Field label={label}><Input type="number" inputMode="decimal" min={0} step={step} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></Field>;
+function Field({ label, children, className = "", tip }: { label: string; children: React.ReactNode; className?: string; tip?: string }) {
+  return (
+    <div className={`space-y-2 ${className}`}>
+      <div className="flex items-center gap-1.5">
+        <Label>{label}</Label>
+        {tip && <InfoTip text={tip} />}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function NumberField({ label, value, onChange, placeholder, step = "0.01", tip }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; step?: string; tip?: string }) {
+  return <Field label={label} tip={tip}><Input type="number" inputMode="decimal" min={0} step={step} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></Field>;
 }
 
 const ACCENT_COLORS: Record<string, string> = { cyan: "#5fa8a3", green: "#8aab6e", yellow: "#e0a93b", pink: "#d98ca0", magenta: "#8a3a52" };
 
-function ResultCard({ label, value, accent, emphasize = false }: { label: string; value: string; accent: keyof typeof ACCENT_COLORS; emphasize?: boolean }) {
+function ResultCard({ label, value, accent, emphasize = false, tip }: { label: string; value: string; accent: keyof typeof ACCENT_COLORS; emphasize?: boolean; tip?: string }) {
   const color = ACCENT_COLORS[accent];
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4" style={{ boxShadow: `0 8px 24px -16px ${color}` }}>
       <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: color }} />
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+        {tip && <InfoTip text={tip} />}
+      </div>
       <div className={`mt-2 font-display font-bold tabular-nums ${emphasize ? "text-3xl" : "text-2xl"}`} style={emphasize ? undefined : { color }}>
         {emphasize ? <span className="filament-text">{value}</span> : value}
       </div>
