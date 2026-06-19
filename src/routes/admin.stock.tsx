@@ -164,9 +164,14 @@ function Stock() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Peso atualizado."); setWeightAdj(null); },
   });
 
+  const allUsedSkus = useMemo(
+    () => [...filamentos.map((f) => f.sku), ...filamentosHistory.map((f) => f.sku)],
+    [filamentos, filamentosHistory],
+  );
+
   const [fForm, setFForm] = useState<FilamentoForm>(() => ({
     ...initialFilamentoForm,
-    sku: generateSku(filamentos),
+    sku: generateSku(allUsedSkus),
     dataCompra: new Date().toISOString().slice(0, 10),
   }));
   const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
@@ -196,8 +201,9 @@ function Stock() {
     setIForm((f) => ({ ...f, [key]: value }));
 
   // ── Filament submit ──
-  const submitFilamento = (e: React.FormEvent) => {
+  const submitFilamento = async (e: React.FormEvent) => {
     e.preventDefault();
+    const qty = Math.max(1, Math.floor(Number(fForm.quantidade) || 1));
     const parsed = filamentoSchema.safeParse({
       sku: fForm.sku,
       marca: fForm.marca,
@@ -212,14 +218,42 @@ function Stock() {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
-    mutateFilamento.mutate(parsed.data);
-    setFForm({
-      ...initialFilamentoForm,
-      sku: generateSku(filamentos),
-      dataCompra: new Date().toISOString().slice(0, 10),
-    });
-    toast.success(`Rolo [${parsed.data.sku}] cadastrado.`);
+
+    // Build SKU list for this batch (auto-increment when qty > 1; verify uniqueness against existing)
+    const usedLower = new Set(allUsedSkus.map((s) => s.trim().toLowerCase()));
+    const skus: string[] = [];
+    let firstSku = parsed.data.sku.trim();
+    if (usedLower.has(firstSku.toLowerCase())) {
+      toast.error(`SKU "${firstSku}" já está cadastrado. Use outro código.`);
+      return;
+    }
+    skus.push(firstSku);
+    usedLower.add(firstSku.toLowerCase());
+    for (let i = 1; i < qty; i++) {
+      const next = generateSku([...usedLower]);
+      skus.push(next);
+      usedLower.add(next.toLowerCase());
+    }
+
+    try {
+      for (const sku of skus) {
+        await mutateFilamento.mutateAsync({ ...parsed.data, sku });
+      }
+      toast.success(
+        qty === 1
+          ? `Rolo [${skus[0]}] cadastrado.`
+          : `${qty} rolos cadastrados (${skus[0]} → ${skus[skus.length - 1]}).`,
+      );
+      setFForm({
+        ...initialFilamentoForm,
+        sku: generateSku([...usedLower]),
+        dataCompra: new Date().toISOString().slice(0, 10),
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao cadastrar rolo.");
+    }
   };
+
 
   // ── Archive submit ──
   const submitArchive = () => {
