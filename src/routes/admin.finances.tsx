@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle } from "lucide-react";
+import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
