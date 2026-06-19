@@ -64,6 +64,18 @@ const FILAMENT_SWATCHES: Record<string, string> = {
   white: "#f5f5f5", orange: "#ff8a3d", purple: "#8b5cf6",
 };
 
+/* Bambu Lab printer presets — wattagem média durante impressão.
+   Fonte: bambucostpro.com / specs oficiais Bambu Lab. */
+const BAMBU_PRESETS = [
+  { id: "X1C",     label: "X1-Carbon",    watts: 350 },
+  { id: "X1E",     label: "X1E",          watts: 350 },
+  { id: "P1S",     label: "P1S",          watts: 190 },
+  { id: "P1P",     label: "P1P",          watts: 190 },
+  { id: "A1",      label: "A1",           watts: 150 },
+  { id: "A1Mini",  label: "A1 Mini",      watts:  60 },
+] as const;
+type BambuPresetId = (typeof BAMBU_PRESETS)[number]["id"];
+
 const projectSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome").max(100),
   categoria: z.enum(CATEGORIES),
@@ -81,18 +93,34 @@ type FormState = {
   nome: string; categoria: Category; linkModelo: string; filamentoId: string;
   custoRolo: string; pesoRolo: string; pesoPeca: string; tempoMin: string;
   quantidade: string; precoVenda: string; perdaPercent: string;
+  // novos — espelham BambuCost Pro
+  modeloPreset: BambuPresetId; precoImpressora: string; vidaUtilHoras: string; margemPercent: string;
 };
 const initialForm: FormState = {
   nome: "", categoria: "Chaveiro", linkModelo: "", filamentoId: "",
   custoRolo: "", pesoRolo: "1000", pesoPeca: "", tempoMin: "",
   quantidade: "10", precoVenda: "", perdaPercent: "0",
+  modeloPreset: "A1", precoImpressora: "2999", vidaUtilHoras: "2000", margemPercent: "30",
 };
 
-function calc(p: { custoRolo: number; pesoRolo: number; pesoPeca: number; tempoMin: number; quantidade: number; precoVenda: number; perdaPercent: number; settings?: AppSettings }) {
+function calc(p: {
+  custoRolo: number; pesoRolo: number; pesoPeca: number; tempoMin: number;
+  quantidade: number; precoVenda: number; perdaPercent: number;
+  settings?: AppSettings;
+  modeloPreset?: BambuPresetId; precoImpressora?: number; vidaUtilHoras?: number; margemPercent?: number;
+}) {
   const s = p.settings ?? DEFAULT_APP_SETTINGS;
+  // Energia: usa wattagem do preset (kW = W/1000) — se preset informado, sobrescreve settings
+  const preset = p.modeloPreset ? BAMBU_PRESETS.find((m) => m.id === p.modeloPreset) : undefined;
+  const consumoKw = preset ? preset.watts / 1000 : s.consumoKw;
+  // Amortização: preço ÷ vida útil = R$/h; se não informados, usa settings
+  const amortHoraCalc = (p.precoImpressora && p.vidaUtilHoras && p.vidaUtilHoras > 0)
+    ? p.precoImpressora / p.vidaUtilHoras
+    : s.depreciacaoHora;
+
   const custoFilamento = p.pesoRolo > 0 ? (p.custoRolo / p.pesoRolo) * p.pesoPeca : 0;
-  const custoEnergia = (p.tempoMin / 60) * s.consumoKw * s.tarifaEnergiaKwh;
-  const custoDepreciacao = (p.tempoMin / 60) * s.depreciacaoHora;
+  const custoEnergia = (p.tempoMin / 60) * consumoKw * s.tarifaEnergiaKwh;
+  const custoDepreciacao = (p.tempoMin / 60) * amortHoraCalc;
   const custoFixo = s.custoFixoUnidade;
   const custoBase = custoFilamento + custoEnergia + custoDepreciacao + custoFixo;
   const custoPerda = custoBase * ((p.perdaPercent || 0) / 100);
@@ -100,7 +128,10 @@ function calc(p: { custoRolo: number; pesoRolo: number; pesoPeca: number; tempoM
   const custoLote = custoUnidade * p.quantidade;
   const receitaTotal = p.precoVenda * p.quantidade;
   const lucroLiquido = receitaTotal - custoLote;
-  return { custoUnidade, custoFilamento, custoEnergia, custoDepreciacao, custoFixo, custoPerda, custoLote, receitaTotal, lucroLiquido };
+  // Preço sugerido pela margem
+  const margem = p.margemPercent ?? 0;
+  const precoSugerido = custoUnidade * (1 + margem / 100);
+  return { custoUnidade, custoFilamento, custoEnergia, custoDepreciacao, custoFixo, custoPerda, custoLote, receitaTotal, lucroLiquido, precoSugerido, consumoKw, amortHora: amortHoraCalc };
 }
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
