@@ -513,9 +513,9 @@ function CalcPedidos() {
   /* ═══════════ CALCULATOR TAB ═══════════ */
   function renderCalculatorTab() {
     return (
-      <div className="space-y-8">
       <TooltipProvider delayDuration={150}>
       <div className="space-y-8">
+
         {/* Form + Results */}
         <form onSubmit={submitProject} className="filament-top space-y-6 rounded-2xl border border-border bg-card p-6">
           {/* ── Bloco 1: Identificação do projeto ── */}
