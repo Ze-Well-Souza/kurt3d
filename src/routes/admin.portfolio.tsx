@@ -231,11 +231,7 @@ function CalcPedidos() {
         </button>
       </div>
 
-      {activeTab === "calc" ? (
-        <CalculatorTab />
-      ) : (
-        <OrdersTab />
-      )}
+      {activeTab === "calc" ? renderCalculatorTab() : renderOrdersTab()}
 
       {/* ── Create Order from Portfolio dialog ── */}
       <Dialog open={orderDialog.open} onOpenChange={(open) => setOrderDialog((s) => ({ ...s, open }))}>
@@ -479,7 +475,7 @@ function CalcPedidos() {
   );
 
   /* ═══════════ CALCULATOR TAB ═══════════ */
-  function CalculatorTab() {
+  function renderCalculatorTab() {
     return (
       <div className="space-y-8">
         {/* Form + Results */}
@@ -579,7 +575,7 @@ function CalcPedidos() {
   }
 
   /* ═══════════ ORDERS TAB ═══════════ */
-  function OrdersTab() {
+  function renderOrdersTab() {
     return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
