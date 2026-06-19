@@ -73,7 +73,7 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
 });
 
 export const upsertFilamento = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string().min(1).optional(),
       sku: z.string().trim().min(1).max(50),
@@ -111,7 +111,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
   });
 
 export const removeFilamento = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string().min(1) }))
+  .inputValidator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
     const repo = await filamentosRepo();
     await repo.save(repo.list.filter((f) => f.id !== data.id));
@@ -119,7 +119,7 @@ export const removeFilamento = createServerFn({ method: "POST" })
   });
 
 export const archiveFilamento = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string().min(1),
       qualidade: z.enum(["bom", "medio", "ruim"]).optional(),
@@ -144,7 +144,7 @@ export const archiveFilamento = createServerFn({ method: "POST" })
   });
 
 export const updateFilamentoQualidade = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string().min(1),
       qualidade: z.enum(["bom", "medio", "ruim"]).optional(),
@@ -167,7 +167,7 @@ export const updateFilamentoQualidade = createServerFn({ method: "POST" })
   });
 
 export const addInsumo = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       nome: z.string().trim().min(1).max(200),
       dataCompra: z.string().min(1).max(30),
@@ -202,7 +202,7 @@ export const addInsumo = createServerFn({ method: "POST" })
   });
 
 export const removeInsumo = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string().min(1) }))
+  .inputValidator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
     const repo = await insumosRepo();
     await repo.save(repo.list.filter((i) => i.id !== data.id));
@@ -212,7 +212,7 @@ export const removeInsumo = createServerFn({ method: "POST" })
   });
 
 export const addPortfolioProject = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       nome: z.string().trim().min(1).max(100),
       categoria: z.string().trim().min(1).max(50),
@@ -242,7 +242,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
   });
 
 export const removePortfolioProject = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string().min(1) }))
+  .inputValidator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
     const repo = await portfolioRepo();
     await repo.save(repo.list.filter((p) => p.id !== data.id));
@@ -250,7 +250,7 @@ export const removePortfolioProject = createServerFn({ method: "POST" })
   });
 
 export const createOrderFromPortfolio = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       portfolioProjectId: z.string().min(1),
       client: z.string().trim().min(1).max(120),
@@ -282,7 +282,7 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
   });
 
 export const addOrder = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       client: z.string().trim().min(1).max(120),
       projectName: z.string().trim().min(1).max(140),
@@ -322,7 +322,7 @@ export const addOrder = createServerFn({ method: "POST" })
   });
 
 export const removeOrder = createServerFn({ method: "POST" })
-  .validator(z.object({ orderId: z.string().min(1), reason: z.string().trim().min(1, "Informe o motivo").max(500) }))
+  .inputValidator(z.object({ orderId: z.string().min(1), reason: z.string().trim().min(1, "Informe o motivo").max(500) }))
   .handler(async ({ data }) => {
     const repo = await ordersRepo();
     await repo.save(repo.list.filter((o) => o.id !== data.orderId));
@@ -330,7 +330,7 @@ export const removeOrder = createServerFn({ method: "POST" })
   });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator(z.object({ orderId: z.string().min(1), status: z.enum(["todo", "printing", "done"]) }))
+  .inputValidator(z.object({ orderId: z.string().min(1), status: z.enum(["todo", "printing", "done"]) }))
   .handler(async ({ data }) => {
     const [orders, filamentos, portfolio, inv] = await Promise.all([ordersRepo(), filamentosRepo(), portfolioRepo(), inventoryRepo()]);
     const order = orders.list.find((o) => o.id === data.orderId);
@@ -378,7 +378,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   });
 
 export const finalizarDestino = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       orderId: z.string().min(1),
       destino: z.enum(["Kurtido e Vendido", "Dado de Presente", "Falha de Impressão"]),
@@ -462,7 +462,7 @@ export const getSettings = createServerFn({ method: "GET" }).handler(async () =>
 });
 
 export const saveSettings = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       studioNome: z.string().trim().min(1).max(100),
       impressoraModelo: z.string().trim().min(1).max(100),
@@ -497,7 +497,7 @@ export const saveSettings = createServerFn({ method: "POST" })
 // ============================================================
 
 export const submitLead = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       nome: z.string().trim().min(1, "Nome obrigatório").max(200),
       whatsapp: z.string().trim().min(8, "WhatsApp obrigatório").max(30),
@@ -522,7 +522,7 @@ export const submitLead = createServerFn({ method: "POST" })
 // ============================================================
 
 export const updateOrder = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       orderId: z.string().min(1),
       client: z.string().trim().max(200),
@@ -572,7 +572,7 @@ export const updateOrder = createServerFn({ method: "POST" })
 // ============================================================
 
 export const updatePortfolioProject = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string().min(1),
       nome: z.string().trim().min(1).max(200),
@@ -617,7 +617,7 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
 // ============================================================
 
 export const addClient = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       nome: z.string().trim().min(1, "Nome obrigatório").max(200),
       whatsapp: z.string().trim().max(30).nullable(),
@@ -642,7 +642,7 @@ export const addClient = createServerFn({ method: "POST" })
   });
 
 export const updateClient = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string().min(1),
       nome: z.string().trim().min(1).max(200),
@@ -669,7 +669,7 @@ export const updateClient = createServerFn({ method: "POST" })
   });
 
 export const removeClient = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string().min(1) }))
+  .inputValidator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
     const repo = await clientsRepo();
     const next = repo.list.filter((c) => c.id !== data.id);
@@ -682,7 +682,7 @@ export const removeClient = createServerFn({ method: "POST" })
 // ============================================================
 
 export const addManualExpense = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       descricao: z.string().trim().min(1, "Descrição obrigatória").max(300),
       valor: z.number().min(0.01),
@@ -706,7 +706,7 @@ export const addManualExpense = createServerFn({ method: "POST" })
   });
 
 export const removeExpense = createServerFn({ method: "POST" })
-  .validator(z.object({ id: z.string().min(1) }))
+  .inputValidator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
     const repo = await expensesRepo();
     const next = repo.list.filter((e) => e.id !== data.id);
@@ -719,7 +719,7 @@ export const removeExpense = createServerFn({ method: "POST" })
 // ============================================================
 
 export const updateFilamentoPeso = createServerFn({ method: "POST" })
-  .validator(
+  .inputValidator(
     z.object({
       id: z.string().min(1),
       pesoAtual: z.number().min(0).max(50000),
