@@ -324,11 +324,20 @@ function toExpenseRow(row: Expense) {
 }
 
 function fromLeadRow(row: any): Lead {
+  let imagens: Lead["imagens"] = null;
+  try {
+    if (Array.isArray(row.imagens)) imagens = row.imagens;
+    else if (typeof row.imagens === "string" && row.imagens) imagens = JSON.parse(row.imagens);
+  } catch {
+    imagens = null;
+  }
   return {
     id: row.id,
     nome: row.nome,
     whatsapp: row.whatsapp,
     mensagem: row.mensagem,
+    linkProjeto: row.link_projeto ?? null,
+    imagens,
     createdAt: row.created_at,
   };
 }
@@ -339,6 +348,8 @@ function toLeadRow(row: Lead) {
     nome: row.nome,
     whatsapp: row.whatsapp,
     mensagem: row.mensagem,
+    link_projeto: row.linkProjeto ?? null,
+    imagens: row.imagens ? JSON.parse(JSON.stringify(row.imagens)) : null,
     created_at: row.createdAt,
   };
 }

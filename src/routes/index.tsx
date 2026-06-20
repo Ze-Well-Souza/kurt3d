@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle } from "lucide-react";
+import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle, Upload, ImagePlus, X, Link as LinkIcon } from "lucide-react";
 import { listSnapshot, submitLead } from "@/lib/api/data.functions";
 import { getSiteContent } from "@/lib/api/auth.functions";
 import { KurtiLogo } from "@/components/KurtiLogo";
@@ -260,10 +260,56 @@ function Gallery() {
   );
 }
 
+type ContactImage = { file: File; preview: string };
+
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB per image
+const MAX_IMAGES = 6;
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function Contact() {
   const [loading, setLoading] = useState(false);
+  const [linkProjeto, setLinkProjeto] = useState("");
+  const [images, setImages] = useState<ContactImage[]>([]);
   const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
   const whatsappNumero = snap.data?.settings?.whatsappNumero ?? "5511999999999";
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const available = MAX_IMAGES - images.length;
+    if (available <= 0) {
+      toast.error(`Máximo de ${MAX_IMAGES} imagens.`);
+      return;
+    }
+    const picks = Array.from(files).slice(0, available);
+    for (const f of picks) {
+      if (!f.type.startsWith("image/")) {
+        toast.error(`"${f.name}" não é uma imagem.`);
+        continue;
+      }
+      if (f.size > MAX_IMAGE_SIZE) {
+        toast.error(`"${f.name}" ultrapassa o limite de 2 MB.`);
+        continue;
+      }
+      const preview = await fileToDataUrl(f);
+      setImages((prev) => [...prev, { file: f, preview }]);
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    setImages((prev) => {
+      const target = prev[idx];
+      if (target?.preview) URL.revokeObjectURL(target.preview);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -273,13 +319,38 @@ function Contact() {
     const whatsapp = formData.get("whatsapp") as string;
     const mensagem = formData.get("project") as string;
 
+    const imgList = await Promise.all(
+      images.map(async (img) => ({
+        nome: img.file.name,
+        tipo: img.file.type || "image/jpeg",
+        dataUrl: await fileToDataUrl(img.file),
+      })),
+    );
+
     setLoading(true);
     try {
-      await submitLead({ data: { nome, whatsapp, mensagem } });
+      await submitLead({
+        data: {
+          nome,
+          whatsapp,
+          mensagem,
+          linkProjeto: linkProjeto.trim() || undefined,
+          imagens: imgList.length > 0 ? imgList : undefined,
+        },
+      });
       toast.success("Mensagem enviada — responderemos em até 24h.");
       form.reset();
+      setLinkProjeto("");
+      setImages([]);
       // Open WhatsApp with pre-formatted message
-      const text = encodeURIComponent(`Olá! Meu nome é ${nome}.\n\n${mensagem}\n\n(WhatsApp: ${whatsapp})`);
+      const imgNote =
+        imgList.length > 0
+          ? `\n\n📎 ${imgList.length} imagem(ns) anexa(s): envie-as em seguida nesta conversa.`
+          : "";
+      const linkNote = linkProjeto.trim() ? `\n\nLink de referência: ${linkProjeto.trim()}` : "";
+      const text = encodeURIComponent(
+        `Olá! Meu nome é ${nome}.\n\n${mensagem}${linkNote}${imgNote}\n\n(WhatsApp: ${whatsapp})`,
+      );
       window.open(`https://wa.me/${whatsappNumero}?text=${text}`, "_blank");
     } catch {
       toast.error("Erro ao enviar. Tente novamente.");
@@ -319,6 +390,83 @@ function Contact() {
             <Label htmlFor="project">Mensagem</Label>
             <Textarea id="project" name="project" required rows={5} placeholder="Conte sobre a peça, material, quantidade…" />
           </div>
+
+          {/* Link do projeto (MakerWorld, Thingiverse, etc.) */}
+          <div className="mt-4 space-y-2">
+            <Label htmlFor="linkProjeto" className="flex items-center gap-1.5">
+              <LinkIcon className="h-3.5 w-3.5" />
+              Link de referência <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+            <Input
+              id="linkProjeto"
+              type="url"
+              value={linkProjeto}
+              onChange={(e) => setLinkProjeto(e.target.value)}
+              placeholder="https://makerworld.com/... ou thingiverse, printables, etc."
+              maxLength={2000}
+            />
+            <p className="text-xs text-muted-foreground">
+              Viu um modelo no MakerWorld ou em outro site? Cole o link aqui.
+            </p>
+          </div>
+
+          {/* Upload de imagens */}
+          <div className="mt-4 space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <ImagePlus className="h-3.5 w-3.5" />
+              Imagens de referência <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+            <label
+              htmlFor="contact-images"
+              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background/40 px-4 py-6 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+            >
+              <Upload className="h-5 w-5" />
+              <span className="font-medium">Clique para enviar imagens</span>
+              <span className="text-xs">
+                PNG, JPG ou WEBP · até {MAX_IMAGES} imagens · máx. 2 MB cada
+              </span>
+            </label>
+            <input
+              id="contact-images"
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              onChange={(e) => {
+                void handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+
+            {images.length > 0 && (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                {images.map((img, idx) => (
+                  <div
+                    key={idx}
+                    className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted"
+                  >
+                    <img
+                      src={img.preview}
+                      alt={img.file.name}
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-background/90 text-foreground shadow-sm transition-opacity hover:bg-destructive hover:text-white"
+                      aria-label={`Remover ${img.file.name}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                    <div className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      {img.file.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button type="submit" disabled={loading} className="btn-filament mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-sm font-semibold disabled:opacity-60">
             {loading ? "Enviando…" : <><MessageCircle className="h-4 w-4" />Enviar mensagem</>}
           </button>

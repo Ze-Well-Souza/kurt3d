@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../domain/cost";
-import type { AppSettings, Client, Expense, Filamento, FilamentoQualidade, Insumo, Lead, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
+import type { AppSettings, Client, Expense, Filamento, FilamentoQualidade, Insumo, Lead, LeadImagem, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
 import { clampGrams, computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "../server/db.server";
 import { clientsRepo, expensesRepo, filamentosHistoryRepo, filamentosRepo, insumosRepo, inventoryRepo, leadsRepo, ordersRepo, portfolioRepo, settingsRepo, vendasRepo } from "../server/repositories.server";
@@ -519,15 +519,32 @@ export const submitLead = createServerFn({ method: "POST" })
       nome: z.string().trim().min(1, "Nome obrigatório").max(200),
       whatsapp: z.string().trim().min(8, "WhatsApp obrigatório").max(30),
       mensagem: z.string().trim().min(1, "Mensagem obrigatória").max(5000),
+      linkProjeto: z.string().trim().url("Link inválido").max(2000).optional(),
+      imagens: z
+        .array(
+          z.object({
+            nome: z.string().max(200),
+            tipo: z.string().max(100),
+            dataUrl: z.string().max(5_000_000),
+          }),
+        )
+        .max(6)
+        .optional(),
     }),
   )
   .handler(async ({ data }) => {
     const repo = await leadsRepo();
+    const imagens: LeadImagem[] | null =
+      data.imagens && data.imagens.length > 0
+        ? data.imagens.map((i) => ({ nome: i.nome, tipo: i.tipo, dataUrl: i.dataUrl }))
+        : null;
     const lead: Lead = {
       id: randomUUID(),
       nome: data.nome,
       whatsapp: data.whatsapp,
       mensagem: data.mensagem,
+      linkProjeto: data.linkProjeto ?? null,
+      imagens,
       createdAt: nowIso(),
     };
     await repo.insert(lead);

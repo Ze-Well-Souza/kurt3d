@@ -110,11 +110,19 @@ export type Expense = {
   categoria?: string | null;
 };
 
+export type LeadImagem = {
+  nome: string;
+  tipo: string;
+  dataUrl: string;
+};
+
 export type Lead = {
   id: string;
   nome: string;
   whatsapp: string;
   mensagem: string;
+  linkProjeto?: string | null;
+  imagens?: LeadImagem[] | null;
   createdAt: string;
 };
 

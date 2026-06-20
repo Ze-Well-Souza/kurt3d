@@ -126,6 +126,8 @@ create table if not exists public.leads (
   nome text not null,
   whatsapp text not null,
   mensagem text not null,
+  link_projeto text null,
+  imagens jsonb null,
   created_at timestamptz not null default now()
 );
 
@@ -171,3 +173,7 @@ insert into public.site_content (id) values ('main') on conflict (id) do nothing
 
 create index if not exists idx_leads_created_at on public.leads(created_at desc);
 create index if not exists idx_clients_nome on public.clients(nome);
+
+-- Backwards-compatible column additions for existing leads table
+alter table public.leads add column if not exists link_projeto text null;
+alter table public.leads add column if not exists imagens jsonb null;

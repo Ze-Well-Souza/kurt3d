@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MessageSquare, Phone, Calendar, Search } from "lucide-react";
+import { MessageSquare, Phone, Calendar, Search, ExternalLink, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -89,10 +89,49 @@ function LeadsPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="space-y-3 pt-0">
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {lead.mensagem || <em className="text-muted-foreground/50">Sem mensagem</em>}
               </p>
+              {lead.linkProjeto && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <ExternalLink className="h-3.5 w-3.5 text-blue-500" />
+                  <a
+                    href={lead.linkProjeto}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-600 hover:underline"
+                  >
+                    {lead.linkProjeto}
+                  </a>
+                </div>
+              )}
+              {lead.imagens && lead.imagens.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ImageIcon className="h-3.5 w-3.5" />
+                    {lead.imagens.length} imagem(ns) anexada(s)
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                    {lead.imagens.map((img, idx) => (
+                      <a
+                        key={idx}
+                        href={img.dataUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={img.nome}
+                        className="group relative block aspect-square overflow-hidden rounded-md border border-border bg-muted"
+                      >
+                        <img
+                          src={img.dataUrl}
+                          alt={img.nome}
+                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

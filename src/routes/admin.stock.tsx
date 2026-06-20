@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Scale } from "lucide-react";
+import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { archiveFilamento, addInsumo, listSnapshot, removeFilamento, removeInsumo, upsertFilamento, updateFilamentoPeso } from "@/lib/api/data.functions";
+import { archiveFilamento, addInsumo, listSnapshot, removeFilamento, removeInsumo, upsertFilamento } from "@/lib/api/data.functions";
 import type { Filamento, FilamentoHistory, FilamentoQualidade, Insumo } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 
@@ -159,11 +159,6 @@ function Stock() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
   });
 
-  const mutatePeso = useMutation({
-    mutationFn: (input: { id: string; pesoAtual: number }) => updateFilamentoPeso({ data: input }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Peso atualizado."); setWeightAdj(null); },
-  });
-
   const allUsedSkus = useMemo(
     () => [...filamentos.map((f) => f.sku), ...filamentosHistory.map((f) => f.sku)],
     [filamentos, filamentosHistory],
@@ -178,7 +173,7 @@ function Stock() {
 
   const [filSearch, setFilSearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
-  const [weightAdj, setWeightAdj] = useState<{ id: string; nome: string; pesoAtual: number } | null>(null);
+  const [detailFilament, setDetailFilament] = useState<Filamento | null>(null);
 
   const [archiveDialog, setArchiveDialog] = useState<{
     open: boolean;
@@ -577,10 +572,10 @@ function Stock() {
                         size="sm"
                         variant="outline"
                         className="h-8 gap-1 text-xs"
-                        onClick={() => setWeightAdj({ id: f.id, nome: `${f.marca} ${f.cor}`, pesoAtual: f.pesoAtual })}
+                        onClick={() => setDetailFilament(f as Filamento)}
                       >
-                        <Scale className="h-3.5 w-3.5" />
-                        Ajustar peso
+                        <Eye className="h-3.5 w-3.5" />
+                        Ver detalhes
                       </Button>
                       <Button
                         size="sm"
@@ -889,55 +884,101 @@ function Stock() {
         )}
       </div>
 
-      {/* Weight Adjustment Dialog */}
-      <Dialog open={!!weightAdj} onOpenChange={(o) => !o && setWeightAdj(null)}>
-        <DialogContent className="sm:max-w-md">
+      {/* ═══════════ FILAMENT DETAIL DIALOG ═══════════ */}
+      <Dialog open={!!detailFilament} onOpenChange={(o) => !o && setDetailFilament(null)}>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Ajustar Peso do Filamento</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Detalhes do Filamento
+            </DialogTitle>
           </DialogHeader>
-          {weightAdj && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                const novo = Number(fd.get("pesoNovo"));
-                if (isNaN(novo) || novo < 0) return;
-                const wa = weightAdj;
-                mutatePeso.mutate({ id: wa.id, pesoAtual: novo });
-              }}
-              className="space-y-4"
-            >
-              {(() => { const wa = weightAdj; return (
-              <>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Filamento</p>
-                <p className="font-medium">{wa.nome}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Peso atual</p>
-                <p className="font-semibold tabular-nums">{wa.pesoAtual.toFixed(0)} g</p>
-              </div>
-              <Field label="Novo peso (g)">
-                <Input
-                  name="pesoNovo"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="1"
-                  defaultValue={wa.pesoAtual}
-                  autoFocus
+          {detailFilament && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <DetailRow label="SKU" value={detailFilament.sku} mono />
+                <DetailRow label="Material" value={detailFilament.material} />
+                <DetailRow label="Marca" value={detailFilament.marca} />
+                <DetailRow label="Cor" value={detailFilament.cor} />
+                <DetailRow label="Peso inicial" value={`${detailFilament.pesoInicial} g`} />
+                <DetailRow label="Preço pago" value={brl(detailFilament.precoPago)} />
+                <DetailRow
+                  label="Data da compra"
+                  value={new Date(detailFilament.dataCompra).toLocaleDateString("pt-BR")}
                 />
-              </Field>
-              </>
-              ); })()}
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setWeightAdj(null)}>Cancelar</Button>
-                <Button type="submit" disabled={mutatePeso.isPending}>
-                  {mutatePeso.isPending ? "Salvando…" : "Salvar"}
-                </Button>
-              </DialogFooter>
-            </form>
+                <DetailRow
+                  label="Custo por grama"
+                  value={brl(
+                    detailFilament.pesoInicial > 0
+                      ? detailFilament.precoPago / detailFilament.pesoInicial
+                      : 0,
+                  )}
+                />
+              </div>
+
+              <div className="space-y-1 border-t border-border pt-3">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Link do produto
+                </div>
+                {detailFilament.linkProduto ? (
+                  <a
+                    href={detailFilament.linkProduto}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-600 hover:underline"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span className="truncate">{detailFilament.linkProduto}</span>
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground">— sem link cadastrado</p>
+                )}
+              </div>
+
+              {detailFilament.comentario && (
+                <div className="space-y-1 border-t border-border pt-3">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Comentário
+                  </div>
+                  <p className="text-sm italic text-muted-foreground">
+                    "{detailFilament.comentario}"
+                  </p>
+                </div>
+              )}
+
+              {detailFilament.qualidade && (
+                <div className="space-y-1 border-t border-border pt-3">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    Qualidade
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="gap-1 text-xs"
+                    style={{
+                      borderColor: QUALIDADE_CONFIG[detailFilament.qualidade].color,
+                      color: QUALIDADE_CONFIG[detailFilament.qualidade].color,
+                    }}
+                  >
+                    {(() => {
+                      const Icon = QUALIDADE_CONFIG[detailFilament.qualidade!].icon;
+                      return <Icon className="h-3 w-3" />;
+                    })()}
+                    {QUALIDADE_CONFIG[detailFilament.qualidade].label}
+                  </Badge>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between rounded-lg bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+                <span>Quantidade cadastrada</span>
+                <span className="font-semibold tabular-nums text-foreground">1 rolo</span>
+              </div>
+            </div>
           )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailFilament(null)}>
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -988,5 +1029,26 @@ function NumberField({
         placeholder={placeholder}
       />
     </Field>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className={`text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`}>
+        {value}
+      </div>
+    </div>
   );
 }
