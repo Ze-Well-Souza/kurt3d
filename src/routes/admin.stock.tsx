@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye } from "lucide-react";
+import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,7 +131,7 @@ function Stock() {
   const insumos = (snap.data?.insumos ?? []) as Insumo[];
 
   const mutateFilamento = useMutation({
-    mutationFn: (input: z.infer<typeof filamentoSchema>) => upsertFilamento({ data: input as any }),
+    mutationFn: (input: z.infer<typeof filamentoSchema> & { id?: string }) => upsertFilamento({ data: input as any }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
   });
 
@@ -174,6 +174,51 @@ function Stock() {
   const [filSearch, setFilSearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
   const [detailFilament, setDetailFilament] = useState<Filamento | null>(null);
+  const [editForm, setEditForm] = useState<FilamentoForm & { id: string } | null>(null);
+
+  const openEdit = (f: Filamento) => {
+    setEditForm({
+      id: f.id,
+      sku: f.sku,
+      marca: f.marca,
+      cor: f.cor,
+      material: f.material as Material,
+      pesoInicial: String(f.pesoInicial),
+      precoPago: String(f.precoPago),
+      dataCompra: f.dataCompra,
+      linkProduto: f.linkProduto ?? "",
+      quantidade: "1",
+    });
+  };
+
+  const setEditField = <K extends keyof FilamentoForm>(key: K, value: FilamentoForm[K]) =>
+    setEditForm((f) => (f ? { ...f, [key]: value } : f));
+
+  const submitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm) return;
+    const parsed = filamentoSchema.safeParse({
+      sku: editForm.sku,
+      marca: editForm.marca,
+      cor: editForm.cor,
+      material: editForm.material,
+      pesoInicial: Number(editForm.pesoInicial),
+      precoPago: Number(editForm.precoPago),
+      dataCompra: editForm.dataCompra,
+      linkProduto: editForm.linkProduto || undefined,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
+      return;
+    }
+    try {
+      await mutateFilamento.mutateAsync({ ...parsed.data, id: editForm.id });
+      toast.success(`Filamento [${parsed.data.sku}] atualizado.`);
+      setEditForm(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao atualizar filamento.");
+    }
+  };
 
   const [archiveDialog, setArchiveDialog] = useState<{
     open: boolean;
@@ -581,6 +626,15 @@ function Stock() {
                         size="sm"
                         variant="outline"
                         className="h-8 gap-1 text-xs"
+                        onClick={() => openEdit(f as Filamento)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1 text-xs"
                         onClick={() =>
                           setArchiveDialog({
                             open: true,
@@ -978,7 +1032,122 @@ function Stock() {
             <Button variant="outline" onClick={() => setDetailFilament(null)}>
               Fechar
             </Button>
+            {detailFilament && (
+              <Button
+                className="btn-filament gap-2"
+                onClick={() => {
+                  const f = detailFilament;
+                  setDetailFilament(null);
+                  openEdit(f);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+                Editar
+              </Button>
+            )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════ FILAMENT EDIT DIALOG ═══════════ */}
+      <Dialog open={!!editForm} onOpenChange={(o) => !o && setEditForm(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Editar Filamento
+            </DialogTitle>
+          </DialogHeader>
+          {editForm && (
+            <form onSubmit={submitEdit} className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="SKU (Código)">
+                  <Input
+                    value={editForm.sku}
+                    onChange={(e) => setEditField("sku", e.target.value.toUpperCase())}
+                    placeholder="FIL-001"
+                    maxLength={50}
+                  />
+                </Field>
+                <Field label="Material">
+                  <Select
+                    value={editForm.material}
+                    onValueChange={(v) => setEditField("material", v as Material)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MATERIALS.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Marca">
+                  <Input
+                    value={editForm.marca}
+                    onChange={(e) => setEditField("marca", e.target.value)}
+                    placeholder="Creality, Bambu Lab..."
+                    maxLength={100}
+                  />
+                </Field>
+                <Field label="Cor">
+                  <Input
+                    value={editForm.cor}
+                    onChange={(e) => setEditField("cor", e.target.value)}
+                    placeholder="Cyan, Magenta, Black..."
+                    maxLength={100}
+                  />
+                </Field>
+                <NumberField
+                  label="Peso Inicial (g)"
+                  value={editForm.pesoInicial}
+                  onChange={(v) => setEditField("pesoInicial", v)}
+                  placeholder="1000"
+                  step="1"
+                />
+                <NumberField
+                  label="Preço Pago por Rolo (R$)"
+                  value={editForm.precoPago}
+                  onChange={(v) => setEditField("precoPago", v)}
+                  placeholder="120,00"
+                />
+                <Field label="Data da Compra">
+                  <Input
+                    type="date"
+                    value={editForm.dataCompra}
+                    onChange={(e) => setEditField("dataCompra", e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              <Field label="Link do Produto (opcional)">
+                <Input
+                  type="url"
+                  value={editForm.linkProduto}
+                  onChange={(e) => setEditField("linkProduto", e.target.value)}
+                  placeholder="https://www.amazon.com.br/... ou link do vendedor"
+                  maxLength={500}
+                />
+              </Field>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditForm(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  className="btn-filament gap-2"
+                  disabled={mutateFilamento.isPending}
+                >
+                  {mutateFilamento.isPending ? "Salvando…" : "Salvar alterações"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
