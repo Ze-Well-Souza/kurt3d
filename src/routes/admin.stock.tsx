@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil } from "lucide-react";
+import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,6 +173,7 @@ function Stock() {
 
   const [filSearch, setFilSearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
+  const [stockView, setStockView] = useState<"cards" | "table">("cards");
   const [detailFilament, setDetailFilament] = useState<Filamento | null>(null);
   const [editForm, setEditForm] = useState<FilamentoForm & { id: string } | null>(null);
 
@@ -479,20 +480,201 @@ function Stock() {
 
       {/* ═══════════ FILAMENT LIST ═══════════ */}
       <div className="filament-top rounded-2xl border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="font-display text-lg font-semibold">Estoque Atual de Filamentos</h2>
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
+          <div>
+            <h2 className="font-display text-lg font-semibold">Estoque Atual de Filamentos</h2>
+            <p className="text-xs text-muted-foreground">
+              {filteredFilamentos.length} rolo(s) · {totalGramas}g de {totalInicial}g restantes
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
-            <span className="text-xs text-muted-foreground">
-              {totalGramas}g de {totalInicial}g restantes
-            </span>
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
+              <Button
+                size="sm"
+                variant={stockView === "cards" ? "default" : "ghost"}
+                className="h-8 gap-1.5 px-3 text-xs"
+                onClick={() => setStockView("cards")}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Cards
+              </Button>
+              <Button
+                size="sm"
+                variant={stockView === "table" ? "default" : "ghost"}
+                className="h-8 gap-1.5 px-3 text-xs"
+                onClick={() => setStockView("table")}
+              >
+                <TableIcon className="h-3.5 w-3.5" />
+                Tabela
+              </Button>
+            </div>
           </div>
         </div>
         {filamentos.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
             Nenhum filamento cadastrado. Adicione seu primeiro rolo acima.
           </div>
+        ) : stockView === "table" ? (
+          /* ───────── TABLE VIEW ───────── */
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Marca</TableHead>
+                  <TableHead>Cor</TableHead>
+                  <TableHead>Material</TableHead>
+                  <TableHead className="text-right">Estoque</TableHead>
+                  <TableHead className="text-center">Nível</TableHead>
+                  <TableHead className="text-right">Custo/g</TableHead>
+                  <TableHead className="text-right">Investido</TableHead>
+                  <TableHead>Data Compra</TableHead>
+                  <TableHead>Link</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredFilamentos.map((f) => {
+                  const percent = f.pesoInicial > 0 ? (f.pesoAtual / f.pesoInicial) * 100 : 0;
+                  const custoPorGrama = f.pesoInicial > 0 ? f.precoPago / f.pesoInicial : 0;
+                  const isLow = percent < 20;
+                  const isMedium = percent >= 20 && percent < 50;
+                  const levelColor = isLow
+                    ? "#ef4444"
+                    : isMedium
+                      ? "#e0a93b"
+                      : "#5fa8a3";
+                  return (
+                    <TableRow key={f.id}>
+                      <TableCell className="font-mono text-xs">{f.sku}</TableCell>
+                      <TableCell className="font-medium">{f.marca}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className="h-3 w-3 rounded-full border border-border"
+                            style={{ background: levelColor }}
+                          />
+                          {f.cor}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {f.material}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        <div className="font-semibold">
+                          {f.pesoAtual}g
+                          <span className="text-muted-foreground"> / {f.pesoInicial}g</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="h-2 w-20 overflow-hidden rounded-full bg-secondary">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.min(100, percent)}%`,
+                                background: levelColor,
+                              }}
+                            />
+                          </div>
+                          <span
+                            className="w-10 text-right text-xs font-semibold tabular-nums"
+                            style={{ color: isLow ? "#ef4444" : undefined }}
+                          >
+                            {percent.toFixed(0)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {brl(custoPorGrama)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold">
+                        {brl(f.precoPago)}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {new Date(f.dataCompra).toLocaleDateString("pt-BR")}
+                      </TableCell>
+                      <TableCell>
+                        {f.linkProduto ? (
+                          <a
+                            href={f.linkProduto}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Ver
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => setDetailFilament(f as Filamento)}
+                            title="Ver detalhes"
+                            aria-label="Ver detalhes"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => openEdit(f as Filamento)}
+                            title="Editar"
+                            aria-label="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() =>
+                              setArchiveDialog({
+                                open: true,
+                                filamentId: f.id,
+                                qualidade: "bom",
+                                comentario: "",
+                                dataFim: new Date().toISOString().slice(0, 10),
+                              })
+                            }
+                            title="Finalizar (arquivar)"
+                            aria-label="Finalizar"
+                          >
+                            <Archive className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              mutateRemoveFilamento.mutate(f.id);
+                              toast.success("Filamento removido.");
+                            }}
+                            aria-label="Excluir filamento"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            title="Excluir"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
+          /* ───────── CARD VIEW ───────── */
           <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredFilamentos.map((f) => {
               const percent = f.pesoInicial > 0 ? (f.pesoAtual / f.pesoInicial) * 100 : 0;
@@ -605,36 +787,38 @@ function Stock() {
                   )}
 
                   {/* Footer */}
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
                     <div className="text-xs text-muted-foreground">
                       {brl(f.precoPago)} ·{" "}
                       <span className="tabular-nums">
                         {new Date(f.dataCompra).toLocaleDateString("pt-BR")}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
-                        className="h-8 gap-1 text-xs"
+                        className="h-8 w-8"
                         onClick={() => setDetailFilament(f as Filamento)}
+                        title="Ver detalhes"
+                        aria-label="Ver detalhes"
                       >
                         <Eye className="h-3.5 w-3.5" />
-                        Ver detalhes
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
-                        className="h-8 gap-1 text-xs"
+                        className="h-8 w-8"
                         onClick={() => openEdit(f as Filamento)}
+                        title="Editar"
+                        aria-label="Editar"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        Editar
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
-                        className="h-8 gap-1 text-xs"
+                        className="h-8 w-8"
                         onClick={() =>
                           setArchiveDialog({
                             open: true,
@@ -644,9 +828,10 @@ function Stock() {
                             dataFim: new Date().toISOString().slice(0, 10),
                           })
                         }
+                        title="Finalizar (arquivar)"
+                        aria-label="Finalizar"
                       >
                         <Archive className="h-3.5 w-3.5" />
-                        Finalizar
                       </Button>
                       <Button
                         size="icon"
@@ -656,6 +841,7 @@ function Stock() {
                           toast.success("Filamento removido.");
                         }}
                         aria-label="Excluir filamento"
+                        title="Excluir"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
