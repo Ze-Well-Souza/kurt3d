@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon } from "lucide-react";
+import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,8 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { SearchInput } from "@/components/SearchInput";
-import { listSnapshot, addManualExpense, removeExpense } from "@/lib/api/data.functions";
+import { listSnapshot, addManualExpense, removeExpense, payInstallment, settlePayment } from "@/lib/api/data.functions";
+import type { FilamentoPayment, FilamentoPaymentInstallment } from "@/lib/domain/types";
 
 export const Route = createFileRoute("/admin/finances")({
   component: Finances,
@@ -42,14 +43,27 @@ function Finances() {
   const orders = snap.data?.orders ?? [];
   const filamentos = snap.data?.filamentos ?? [];
   const expenses = snap.data?.expenses ?? [];
+  const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
+  const filamentoInstallments = (snap.data?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
 
   const [search, setSearch] = useState("");
   const [showExpense, setShowExpense] = useState(false);
   const [stockView, setStockView] = useState<"list" | "table">("table");
   const [expForm, setExpForm] = useState({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" });
 
-  const mutateAddExp = useMutation({ mutationFn: (data: any) => addManualExpense({ data }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Despesa adicionada."); setShowExpense(false); setExpForm({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" }); } });
-  const mutateRemoveExp = useMutation({ mutationFn: (id: string) => removeExpense({ data: { id } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Despesa removida."); } });
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); };
+  const mutateAddExp = useMutation({ mutationFn: (data: any) => addManualExpense({ data }), onSuccess: () => { invalidate(); toast.success("Despesa adicionada."); setShowExpense(false); setExpForm({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" }); } });
+  const mutateRemoveExp = useMutation({ mutationFn: (id: string) => removeExpense({ data: { id } }), onSuccess: () => { invalidate(); toast.success("Despesa removida."); } });
+  const mutatePayInstallment = useMutation({
+    mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number }) =>
+      payInstallment({ data: input }),
+    onSuccess: () => { invalidate(); toast.success("Parcela marcada como paga."); },
+  });
+  const mutateSettlePayment = useMutation({
+    mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
+      settlePayment({ data: input }),
+    onSuccess: () => { invalidate(); toast.success("Todas as parcelas quitadas."); },
+  });
 
   const totals = useMemo(() => {
     const receita = vendas.reduce((s, v) => s + v.valor, 0);
@@ -106,6 +120,41 @@ function Finances() {
   const despesasManuais = expenses.filter((e) => e.source === "manual").reduce((s, e) => s + e.valor, 0);
   const despesasFalha = expenses.filter((e) => e.source === "falha").reduce((s, e) => s + e.valor, 0);
   const despesasInsumos = expenses.filter((e) => e.source === "insumo").reduce((s, e) => s + e.valor, 0);
+
+  // Installment (parcelas) KPIs
+  const installmentKpis = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const yearMonth = today.slice(0, 7);
+    let pendente = 0;
+    let pagoNoMes = 0;
+    let vencendoEm30 = 0;
+    let atrasadas = 0;
+    for (const inst of filamentoInstallments) {
+      if (!inst.pago) {
+        pendente += inst.valor;
+        if (inst.vencimento <= today) atrasadas++;
+        const diffDays = (new Date(inst.vencimento).getTime() - new Date(today).getTime()) / 86400000;
+        if (diffDays >= 0 && diffDays <= 30) vencendoEm30 += inst.valor;
+      } else if (inst.dataPagamento && inst.dataPagamento.slice(0, 7) === yearMonth) {
+        pagoNoMes += inst.valorPago ?? inst.valor;
+      }
+    }
+    return { pendente, pagoNoMes, vencendoEm30, atrasadas };
+  }, [filamentoInstallments]);
+
+  const upcomingInstallments = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return filamentoInstallments
+      .filter((i) => !i.pago)
+      .map((i) => {
+        const payment = filamentoPayments.find((p) => p.id === i.paymentId);
+        const batchSkus = payment
+          ? filamentos.filter((f) => f.batchId === payment.batchId).map((f) => f.sku)
+          : [];
+        return { inst: i, payment, batchSkus, overdue: i.vencimento <= today };
+      })
+      .sort((a, b) => a.inst.vencimento.localeCompare(b.inst.vencimento));
+  }, [filamentoInstallments, filamentoPayments, filamentos]);
 
   const filteredVendas = useMemo(() => {
     if (!search.trim()) return vendas;
@@ -273,6 +322,34 @@ function Finances() {
           label="Estoque Físico Restante"
           value={`${filamentTotals.gramasRestantes.toFixed(0)} g`}
           color="var(--filament-pink)"
+        />
+      </div>
+
+      {/* Installments (Parcelas) KPIs */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          icon={<CreditCard className="h-4 w-4" />}
+          label="Parcelas Pendentes"
+          value={brl(installmentKpis.pendente)}
+          color="var(--filament-magenta)"
+        />
+        <KpiCard
+          icon={<Banknote className="h-4 w-4" />}
+          label="Parcelas Pagas (mês)"
+          value={brl(installmentKpis.pagoNoMes)}
+          color="var(--filament-green)"
+        />
+        <KpiCard
+          icon={<CalendarClock className="h-4 w-4" />}
+          label="Vencendo em 30 dias"
+          value={brl(installmentKpis.vencendoEm30)}
+          color="var(--filament-yellow)"
+        />
+        <KpiCard
+          icon={<AlertCircle className="h-4 w-4" />}
+          label="Parcelas Atrasadas"
+          value={String(installmentKpis.atrasadas)}
+          color={installmentKpis.atrasadas > 0 ? "var(--filament-magenta)" : "var(--filament-cyan)"}
         />
       </div>
 
@@ -461,6 +538,122 @@ function Finances() {
                 </Table>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Installments Schedule */}
+      <div className="filament-top rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <h2 className="font-display text-lg font-semibold">Cronograma de Parcelas</h2>
+              <p className="text-xs text-muted-foreground">
+                {upcomingInstallments.length} parcela(s) pendente(s)
+                {installmentKpis.atrasadas > 0 && (
+                  <span className="ml-2 font-semibold text-destructive">
+                    · {installmentKpis.atrasadas} atrasada(s)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+        {upcomingInstallments.length === 0 ? (
+          <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+            Nenhuma parcela pendente. Todos os pagamentos estão em dia.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>Lote</TableHead>
+                  <TableHead>Vencimento</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-center">Forma</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {upcomingInstallments.map(({ inst, payment, batchSkus, overdue }) => (
+                  <TableRow key={inst.id}>
+                    <TableCell className="font-mono text-xs">{inst.numero}</TableCell>
+                    <TableCell className="text-xs">
+                      {batchSkus.length > 0 ? (
+                        <span className="font-mono">{batchSkus.join(", ")}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`text-xs tabular-nums ${overdue ? "font-semibold text-destructive" : ""}`}
+                      >
+                        {new Date(inst.vencimento).toLocaleDateString("pt-BR")}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{brl(inst.valor)}</TableCell>
+                    <TableCell className="text-center">
+                      {overdue ? (
+                        <Badge variant="destructive" className="text-[10px]">Atrasado</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px]">Pendente</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {payment?.formaPagamento === "a_vista" ? (
+                        <Badge variant="outline" className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]">
+                          <Banknote className="h-3 w-3" /> À vista
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 border-blue-500/30 bg-blue-50 text-blue-700 text-[10px]">
+                          <CreditCard className="h-3 w-3" />
+                          Parcelado
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1 text-xs"
+                          disabled={mutatePayInstallment.isPending || mutateSettlePayment.isPending}
+                          onClick={() =>
+                            mutatePayInstallment.mutate({
+                              installmentId: inst.id,
+                              dataPagamento: new Date().toISOString().slice(0, 10),
+                            })
+                          }
+                        >
+                          <Check className="h-3 w-3" /> Pagar
+                        </Button>
+                        {payment && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 gap-1 text-xs"
+                            disabled={mutateSettlePayment.isPending}
+                            onClick={() =>
+                              mutateSettlePayment.mutate({
+                                paymentId: payment.id,
+                                dataPagamento: new Date().toISOString().slice(0, 10),
+                              })
+                            }
+                          >
+                            Quitar lote
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>

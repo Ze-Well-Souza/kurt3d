@@ -41,6 +41,29 @@ export type Venda = {
 
 export type FilamentoQualidade = "bom" | "medio" | "ruim";
 
+export type FormaPagamento = "a_vista" | "parcelado";
+
+export type FilamentoPayment = {
+  id: string;
+  batchId: string;
+  formaPagamento: FormaPagamento;
+  custoTotal: number;
+  parcelas: number;
+  createdAt: string;
+};
+
+export type FilamentoPaymentInstallment = {
+  id: string;
+  paymentId: string;
+  numero: number;
+  valor: number;
+  vencimento: string;
+  pago: boolean;
+  dataPagamento: string | null;
+  valorPago: number | null;
+  observacao: string | null;
+};
+
 export type Filamento = {
   id: string;
   sku: string;
@@ -55,6 +78,8 @@ export type Filamento = {
   qualidade?: FilamentoQualidade | null;
   comentario?: string | null;
   linkProduto?: string | null;
+  batchId?: string | null;
+  paymentId?: string | null;
 };
 
 export type FilamentoHistory = Filamento & {

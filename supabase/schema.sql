@@ -177,3 +177,35 @@ create index if not exists idx_clients_nome on public.clients(nome);
 -- Backwards-compatible column additions for existing leads table
 alter table public.leads add column if not exists link_projeto text null;
 alter table public.leads add column if not exists imagens jsonb null;
+
+-- ═══════════ Filament payment tracking (batch-level) ═══════════
+create table if not exists public.filamento_payments (
+  id text primary key,
+  batch_id text not null,
+  forma_pagamento text not null,
+  custo_total double precision not null,
+  parcelas integer not null default 1,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.filamento_payment_installments (
+  id text primary key,
+  payment_id text not null references public.filamento_payments(id) on delete cascade,
+  numero integer not null,
+  valor double precision not null,
+  vencimento date not null,
+  pago boolean not null default false,
+  data_pagamento date null,
+  valor_pago double precision null,
+  observacao text null
+);
+
+create index if not exists idx_filamento_payments_batch on public.filamento_payments(batch_id);
+create index if not exists idx_filamento_installments_payment on public.filamento_payment_installments(payment_id);
+create index if not exists idx_filamento_installments_vencimento on public.filamento_payment_installments(vencimento);
+
+-- Backwards-compatible additions for existing filamentos table
+alter table public.filamentos add column if not exists batch_id text null;
+alter table public.filamentos add column if not exists payment_id text null;
+alter table public.filamentos_history add column if not exists batch_id text null;
+alter table public.filamentos_history add column if not exists payment_id text null;

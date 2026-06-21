@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { randomUUID } from "node:crypto";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil, LayoutGrid, Table as TableIcon } from "lucide-react";
+import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil, LayoutGrid, Table as TableIcon, CreditCard, Banknote, Check, Undo2, CalendarClock } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,8 +34,22 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { archiveFilamento, addInsumo, listSnapshot, removeFilamento, removeInsumo, upsertFilamento } from "@/lib/api/data.functions";
-import type { Filamento, FilamentoHistory, FilamentoQualidade, Insumo } from "@/lib/domain/types";
+import {
+  archiveFilamento,
+  addInsumo,
+  createFilamentoPayment,
+  deleteFilamentoPayment,
+  listSnapshot,
+  payInstallment,
+  removeFilamento,
+  removeInsumo,
+  revertInstallment,
+  settlePayment,
+  updateFilamentoPayment,
+  updateInstallment,
+  upsertFilamento,
+} from "@/lib/api/data.functions";
+import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 
 export const Route = createFileRoute("/admin/stock")({
@@ -64,6 +79,10 @@ type FilamentoForm = {
   dataCompra: string;
   linkProduto: string;
   quantidade: string;
+  formaPagamento: FormaPagamento;
+  custoTotal: string;
+  parcelas: string;
+  primeiraVencimento: string;
 };
 
 const initialFilamentoForm: FilamentoForm = {
@@ -76,6 +95,10 @@ const initialFilamentoForm: FilamentoForm = {
   dataCompra: "",
   linkProduto: "",
   quantidade: "1",
+  formaPagamento: "a_vista",
+  custoTotal: "",
+  parcelas: "1",
+  primeiraVencimento: "",
 };
 
 
@@ -129,34 +152,78 @@ function Stock() {
   const filamentos = (snap.data?.filamentos ?? []) as FilamentoView[];
   const filamentosHistory = (snap.data?.filamentosHistory ?? []) as FilamentoHistory[];
   const insumos = (snap.data?.insumos ?? []) as Insumo[];
+  const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
+  const filamentoInstallments = (snap.data?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["snapshot"] });
 
   const mutateFilamento = useMutation({
-    mutationFn: (input: z.infer<typeof filamentoSchema> & { id?: string }) => upsertFilamento({ data: input as any }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+    mutationFn: (input: z.infer<typeof filamentoSchema> & { id?: string; batchId?: string }) => upsertFilamento({ data: input as any }),
+    onSuccess: invalidate,
   });
 
   const mutateRemoveFilamento = useMutation({
     mutationFn: (id: string) => removeFilamento({ data: { id } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+    onSuccess: invalidate,
   });
 
   const mutateArchive = useMutation({
     mutationFn: (input: { id: string; qualidade?: FilamentoQualidade; comentario?: string }) =>
       archiveFilamento({ data: input }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["snapshot"] });
+      invalidate();
       toast.success("Filamento arquivado no histórico.");
     },
   });
 
   const mutateInsumo = useMutation({
     mutationFn: (input: z.infer<typeof insumoSchema>) => addInsumo({ data: input as any }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+    onSuccess: invalidate,
   });
 
   const mutateRemoveInsumo = useMutation({
     mutationFn: (id: string) => removeInsumo({ data: { id } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+    onSuccess: invalidate,
+  });
+
+  const mutateCreatePayment = useMutation({
+    mutationFn: (input: { batchId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; primeiraVencimento: string }) =>
+      createFilamentoPayment({ data: input }),
+    onSuccess: invalidate,
+  });
+
+  const mutateUpdatePayment = useMutation({
+    mutationFn: (input: { paymentId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; primeiraVencimento: string }) =>
+      updateFilamentoPayment({ data: input }),
+    onSuccess: invalidate,
+  });
+
+  const mutateDeletePayment = useMutation({
+    mutationFn: (paymentId: string) => deleteFilamentoPayment({ data: { paymentId } }),
+    onSuccess: invalidate,
+  });
+
+  const mutatePayInstallment = useMutation({
+    mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number; observacao?: string }) =>
+      payInstallment({ data: input }),
+    onSuccess: invalidate,
+  });
+
+  const mutateRevertInstallment = useMutation({
+    mutationFn: (installmentId: string) => revertInstallment({ data: { installmentId } }),
+    onSuccess: invalidate,
+  });
+
+  const mutateUpdateInstallment = useMutation({
+    mutationFn: (input: { installmentId: string; vencimento?: string; valor?: number; observacao?: string }) =>
+      updateInstallment({ data: input }),
+    onSuccess: invalidate,
+  });
+
+  const mutateSettlePayment = useMutation({
+    mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
+      settlePayment({ data: input }),
+    onSuccess: invalidate,
   });
 
   const allUsedSkus = useMemo(
@@ -168,6 +235,7 @@ function Stock() {
     ...initialFilamentoForm,
     sku: generateSku(allUsedSkus),
     dataCompra: new Date().toISOString().slice(0, 10),
+    primeiraVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
   }));
   const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
 
@@ -178,6 +246,9 @@ function Stock() {
   const [editForm, setEditForm] = useState<FilamentoForm & { id: string } | null>(null);
 
   const openEdit = (f: Filamento) => {
+    const payment = f.paymentId ? filamentoPayments.find((p) => p.id === f.paymentId) : null;
+    const insts = payment ? filamentoInstallments.filter((i) => i.paymentId === payment.id) : [];
+    const first = insts.sort((a, b) => a.numero - b.numero)[0];
     setEditForm({
       id: f.id,
       sku: f.sku,
@@ -189,6 +260,10 @@ function Stock() {
       dataCompra: f.dataCompra,
       linkProduto: f.linkProduto ?? "",
       quantidade: "1",
+      formaPagamento: payment?.formaPagamento ?? "a_vista",
+      custoTotal: payment ? String(payment.custoTotal) : String(f.precoPago),
+      parcelas: payment ? String(payment.parcelas) : "1",
+      primeiraVencimento: first?.vencimento ?? (f.dataCompra || new Date().toISOString().slice(0, 10)),
     });
   };
 
@@ -260,6 +335,19 @@ function Stock() {
       return;
     }
 
+    // Validate payment inputs
+    const formaPagamento = fForm.formaPagamento;
+    const custoTotalNum =
+      Number(fForm.custoTotal) > 0
+        ? Number(fForm.custoTotal)
+        : parsed.data.precoPago * qty;
+    const parcelas = formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(fForm.parcelas) || 1)) : 1;
+    const primeiraVencimento = fForm.primeiraVencimento || parsed.data.dataCompra;
+    if (formaPagamento === "parcelado" && !fForm.primeiraVencimento) {
+      toast.error("Informe a data do primeiro vencimento.");
+      return;
+    }
+
     // Build SKU list for this batch (auto-increment when qty > 1; verify uniqueness against existing)
     const usedLower = new Set(allUsedSkus.map((s) => s.trim().toLowerCase()));
     const skus: string[] = [];
@@ -276,19 +364,29 @@ function Stock() {
       usedLower.add(next.toLowerCase());
     }
 
+    const batchId = randomUUID();
+
     try {
       for (const sku of skus) {
-        await mutateFilamento.mutateAsync({ ...parsed.data, sku });
+        await mutateFilamento.mutateAsync({ ...parsed.data, sku, batchId });
       }
+      await mutateCreatePayment.mutateAsync({
+        batchId,
+        formaPagamento,
+        custoTotal: custoTotalNum,
+        parcelas,
+        primeiraVencimento,
+      });
       toast.success(
         qty === 1
-          ? `Rolo [${skus[0]}] cadastrado.`
-          : `${qty} rolos cadastrados (${skus[0]} → ${skus[skus.length - 1]}).`,
+          ? `Rolo [${skus[0]}] cadastrado${formaPagamento === "parcelado" ? ` · ${parcelas}× de ${brl(custoTotalNum / parcelas)}` : " · à vista"}.`
+          : `${qty} rolos cadastrados (${skus[0]} → ${skus[skus.length - 1]}) · ${formaPagamento === "parcelado" ? `${parcelas}×` : "à vista"}.`,
       );
       setFForm({
         ...initialFilamentoForm,
         sku: generateSku([...usedLower]),
         dataCompra: new Date().toISOString().slice(0, 10),
+        primeiraVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao cadastrar rolo.");
@@ -471,6 +569,103 @@ function Stock() {
             />
           </Field>
         </div>
+
+        {/* ─── PAYMENT DETAILS ─── */}
+        <div className="rounded-xl border border-border bg-muted/30 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-muted-foreground" />
+            <h3 className="font-display text-sm font-semibold">Detalhes do Pagamento</h3>
+          </div>
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            <Field label="Forma de Pagamento" className="md:col-span-2">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={fForm.formaPagamento === "a_vista" ? "default" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => setFField("formaPagamento", "a_vista")}
+                >
+                  <Banknote className="h-4 w-4" /> À vista
+                </Button>
+                <Button
+                  type="button"
+                  variant={fForm.formaPagamento === "parcelado" ? "default" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => setFField("formaPagamento", "parcelado")}
+                >
+                  <CreditCard className="h-4 w-4" /> Parcelado
+                </Button>
+              </div>
+            </Field>
+            {fForm.formaPagamento === "parcelado" ? (
+              <>
+                <NumberField
+                  label="Número de Parcelas"
+                  value={fForm.parcelas}
+                  onChange={(v) => setFField("parcelas", v)}
+                  placeholder="1"
+                  step="1"
+                />
+                <NumberField
+                  label="Custo Total (R$)"
+                  value={fForm.custoTotal}
+                  onChange={(v) => setFField("custoTotal", v)}
+                  placeholder={
+                    fForm.precoPago
+                      ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
+                      : "0,00"
+                  }
+                />
+                <Field label="Primeiro Vencimento" className="md:col-span-2 lg:col-span-4">
+                  <Input
+                    type="date"
+                    value={fForm.primeiraVencimento}
+                    onChange={(e) => setFField("primeiraVencimento", e.target.value)}
+                  />
+                </Field>
+              </>
+            ) : (
+              <NumberField
+                label="Custo Total (R$)"
+                value={fForm.custoTotal}
+                onChange={(v) => setFField("custoTotal", v)}
+                placeholder={
+                  fForm.precoPago
+                    ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
+                    : "0,00"
+                }
+              />
+            )}
+          </div>
+          {(() => {
+            const qty = Math.max(1, Number(fForm.quantidade) || 1);
+            const preco = Number(fForm.precoPago) || 0;
+            const custoTotal = Number(fForm.custoTotal) || preco * qty;
+            const parcelas = Math.max(1, Math.floor(Number(fForm.parcelas) || 1));
+            const perParcel = parcelas > 0 ? custoTotal / parcelas : 0;
+            const juros = custoTotal - preco * qty;
+            if (!preco) return null;
+            return (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {fForm.formaPagamento === "parcelado" ? (
+                  <>
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {parcelas}× de {brl(perParcel)}
+                    </span>
+                    {juros > 0.01 && (
+                      <span className="ml-1">· juros de {brl(juros)} sobre o preço à vista</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    Pagamento à vista: <span className="font-semibold tabular-nums">{brl(custoTotal)}</span>
+                    {qty > 1 && <span> para {qty} rolos</span>}
+                  </>
+                )}
+              </p>
+            );
+          })()}
+        </div>
         <div className="flex justify-end">
           <Button type="submit" size="lg" className="btn-filament gap-2 px-6">
             <Plus className="h-4 w-4" /> Adicionar Rolo
@@ -525,6 +720,7 @@ function Stock() {
                   <TableHead>Marca</TableHead>
                   <TableHead>Cor</TableHead>
                   <TableHead>Material</TableHead>
+                  <TableHead className="text-center">Pagamento</TableHead>
                   <TableHead className="text-right">Estoque</TableHead>
                   <TableHead className="text-center">Nível</TableHead>
                   <TableHead className="text-right">Custo/g</TableHead>
@@ -545,6 +741,10 @@ function Stock() {
                     : isMedium
                       ? "#e0a93b"
                       : "#5fa8a3";
+                  const payment = f.paymentId ? filamentoPayments.find((p) => p.id === f.paymentId) : null;
+                  const insts = payment ? filamentoInstallments.filter((i) => i.paymentId === payment.id) : [];
+                  const paidCount = insts.filter((i) => i.pago).length;
+                  const totalInsts = insts.length;
                   return (
                     <TableRow key={f.id}>
                       <TableCell className="font-mono text-xs">{f.sku}</TableCell>
@@ -562,6 +762,20 @@ function Stock() {
                         <Badge variant="secondary" className="text-[10px]">
                           {f.material}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {!payment ? (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        ) : payment.formaPagamento === "a_vista" ? (
+                          <Badge variant="outline" className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]">
+                            <Banknote className="h-3 w-3" /> À vista
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1 border-blue-500/30 bg-blue-50 text-blue-700 text-[10px]">
+                            <CreditCard className="h-3 w-3" />
+                            {paidCount}/{totalInsts}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         <div className="font-semibold">
@@ -725,6 +939,22 @@ function Stock() {
                         <Badge variant="secondary" className="text-xs">
                           {f.material}
                         </Badge>
+                        {(() => {
+                          const payment = f.paymentId ? filamentoPayments.find((p) => p.id === f.paymentId) : null;
+                          if (!payment) return null;
+                          const insts = filamentoInstallments.filter((i) => i.paymentId === payment.id);
+                          const paidCount = insts.filter((i) => i.pago).length;
+                          return payment.formaPagamento === "a_vista" ? (
+                            <Badge variant="outline" className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]">
+                              <Banknote className="h-3 w-3" /> À vista
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="gap-1 border-blue-500/30 bg-blue-50 text-blue-700 text-[10px]">
+                              <CreditCard className="h-3 w-3" />
+                              {paidCount}/{insts.length}
+                            </Badge>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1126,7 +1356,7 @@ function Stock() {
 
       {/* ═══════════ FILAMENT DETAIL DIALOG ═══════════ */}
       <Dialog open={!!detailFilament} onOpenChange={(o) => !o && setDetailFilament(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
@@ -1212,6 +1442,39 @@ function Stock() {
                 <span>Quantidade cadastrada</span>
                 <span className="font-semibold tabular-nums text-foreground">1 rolo</span>
               </div>
+
+              {(() => {
+                const payment = detailFilament?.paymentId
+                  ? filamentoPayments.find((p) => p.id === detailFilament.paymentId)
+                  : null;
+                if (!payment) {
+                  return (
+                    <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-xs text-muted-foreground">
+                      Sem plano de pagamento cadastrado.
+                    </div>
+                  );
+                }
+                const insts = filamentoInstallments.filter((i) => i.paymentId === payment.id);
+                const batchFils = filamentos.filter((f) => f.batchId === payment.batchId);
+                return (
+                  <PaymentSchedule
+                    payment={payment}
+                    installments={insts}
+                    batchFilamentos={batchFils}
+                    brl={brl}
+                    isPending={
+                      mutatePayInstallment.isPending ||
+                      mutateRevertInstallment.isPending ||
+                      mutateSettlePayment.isPending ||
+                      mutateUpdateInstallment.isPending
+                    }
+                    onPay={(input) => mutatePayInstallment.mutateAsync(input).then(() => { toast.success("Parcela marcada como paga."); })}
+                    onRevert={(id) => mutateRevertInstallment.mutateAsync(id).then(() => { toast.success("Pagamento desfeito."); })}
+                    onSettle={(input) => mutateSettlePayment.mutateAsync(input).then(() => { toast.success("Todas as parcelas quitadas."); })}
+                    onUpdateInst={(input) => mutateUpdateInstallment.mutateAsync(input).then(() => { toast.success("Parcela atualizada."); })}
+                  />
+                );
+              })()}
             </div>
           )}
           <DialogFooter>
@@ -1404,6 +1667,351 @@ function DetailRow({
       <div className={`text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function PaymentSchedule({
+  payment,
+  installments,
+  batchFilamentos,
+  brl,
+  onPay,
+  onRevert,
+  onSettle,
+  onUpdateInst,
+  isPending,
+}: {
+  payment: FilamentoPayment;
+  installments: FilamentoPaymentInstallment[];
+  batchFilamentos: Filamento[];
+  brl: (n: number) => string;
+  onPay: (input: { installmentId: string; dataPagamento: string; valorPago?: number; observacao?: string }) => Promise<any> | void;
+  onRevert: (installmentId: string) => Promise<any> | void;
+  onSettle: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) => Promise<any> | void;
+  onUpdateInst: (input: { installmentId: string; vencimento?: string; valor?: number; observacao?: string }) => Promise<any> | void;
+  isPending: boolean;
+}) {
+  const [payDialog, setPayDialog] = useState<{
+    installmentId: string;
+    dataPagamento: string;
+    valorPago: string;
+  } | null>(null);
+  const [settleDialog, setOpenSettle] = useState<{
+    open: boolean;
+    totalPago: string;
+    dataPagamento: string;
+  }>({ open: false, totalPago: "", dataPagamento: new Date().toISOString().slice(0, 10) });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editVencimento, setEditVencimento] = useState("");
+  const [editObservacao, setEditObservacao] = useState("");
+
+  const sorted = [...installments].sort((a, b) => a.numero - b.numero);
+  const paid = sorted.filter((i) => i.pago);
+  const pending = sorted.filter((i) => !i.pago);
+  const totalPago = paid.reduce((s, i) => s + (i.valorPago ?? i.valor), 0);
+  const totalPendente = pending.reduce((s, i) => s + i.valor, 0);
+  const percent = payment.parcelas > 0 ? (paid.length / payment.parcelas) * 100 : 0;
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {payment.formaPagamento === "parcelado" ? (
+            <CreditCard className="h-4 w-4 text-blue-500" />
+          ) : (
+            <Banknote className="h-4 w-4 text-green-600" />
+          )}
+          <h4 className="font-display text-sm font-semibold">
+            {payment.formaPagamento === "parcelado"
+              ? `Parcelamento · ${payment.parcelas}×`
+              : "Pagamento à vista"}
+          </h4>
+        </div>
+        {batchFilamentos.length > 1 && (
+          <span className="text-[10px] text-muted-foreground">
+            Lote: {batchFilamentos.map((f) => f.sku).join(", ")}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-xs md:grid-cols-4">
+        <div>
+          <div className="text-muted-foreground">Custo total</div>
+          <div className="font-semibold tabular-nums">{brl(payment.custoTotal)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Pago</div>
+          <div className="font-semibold tabular-nums text-green-600">{brl(totalPago)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Pendente</div>
+          <div className="font-semibold tabular-nums text-amber-600">{brl(totalPendente)}</div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Progresso</div>
+          <div className="font-semibold tabular-nums">{percent.toFixed(0)}%</div>
+        </div>
+      </div>
+      <Progress value={percent} />
+
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10">#</TableHead>
+              <TableHead>Vencimento</TableHead>
+              <TableHead className="text-right">Valor</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead>Data Pgto</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((i) => {
+              const isEditing = editingId === i.id;
+              const overdue = !i.pago && i.vencimento < today;
+              return (
+                <TableRow key={i.id}>
+                  <TableCell className="font-mono text-xs">{i.numero}</TableCell>
+                  <TableCell>
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        value={editVencimento}
+                        onChange={(e) => setEditVencimento(e.target.value)}
+                        className="h-7 text-xs"
+                      />
+                    ) : (
+                      <span
+                        className={`text-xs tabular-nums ${overdue ? "font-semibold text-destructive" : ""}`}
+                      >
+                        {new Date(i.vencimento).toLocaleDateString("pt-BR")}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{brl(i.valor)}</TableCell>
+                  <TableCell className="text-center">
+                    {i.pago ? (
+                      <Badge className="gap-1 bg-green-600 text-[10px]">
+                        <Check className="h-3 w-3" /> Pago
+                      </Badge>
+                    ) : overdue ? (
+                      <Badge variant="destructive" className="text-[10px]">Atrasado</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">Pendente</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="tabular-nums text-xs text-muted-foreground">
+                    {i.dataPagamento ? new Date(i.dataPagamento).toLocaleDateString("pt-BR") : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      {isEditing ? (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-green-600"
+                            title="Salvar"
+                            disabled={isPending}
+                            onClick={async () => {
+                              await onUpdateInst({
+                                installmentId: i.id,
+                                vencimento: editVencimento,
+                                observacao: editObservacao,
+                              });
+                              setEditingId(null);
+                            }}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Cancelar"
+                            onClick={() => setEditingId(null)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          {!i.pago && (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-green-600"
+                                title="Marcar como pago"
+                                disabled={isPending}
+                                onClick={() =>
+                                  setPayDialog({
+                                    installmentId: i.id,
+                                    dataPagamento: new Date().toISOString().slice(0, 10),
+                                    valorPago: String(i.valor),
+                                  })
+                                }
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                title="Editar vencimento"
+                                disabled={isPending}
+                                onClick={() => {
+                                  setEditingId(i.id);
+                                  setEditVencimento(i.vencimento);
+                                  setEditObservacao(i.observacao ?? "");
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                          {i.pago && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-amber-600"
+                              title="Desfazer pagamento"
+                              disabled={isPending}
+                              onClick={() => onRevert(i.id)}
+                            >
+                              <Undo2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {pending.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-xs"
+            disabled={isPending}
+            onClick={() =>
+              setOpenSettle({
+                open: true,
+                totalPago: String(totalPendente.toFixed(2)),
+                dataPagamento: new Date().toISOString().slice(0, 10),
+              })
+            }
+          >
+            <Check className="h-3.5 w-3.5" /> Quitar tudo
+          </Button>
+        </div>
+      )}
+
+      {/* Pay installment dialog */}
+      <Dialog open={!!payDialog} onOpenChange={(o) => !o && setPayDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Check className="h-4 w-4" /> Marcar como pago
+            </DialogTitle>
+          </DialogHeader>
+          {payDialog && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Data do pagamento</Label>
+                <Input
+                  type="date"
+                  value={payDialog.dataPagamento}
+                  onChange={(e) => setPayDialog({ ...payDialog, dataPagamento: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Valor pago (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={payDialog.valorPago}
+                  onChange={(e) => setPayDialog({ ...payDialog, valorPago: e.target.value })}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPayDialog(null)}>Cancelar</Button>
+                <Button
+                  onClick={async () => {
+                    if (!payDialog) return;
+                    await onPay({
+                      installmentId: payDialog.installmentId,
+                      dataPagamento: payDialog.dataPagamento,
+                      valorPago: Number(payDialog.valorPago) || undefined,
+                    });
+                    setPayDialog(null);
+                  }}
+                  disabled={isPending}
+                >
+                  Confirmar
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Settle dialog */}
+      <Dialog open={settleDialog.open} onOpenChange={(o) => setOpenSettle((s) => ({ ...s, open: o }))}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Check className="h-4 w-4" /> Quitar todas as parcelas
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {pending.length} parcela(s) pendente(s) serão marcadas como pagas.
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs">Data do pagamento</Label>
+              <Input
+                type="date"
+                value={settleDialog.dataPagamento}
+                onChange={(e) => setOpenSettle((s) => ({ ...s, dataPagamento: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Total pago (R$) — opcional</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={settleDialog.totalPago}
+                onChange={(e) => setOpenSettle((s) => ({ ...s, totalPago: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpenSettle((s) => ({ ...s, open: false }))}>Cancelar</Button>
+              <Button
+                onClick={async () => {
+                  await onSettle({
+                    paymentId: payment.id,
+                    dataPagamento: settleDialog.dataPagamento,
+                    totalPago: Number(settleDialog.totalPago) > 0 ? Number(settleDialog.totalPago) : undefined,
+                  });
+                  setOpenSettle({ open: false, totalPago: "", dataPagamento: new Date().toISOString().slice(0, 10) });
+                }}
+                disabled={isPending}
+              >
+                Confirmar
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

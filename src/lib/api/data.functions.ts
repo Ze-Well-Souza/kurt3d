@@ -2,10 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../domain/cost";
-import type { AppSettings, Client, Expense, Filamento, FilamentoQualidade, Insumo, Lead, LeadImagem, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
+import type { AppSettings, Client, Expense, Filamento, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo, Lead, LeadImagem, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
 import { clampGrams, computeReservedByFilament } from "../domain/inventory";
 import { nowIso } from "../server/db.server";
-import { clientsRepo, expensesRepo, filamentosHistoryRepo, filamentosRepo, insumosRepo, inventoryRepo, leadsRepo, ordersRepo, portfolioRepo, settingsRepo, vendasRepo } from "../server/repositories.server";
+import { clientsRepo, expensesRepo, filamentoInstallmentsRepo, filamentoPaymentsRepo, filamentosHistoryRepo, filamentosRepo, insumosRepo, inventoryRepo, leadsRepo, ordersRepo, portfolioRepo, settingsRepo, vendasRepo } from "../server/repositories.server";
 
 function buildFilamentoLabel(f: Filamento) {
   return `[${f.sku}] ${f.marca} ${f.cor}`;
@@ -36,7 +36,7 @@ function computeOrderReservedGrams(txns: { orderId: string; filamentId: string; 
 }
 
 export const listSnapshot = createServerFn({ method: "GET" }).handler(async () => {
-  const [orders, filamentos, filamentosHistory, portfolio, insumos, vendas, inv, expenses, settingsData, leads, clients] = await Promise.all([
+  const [orders, filamentos, filamentosHistory, portfolio, insumos, vendas, inv, expenses, settingsData, leads, clients, payments, installments] = await Promise.all([
     ordersRepo(),
     filamentosRepo(),
     filamentosHistoryRepo(),
@@ -48,6 +48,8 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     settingsRepo(),
     leadsRepo(),
     clientsRepo(),
+    filamentoPaymentsRepo(),
+    filamentoInstallmentsRepo(),
   ]);
 
   const reservedMap = computeReservedByFilament(inv.list);
@@ -69,6 +71,8 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     settings: settingsData.settings,
     leads: leads.list,
     clients: clients.list,
+    filamentoPayments: payments.list,
+    filamentoInstallments: installments.list,
   };
 });
 
@@ -84,6 +88,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       precoPago: z.number().min(0.01).max(100000),
       dataCompra: z.string().min(1).max(30),
       linkProduto: z.string().url().max(500).optional(),
+      batchId: z.string().min(1).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -120,10 +125,12 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       qualidade: existing?.qualidade ?? null,
       comentario: existing?.comentario ?? null,
       linkProduto: data.linkProduto ?? existing?.linkProduto ?? null,
+      batchId: data.batchId ?? existing?.batchId ?? null,
+      paymentId: existing?.paymentId ?? null,
     };
     const next = existing ? repo.list.map((f) => (f.id === id ? filamento : f)) : [...repo.list, filamento];
     await repo.save(next);
-    return { ok: true };
+    return { ok: true, filamento };
   });
 
 
@@ -767,5 +774,229 @@ export const updateFilamentoPeso = createServerFn({ method: "POST" })
     const updated: Filamento = { ...f, pesoAtual: data.pesoAtual };
     await repo.save(repo.list.map((x) => (x.id === f.id ? updated : x)));
     return { ok: true as const };
+  });
+
+// ============================================================
+// Filamento payment tracking
+// ============================================================
+
+function addDaysIso(dateIso: string, days: number): string {
+  const d = new Date(dateIso + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export const createFilamentoPayment = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      batchId: z.string().min(1),
+      formaPagamento: z.enum(["a_vista", "parcelado"]),
+      custoTotal: z.number().min(0.01).max(10_000_000),
+      parcelas: z.number().int().min(1).max(48),
+      primeiraVencimento: z.string().min(1).max(30),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const paymentsRepo = await filamentoPaymentsRepo();
+    const installmentsRepo = await filamentoInstallmentsRepo();
+    const paymentId = randomUUID();
+    const payment: FilamentoPayment = {
+      id: paymentId,
+      batchId: data.batchId,
+      formaPagamento: data.formaPagamento,
+      custoTotal: data.custoTotal,
+      parcelas: data.parcelas,
+      createdAt: nowIso(),
+    };
+    await paymentsRepo.insert(payment);
+
+    const perParcel = Math.round((data.custoTotal / data.parcelas) * 100) / 100;
+    const lastParcelDiff = +(data.custoTotal - perParcel * data.parcelas).toFixed(2);
+    const items: FilamentoPaymentInstallment[] = [];
+    for (let i = 0; i < data.parcelas; i++) {
+      const valor = i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+      items.push({
+        id: randomUUID(),
+        paymentId,
+        numero: i + 1,
+        valor,
+        vencimento: addDaysIso(data.primeiraVencimento, i * 30),
+        pago: false,
+        dataPagamento: null,
+        valorPago: null,
+        observacao: null,
+      });
+    }
+    await installmentsRepo.insertMany(items);
+
+    // Attach paymentId + batchId to all filamentos in this batch
+    await paymentsRepo.attachToBatch(data.batchId, paymentId);
+    return { ok: true, paymentId };
+  });
+
+export const updateFilamentoPayment = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      paymentId: z.string().min(1),
+      formaPagamento: z.enum(["a_vista", "parcelado"]),
+      custoTotal: z.number().min(0.01).max(10_000_000),
+      parcelas: z.number().int().min(1).max(48),
+      primeiraVencimento: z.string().min(1).max(30),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const paymentsRepo = await filamentoPaymentsRepo();
+    const installmentsRepo = await filamentoInstallmentsRepo();
+    const existing = paymentsRepo.list.find((p) => p.id === data.paymentId);
+    if (!existing) throw new Error("Plano de pagamento não encontrado.");
+
+    const updated: FilamentoPayment = {
+      ...existing,
+      formaPagamento: data.formaPagamento,
+      custoTotal: data.custoTotal,
+      parcelas: data.parcelas,
+    };
+    await paymentsRepo.update(updated);
+
+    // Preserve paid installments, regenerate unpaid
+    const paid = installmentsRepo.list.filter((i) => i.paymentId === data.paymentId && i.pago);
+    await installmentsRepo.deleteByPayment(data.paymentId);
+
+    const perParcel = Math.round((data.custoTotal / data.parcelas) * 100) / 100;
+    const lastParcelDiff = +(data.custoTotal - perParcel * data.parcelas).toFixed(2);
+    const newItems: FilamentoPaymentInstallment[] = [];
+    for (let i = 0; i < data.parcelas; i++) {
+      const numero = i + 1;
+      const existingPaid = paid.find((p) => p.numero === numero);
+      if (existingPaid) {
+        newItems.push(existingPaid);
+        continue;
+      }
+      const valor = i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+      newItems.push({
+        id: randomUUID(),
+        paymentId: data.paymentId,
+        numero,
+        valor,
+        vencimento: addDaysIso(data.primeiraVencimento, i * 30),
+        pago: false,
+        dataPagamento: null,
+        valorPago: null,
+        observacao: null,
+      });
+    }
+    await installmentsRepo.insertMany(newItems);
+    return { ok: true };
+  });
+
+export const deleteFilamentoPayment = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ paymentId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const paymentsRepo = await filamentoPaymentsRepo();
+    const installmentsRepo = await filamentoInstallmentsRepo();
+    await installmentsRepo.deleteByPayment(data.paymentId);
+    await paymentsRepo.detachFromFilamentos(data.paymentId);
+    await paymentsRepo.remove(data.paymentId);
+    return { ok: true };
+  });
+
+export const payInstallment = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      installmentId: z.string().min(1),
+      dataPagamento: z.string().min(1).max(30),
+      valorPago: z.number().min(0).max(10_000_000).optional(),
+      observacao: z.string().max(500).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const installmentsRepo = await filamentoInstallmentsRepo();
+    const inst = installmentsRepo.list.find((i) => i.id === data.installmentId);
+    if (!inst) throw new Error("Parcela não encontrada.");
+    const updated: FilamentoPaymentInstallment = {
+      ...inst,
+      pago: true,
+      dataPagamento: data.dataPagamento,
+      valorPago: data.valorPago ?? inst.valor,
+      observacao: data.observacao ?? inst.observacao,
+    };
+    await installmentsRepo.update(updated);
+    return { ok: true };
+  });
+
+export const revertInstallment = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ installmentId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const installmentsRepo = await filamentoInstallmentsRepo();
+    const inst = installmentsRepo.list.find((i) => i.id === data.installmentId);
+    if (!inst) throw new Error("Parcela não encontrada.");
+    const updated: FilamentoPaymentInstallment = {
+      ...inst,
+      pago: false,
+      dataPagamento: null,
+      valorPago: null,
+    };
+    await installmentsRepo.update(updated);
+    return { ok: true };
+  });
+
+export const updateInstallment = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      installmentId: z.string().min(1),
+      vencimento: z.string().min(1).max(30).optional(),
+      valor: z.number().min(0.01).max(10_000_000).optional(),
+      observacao: z.string().max(500).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const installmentsRepo = await filamentoInstallmentsRepo();
+    const inst = installmentsRepo.list.find((i) => i.id === data.installmentId);
+    if (!inst) throw new Error("Parcela não encontrada.");
+    const updated: FilamentoPaymentInstallment = {
+      ...inst,
+      vencimento: data.vencimento ?? inst.vencimento,
+      valor: data.valor ?? inst.valor,
+      observacao: data.observacao ?? inst.observacao,
+    };
+    await installmentsRepo.update(updated);
+    return { ok: true };
+  });
+
+export const settlePayment = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      paymentId: z.string().min(1),
+      totalPago: z.number().min(0).max(10_000_000).optional(),
+      dataPagamento: z.string().min(1).max(30).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const installmentsRepo = await filamentoInstallmentsRepo();
+    const pending = installmentsRepo.list
+      .filter((i) => i.paymentId === data.paymentId && !i.pago)
+      .sort((a, b) => a.numero - b.numero);
+    if (pending.length === 0) return { ok: true };
+
+    const today = data.dataPagamento ?? new Date().toISOString().slice(0, 10);
+    let remaining = data.totalPago ?? pending.reduce((sum, i) => sum + i.valor, 0);
+    let distributed = 0;
+    const updates: FilamentoPaymentInstallment[] = [];
+    for (let idx = 0; idx < pending.length; idx++) {
+      const p = pending[idx];
+      const isLast = idx === pending.length - 1;
+      const valorPago = isLast ? Math.round((remaining - distributed) * 100) / 100 : p.valor;
+      updates.push({
+        ...p,
+        pago: true,
+        dataPagamento: today,
+        valorPago,
+      });
+      distributed += valorPago;
+    }
+    for (const u of updates) {
+      await installmentsRepo.update(u);
+    }
+    return { ok: true };
   });
 

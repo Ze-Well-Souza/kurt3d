@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { AdminUser, AppSettings, Client, Expense, ExpenseSource, Filamento, FilamentoHistory, Insumo, InventoryTxn, Lead, Order, PortfolioProject, SiteContent, Venda } from "../domain/types";
+import type { AdminUser, AppSettings, Client, Expense, ExpenseSource, Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FormaPagamento, Insumo, InventoryTxn, Lead, Order, PortfolioProject, SiteContent, Venda } from "../domain/types";
 import { DEFAULT_APP_SETTINGS } from "../domain/types";
 import { DEFAULT_SITE_CONTENT } from "../domain/types";
 import { computeReservedByFilament } from "../domain/inventory";
@@ -84,6 +84,8 @@ function fromFilamentoRow(row: any): Filamento {
     qualidade: row.qualidade ?? null,
     comentario: row.comentario ?? null,
     linkProduto: row.link_produto ?? null,
+    batchId: row.batch_id ?? null,
+    paymentId: row.payment_id ?? null,
   };
 }
 
@@ -102,6 +104,8 @@ function toFilamentoRow(row: Filamento) {
     qualidade: row.qualidade ?? null,
     comentario: row.comentario ?? null,
     link_produto: row.linkProduto ?? null,
+    batch_id: row.batchId ?? null,
+    payment_id: row.paymentId ?? null,
   };
 }
 
@@ -299,6 +303,56 @@ function toInventoryRow(row: InventoryTxn) {
   };
 }
 
+function fromPaymentRow(row: any): FilamentoPayment {
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    formaPagamento: row.forma_pagamento as FormaPagamento,
+    custoTotal: row.custo_total,
+    parcelas: row.parcelas,
+    createdAt: row.created_at,
+  };
+}
+
+function toPaymentRow(row: FilamentoPayment) {
+  return {
+    id: row.id,
+    batch_id: row.batchId,
+    forma_pagamento: row.formaPagamento,
+    custo_total: row.custoTotal,
+    parcelas: row.parcelas,
+    created_at: row.createdAt,
+  };
+}
+
+function fromInstallmentRow(row: any): FilamentoPaymentInstallment {
+  return {
+    id: row.id,
+    paymentId: row.payment_id,
+    numero: row.numero,
+    valor: row.valor,
+    vencimento: row.vencimento,
+    pago: !!row.pago,
+    dataPagamento: row.data_pagamento ?? null,
+    valorPago: row.valor_pago ?? null,
+    observacao: row.observacao ?? null,
+  };
+}
+
+function toInstallmentRow(row: FilamentoPaymentInstallment) {
+  return {
+    id: row.id,
+    payment_id: row.paymentId,
+    numero: row.numero,
+    valor: row.valor,
+    vencimento: row.vencimento,
+    pago: row.pago,
+    data_pagamento: row.dataPagamento ?? null,
+    valor_pago: row.valorPago ?? null,
+    observacao: row.observacao ?? null,
+  };
+}
+
 function fromExpenseRow(row: any): Expense {
   return {
     id: row.id,
@@ -421,6 +475,55 @@ export async function filamentosHistoryRepo() {
       const fRepo = await filamentosRepo();
       await fRepo.save(fRepo.list.filter((f) => f.id !== filamento.id));
       return historyRow;
+    },
+  };
+}
+
+export async function filamentoPaymentsRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrap(await supabase.from("filamento_payments").select("*").order("created_at", { ascending: false }));
+  const list = (rows as any[]).map(fromPaymentRow);
+  return {
+    list,
+    async save(next: FilamentoPayment[]) {
+      await replaceById("filamento_payments", next.map(toPaymentRow));
+    },
+    async insert(p: FilamentoPayment) {
+      unwrap(await supabase.from("filamento_payments").insert(toPaymentRow(p)));
+    },
+    async update(p: FilamentoPayment) {
+      unwrap(await supabase.from("filamento_payments").update(toPaymentRow(p)).eq("id", p.id));
+    },
+    async remove(id: string) {
+      unwrap(await supabase.from("filamento_payments").delete().eq("id", id));
+    },
+    async attachToBatch(batchId: string, paymentId: string) {
+      unwrap(await supabase.from("filamentos").update({ payment_id: paymentId, batch_id: batchId }).eq("batch_id", batchId));
+    },
+    async detachFromFilamentos(paymentId: string) {
+      unwrap(await supabase.from("filamentos").update({ payment_id: null }).eq("payment_id", paymentId));
+    },
+  };
+}
+
+export async function filamentoInstallmentsRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrap(await supabase.from("filamento_payment_installments").select("*").order("numero", { ascending: true }));
+  const list = (rows as any[]).map(fromInstallmentRow);
+  return {
+    list,
+    async save(next: FilamentoPaymentInstallment[]) {
+      await replaceById("filamento_payment_installments", next.map(toInstallmentRow));
+    },
+    async insertMany(items: FilamentoPaymentInstallment[]) {
+      if (items.length === 0) return;
+      unwrap(await supabase.from("filamento_payment_installments").insert(items.map(toInstallmentRow)));
+    },
+    async update(inst: FilamentoPaymentInstallment) {
+      unwrap(await supabase.from("filamento_payment_installments").update(toInstallmentRow(inst)).eq("id", inst.id));
+    },
+    async deleteByPayment(paymentId: string) {
+      unwrap(await supabase.from("filamento_payment_installments").delete().eq("payment_id", paymentId));
     },
   };
 }
