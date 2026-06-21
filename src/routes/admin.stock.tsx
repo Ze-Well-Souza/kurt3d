@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { randomUUID } from "node:crypto";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil, LayoutGrid, Table as TableIcon, CreditCard, Banknote, Check, Undo2, CalendarClock } from "lucide-react";
@@ -141,6 +140,14 @@ function generateSku(usedSkus: string[]): string {
     if (match) max = Math.max(max, Number(match[1]));
   }
   return `FIL-${String(max + 1).padStart(3, "0")}`;
+}
+
+// Browser-safe batch id (no node:crypto dependency on client)
+function makeBatchId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "b-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
 }
 
 
@@ -364,7 +371,7 @@ function Stock() {
       usedLower.add(next.toLowerCase());
     }
 
-    const batchId = randomUUID();
+    const batchId = makeBatchId();
 
     try {
       for (const sku of skus) {
