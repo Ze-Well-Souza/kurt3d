@@ -165,7 +165,7 @@ function Stock() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["snapshot"] });
 
   const mutateFilamento = useMutation({
-    mutationFn: (input: z.infer<typeof filamentoSchema> & { id?: string; batchId?: string }) => upsertFilamento({ data: input as any }),
+    mutationFn: (input: z.infer<typeof filamentoSchema> & { id?: string; batchId?: string; paymentId?: string }) => upsertFilamento({ data: input as any }),
     onSuccess: invalidate,
   });
 
@@ -294,8 +294,49 @@ function Stock() {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
+
+    const formaPagamento: FormaPagamento = editForm.formaPagamento === "parcelado" ? "parcelado" : "a_vista";
+    const custoTotalNum = Number(editForm.custoTotal) || Number(editForm.precoPago) || 0;
+    const parcelas = formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(editForm.parcelas) || 1)) : 1;
+    const primeiraVencimento = editForm.primeiraVencimento || editForm.dataCompra || new Date().toISOString().slice(0, 10);
+
+    const existingFilamento = filamentos.find((x) => x.id === editForm.id);
+    const existingPaymentId = existingFilamento?.paymentId ?? null;
+    const batchId = existingFilamento?.batchId ?? makeBatchId();
+
     try {
-      await mutateFilamento.mutateAsync({ ...parsed.data, id: editForm.id });
+      if (existingPaymentId) {
+        // Update existing payment + filamento
+        await mutateUpdatePayment.mutateAsync({
+          paymentId: existingPaymentId,
+          formaPagamento,
+          custoTotal: custoTotalNum,
+          parcelas,
+          primeiraVencimento,
+        });
+        await mutateFilamento.mutateAsync({
+          ...parsed.data,
+          id: editForm.id,
+          batchId,
+          paymentId: existingPaymentId,
+        });
+      } else {
+        // Create new payment, then update filamento with batchId+paymentId
+        const created = await mutateCreatePayment.mutateAsync({
+          batchId,
+          formaPagamento,
+          custoTotal: custoTotalNum,
+          parcelas,
+          primeiraVencimento,
+        });
+        const paymentId = (created as { ok?: boolean; paymentId?: string })?.paymentId ?? batchId;
+        await mutateFilamento.mutateAsync({
+          ...parsed.data,
+          id: editForm.id,
+          batchId,
+          paymentId,
+        });
+      }
       toast.success(`Filamento [${parsed.data.sku}] atualizado.`);
       setEditForm(null);
     } catch (err) {
@@ -1590,6 +1631,98 @@ function Stock() {
                 />
               </Field>
 
+              {/* ─── PAYMENT DETAILS (EDIT) ─── */}
+              <div className="rounded-xl border border-border bg-muted/30 p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <h3 className="font-display text-sm font-semibold">Detalhes do Pagamento</h3>
+                </div>
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Forma de Pagamento" className="md:col-span-2">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={editForm.formaPagamento === "a_vista" ? "default" : "outline"}
+                        className="flex-1 gap-2"
+                        onClick={() => setEditField("formaPagamento", "a_vista")}
+                      >
+                        <Banknote className="h-4 w-4" /> À vista
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={editForm.formaPagamento === "parcelado" ? "default" : "outline"}
+                        className="flex-1 gap-2"
+                        onClick={() => setEditField("formaPagamento", "parcelado")}
+                      >
+                        <CreditCard className="h-4 w-4" /> Parcelado
+                      </Button>
+                    </div>
+                  </Field>
+                  {editForm.formaPagamento === "parcelado" ? (
+                    <>
+                      <NumberField
+                        label="Número de Parcelas"
+                        value={editForm.parcelas}
+                        onChange={(v) => setEditField("parcelas", v)}
+                        placeholder="1"
+                        step="1"
+                      />
+                      <NumberField
+                        label="Custo Total (R$)"
+                        value={editForm.custoTotal}
+                        onChange={(v) => setEditField("custoTotal", v)}
+                        placeholder={
+                          editForm.precoPago ? String(Number(editForm.precoPago).toFixed(2)) : "0,00"
+                        }
+                      />
+                      <Field label="Primeiro Vencimento" className="md:col-span-2 lg:col-span-4">
+                        <Input
+                          type="date"
+                          value={editForm.primeiraVencimento}
+                          onChange={(e) => setEditField("primeiraVencimento", e.target.value)}
+                        />
+                      </Field>
+                    </>
+                  ) : (
+                    <NumberField
+                      label="Custo Total (R$)"
+                      value={editForm.custoTotal}
+                      onChange={(v) => setEditField("custoTotal", v)}
+                      placeholder={
+                        editForm.precoPago ? String(Number(editForm.precoPago).toFixed(2)) : "0,00"
+                      }
+                    />
+                  )}
+                </div>
+                {(() => {
+                  const preco = Number(editForm.precoPago) || 0;
+                  const custoTotal = Number(editForm.custoTotal) || preco;
+                  const parcelas = Math.max(1, Math.floor(Number(editForm.parcelas) || 1));
+                  const perParcel = parcelas > 0 ? custoTotal / parcelas : 0;
+                  const juros = custoTotal - preco;
+                  if (!preco) return null;
+                  return (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {editForm.formaPagamento === "parcelado" ? (
+                        <>
+                          <span className="font-semibold tabular-nums text-foreground">
+                            {parcelas}× de {brl(perParcel)}
+                          </span>
+                          {juros > 0.01 && (
+                            <span className="ml-1">· juros de {brl(juros)} sobre o preço à vista</span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          Pagamento à vista:{" "}
+                          <span className="font-semibold tabular-nums">{brl(custoTotal)}</span>
+                        </>
+                      )}
+                    </p>
+                  );
+                })()}
+              </div>
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditForm(null)}>
                   Cancelar
@@ -1597,9 +1730,11 @@ function Stock() {
                 <Button
                   type="submit"
                   className="btn-filament gap-2"
-                  disabled={mutateFilamento.isPending}
+                  disabled={mutateFilamento.isPending || mutateCreatePayment.isPending || mutateUpdatePayment.isPending}
                 >
-                  {mutateFilamento.isPending ? "Salvando…" : "Salvar alterações"}
+                  {mutateFilamento.isPending || mutateCreatePayment.isPending || mutateUpdatePayment.isPending
+                    ? "Salvando…"
+                    : "Salvar alterações"}
                 </Button>
               </DialogFooter>
             </form>

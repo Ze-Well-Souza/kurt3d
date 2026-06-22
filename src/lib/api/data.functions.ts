@@ -89,6 +89,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       dataCompra: z.string().min(1).max(30),
       linkProduto: z.string().url().max(500).optional(),
       batchId: z.string().min(1).optional(),
+      paymentId: z.string().min(1).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -126,7 +127,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       comentario: existing?.comentario ?? null,
       linkProduto: data.linkProduto ?? existing?.linkProduto ?? null,
       batchId: data.batchId ?? existing?.batchId ?? null,
-      paymentId: existing?.paymentId ?? null,
+      paymentId: data.paymentId ?? existing?.paymentId ?? null,
     };
     const next = existing ? repo.list.map((f) => (f.id === id ? filamento : f)) : [...repo.list, filamento];
     await repo.save(next);
