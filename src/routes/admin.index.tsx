@@ -15,16 +15,26 @@ function Dashboard() {
   const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
   const orders = snap.data?.orders ?? [];
   const vendas = snap.data?.vendas ?? [];
+  const expenses = snap.data?.expenses ?? [];
   const [period, setPeriod] = useState<"month" | "all">("month");
 
   const periodLabel = period === "month" ? "este mês" : "total";
 
+  const monthStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  }, []);
+
   const filteredVendas = useMemo(() => {
     if (period === "all") return vendas;
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     return vendas.filter((v) => v.data >= monthStart);
-  }, [vendas, period]);
+  }, [vendas, period, monthStart]);
+
+  const filteredExpenses = useMemo(() => {
+    if (period === "all") return expenses;
+    const monthStartDate = monthStart.slice(0, 10);
+    return expenses.filter((e) => e.data >= monthStartDate);
+  }, [expenses, period, monthStart]);
 
   const stats = useMemo(() => {
     const trabalhosAtivos = orders.filter(
@@ -32,15 +42,15 @@ function Dashboard() {
     ).length;
     const receita = filteredVendas.reduce((sum, v) => sum + v.valor, 0);
     const custoTotal = filteredVendas.reduce((sum, v) => sum + v.custo, 0);
-    const lucro = receita - custoTotal;
-    const impressorasOnline = "6/6";
+    const despesas = filteredExpenses.reduce((sum, e) => sum + e.valor, 0);
+    const lucro = receita - custoTotal - despesas;
     return [
       { label: "Trabalhos ativos", value: String(trabalhosAtivos), delta: `de ${orders.length} pedidos` },
       { label: `Receita (${periodLabel})`, value: brl(receita), delta: `${filteredVendas.length} vendas` },
       { label: `Lucro Líquido (${periodLabel})`, value: brl(lucro), delta: lucro >= 0 ? "positivo" : "negativo" },
-      { label: "Impressoras online", value: impressorasOnline, delta: "100%" },
+      { label: `Despesas (${periodLabel})`, value: brl(despesas), delta: `${filteredExpenses.length} lançamentos` },
     ];
-  }, [orders, filteredVendas, periodLabel]);
+  }, [orders, filteredVendas, filteredExpenses, periodLabel]);
 
   // Recent terminal orders for activity section
   const recentActivity = useMemo(() => {
