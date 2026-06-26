@@ -283,10 +283,13 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const [orders, portfolio] = await Promise.all([ordersRepo(), portfolioRepo()]);
+    const [orders, portfolio, clientsData] = await Promise.all([ordersRepo(), portfolioRepo(), clientsRepo()]);
     const proj = portfolio.list.find((p) => p.id === data.portfolioProjectId);
     if (!proj) return { ok: false as const };
     const now = nowIso();
+    // BUG 2 FIX: resolve clientId by matching client name (case-insensitive)
+    const clientNameLower = data.client.trim().toLowerCase();
+    const matchedClient = clientsData.list.find((c) => c.nome.trim().toLowerCase() === clientNameLower);
     const order: Order = {
       id: randomUUID(),
       client: data.client,
@@ -301,6 +304,7 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
       gramsPerUnit: proj.pesoPeca,
       precoVenda: proj.precoVenda,
       linkProjeto: proj.linkModelo ?? null,
+      clientId: matchedClient?.id ?? null,
     };
     await orders.save([order, ...orders.list]);
     return { ok: true as const };
@@ -323,8 +327,11 @@ export const addOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const repo = await ordersRepo();
+    const [repo, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
     const now = nowIso();
+    // BUG 2 FIX: resolve clientId by matching client name (case-insensitive)
+    const clientNameLower = data.client.trim().toLowerCase();
+    const matchedClient = clientsData.list.find((c) => c.nome.trim().toLowerCase() === clientNameLower);
     const order: Order = {
       id: randomUUID(),
       status: "todo",
@@ -341,6 +348,7 @@ export const addOrder = createServerFn({ method: "POST" })
       precoVenda: data.precoVenda ?? null,
       formaPagamento: data.formaPagamento ?? null,
       dataPagamento: data.dataPagamento ?? null,
+      clientId: matchedClient?.id ?? null,
     };
     await repo.save([order, ...repo.list]);
     return { ok: true };
@@ -350,6 +358,28 @@ export const removeOrder = createServerFn({ method: "POST" })
   .inputValidator(z.object({ orderId: z.string().min(1), reason: z.string().trim().min(1, "Informe o motivo").max(500) }))
   .handler(async ({ data }) => {
     const repo = await ordersRepo();
+    const order = repo.list.find((o) => o.id === data.orderId);
+
+    // BUG 4 FIX: release inventory reservation when deleting an order in "printing" status
+    if (order && order.status === "printing") {
+      const filamentId = order.filamentoId ?? null;
+      if (filamentId) {
+        const [portfolio, inv] = await Promise.all([portfolioRepo(), inventoryRepo()]);
+        const proj = order.portfolioProjectId
+          ? portfolio.list.find((p) => p.id === order.portfolioProjectId)
+          : undefined;
+        const gramsTotal = estimateOrderMaterialGrams(order, proj);
+        if (gramsTotal) {
+          const grams = clampGrams(gramsTotal);
+          const reserved = computeOrderReservedGrams(inv.list, order.id, filamentId);
+          const toRelease = Math.min(reserved, grams);
+          if (toRelease > 0) {
+            await inv.append({ orderId: order.id, filamentId, type: "release", grams: toRelease });
+          }
+        }
+      }
+    }
+
     await repo.save(repo.list.filter((o) => o.id !== data.orderId));
     return { ok: true };
   });
@@ -680,6 +710,15 @@ export const addClient = createServerFn({ method: "POST" })
       updatedAt: now,
     };
     await repo.save([client, ...repo.list]);
+    // BUG 2 FIX: retroactively link existing orders whose client name matches this new client
+    const ordersData = await ordersRepo();
+    const nomeLower = data.nome.trim().toLowerCase();
+    const linkedOrders = ordersData.list.map((o) =>
+      !o.clientId && o.client.trim().toLowerCase() === nomeLower
+        ? { ...o, clientId: client.id, updatedAt: now }
+        : o,
+    );
+    await ordersData.save(linkedOrders);
     return { ok: true };
   });
 
@@ -781,9 +820,15 @@ export const updateFilamentoPeso = createServerFn({ method: "POST" })
 // Filamento payment tracking
 // ============================================================
 
-function addDaysIso(dateIso: string, days: number): string {
+// BUG 3 FIX: use calendar months instead of fixed 30-day intervals.
+// Handles month-end edge cases (e.g. Jan 31 + 1 month = Feb 28, not Mar 3).
+function addMonthsIso(dateIso: string, months: number): string {
   const d = new Date(dateIso + "T00:00:00");
-  d.setDate(d.getDate() + days);
+  const day = d.getDate();
+  d.setDate(1); // anchor to 1st to avoid month overflow during setMonth
+  d.setMonth(d.getMonth() + months);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
   return d.toISOString().slice(0, 10);
 }
 
@@ -821,7 +866,7 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
         paymentId,
         numero: i + 1,
         valor,
-        vencimento: addDaysIso(data.primeiraVencimento, i * 30),
+        vencimento: addMonthsIso(data.primeiraVencimento, i),
         pago: false,
         dataPagamento: null,
         valorPago: null,
@@ -879,7 +924,7 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
         paymentId: data.paymentId,
         numero,
         valor,
-        vencimento: addDaysIso(data.primeiraVencimento, i * 30),
+        vencimento: addMonthsIso(data.primeiraVencimento, i),
         pago: false,
         dataPagamento: null,
         valorPago: null,
