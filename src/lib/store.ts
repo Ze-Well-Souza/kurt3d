@@ -190,7 +190,42 @@ export function addOrder(order: Order) {
   ordersStore.set((prev) => [...prev, order]);
 }
 
+export function removeOrder(id: string) {
+  const order = ordersStore.get().find((o) => o.id === id);
+  
+  // Se o pedido estava em produção e for excluído, o filamento já foi consumido
+  // Neste caso, registramos como perda/falha para fins de controle
+  if (order && order.status === "printing") {
+    // O estoque já foi usado na impressão, então tratamos como falha
+    const wastedGrams = 5 * order.quantity; // estimativa de 5g por unidade
+    const matchedColor = order.colors.find((c) =>
+      filamentosStore.get().some((f) => f.id === c),
+    );
+    if (matchedColor) {
+      abaterEstoqueFilamento(matchedColor, wastedGrams);
+    }
+  }
+  
+  ordersStore.set((prev) => prev.filter((o) => o.id !== id));
+}
+
+function getFilamentoIdForColor(color: string): string | undefined {
+  const filamentos = filamentosStore.get();
+  const matched = filamentos.find((f) => f.cor.toLowerCase() === color.toLowerCase());
+  return matched?.id;
+}
+
 export function updateOrderStatus(id: string, status: Status) {
+  const order = ordersStore.get().find((o) => o.id === id);
+  if (!order) return;
+  
+  const previousStatus = order.status;
+  
+  // Se estava em printing e vai para todo, precisamos liberar o estoque que foi reservado/usado
+  // A lógica atual é: estoque é abatido apenas ao finalizar (vendido/presente/falha)
+  // Portanto, ao mover de printing -> todo, não há nada a liberar formalmente
+  // pois o sistema não faz reserva prévia, só abate no destino final
+  
   ordersStore.set((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
 }
 
