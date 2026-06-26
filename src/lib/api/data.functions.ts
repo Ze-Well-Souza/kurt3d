@@ -36,6 +36,63 @@ function computeOrderReservedGrams(txns: { orderId: string; filamentId: string; 
   return Math.max(0, grams);
 }
 
+function normalizeClientName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function resolveClientId(
+  clients: Client[],
+  clientName: string,
+  explicitClientId?: string | null,
+) {
+  if (explicitClientId) {
+    const explicitClient = clients.find((client) => client.id === explicitClientId);
+    if (explicitClient) return explicitClient.id;
+  }
+
+  const normalizedClientName = normalizeClientName(clientName);
+  const matchedClient = clients.find((client) => normalizeClientName(client.nome) === normalizedClientName);
+  return matchedClient?.id ?? null;
+}
+
+function relinkOrdersToClient(
+  orders: Order[],
+  clientId: string,
+  namesToMatch: string[],
+  updatedAt: string,
+) {
+  const normalizedNames = new Set(namesToMatch.map(normalizeClientName).filter(Boolean));
+  return orders.map((order) =>
+    !order.clientId && normalizedNames.has(normalizeClientName(order.client))
+      ? { ...order, clientId, updatedAt }
+      : order,
+  );
+}
+
+function hydrateOrderClientLinks(orders: Order[], clients: Client[]) {
+  const uniqueClientIdsByName = new Map<string, string | null>();
+
+  for (const client of clients) {
+    const normalizedName = normalizeClientName(client.nome);
+    const existingClientId = uniqueClientIdsByName.get(normalizedName);
+
+    if (existingClientId === undefined) {
+      uniqueClientIdsByName.set(normalizedName, client.id);
+      continue;
+    }
+
+    if (existingClientId !== client.id) {
+      uniqueClientIdsByName.set(normalizedName, null);
+    }
+  }
+
+  return orders.map((order) => {
+    if (order.clientId) return order;
+    const inferredClientId = uniqueClientIdsByName.get(normalizeClientName(order.client));
+    return inferredClientId ? { ...order, clientId: inferredClientId } : order;
+  });
+}
+
 export const listSnapshot = createServerFn({ method: "GET" }).handler(async () => {
   const [orders, filamentos, filamentosHistory, portfolio, insumos, vendas, inv, expenses, settingsData, leads, clients, payments, installments] = await Promise.all([
     ordersRepo(),
@@ -61,8 +118,10 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     label: buildFilamentoLabel(f),
   }));
 
+  const ordersView = hydrateOrderClientLinks(orders.list, clients.list);
+
   return {
-    orders: orders.list,
+    orders: ordersView,
     filamentos: filamentosView,
     filamentosHistory: filamentosHistory.list,
     portfolio: portfolio.list,
@@ -280,6 +339,7 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
     z.object({
       portfolioProjectId: z.string().min(1),
       client: z.string().trim().min(1).max(120),
+      clientId: z.string().min(1).optional(),
       quantity: z.number().int().min(1).max(100000),
     }),
   )
@@ -288,9 +348,6 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
     const proj = portfolio.list.find((p) => p.id === data.portfolioProjectId);
     if (!proj) return { ok: false as const };
     const now = nowIso();
-    // BUG 2 FIX: resolve clientId by matching client name (case-insensitive)
-    const clientNameLower = data.client.trim().toLowerCase();
-    const matchedClient = clientsData.list.find((c) => c.nome.trim().toLowerCase() === clientNameLower);
     const order: Order = {
       id: randomUUID(),
       client: data.client,
@@ -305,7 +362,7 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
       gramsPerUnit: proj.pesoPeca,
       precoVenda: proj.precoVenda,
       linkProjeto: proj.linkModelo ?? null,
-      clientId: matchedClient?.id ?? null,
+      clientId: resolveClientId(clientsData.list, data.client, data.clientId),
     };
     await orders.save([order, ...orders.list]);
     return { ok: true as const };
@@ -325,14 +382,12 @@ export const addOrder = createServerFn({ method: "POST" })
       precoVenda: z.number().min(0).max(1000000).optional(),
       formaPagamento: z.string().trim().max(100).optional(),
       dataPagamento: z.string().max(30).optional(),
+      clientId: z.string().min(1).optional(),
     }),
   )
   .handler(async ({ data }) => {
     const [repo, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
     const now = nowIso();
-    // BUG 2 FIX: resolve clientId by matching client name (case-insensitive)
-    const clientNameLower = data.client.trim().toLowerCase();
-    const matchedClient = clientsData.list.find((c) => c.nome.trim().toLowerCase() === clientNameLower);
     const order: Order = {
       id: randomUUID(),
       status: "todo",
@@ -349,7 +404,7 @@ export const addOrder = createServerFn({ method: "POST" })
       precoVenda: data.precoVenda ?? null,
       formaPagamento: data.formaPagamento ?? null,
       dataPagamento: data.dataPagamento ?? null,
-      clientId: matchedClient?.id ?? null,
+      clientId: resolveClientId(clientsData.list, data.client, data.clientId),
     };
     await repo.save([order, ...repo.list]);
     return { ok: true };
@@ -613,7 +668,7 @@ export const updateOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const orders = await ordersRepo();
+    const [orders, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
     const order = orders.list.find((o) => o.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };
     if (order.status === "vendido" || order.status === "presente" || order.status === "falha") {
@@ -633,7 +688,7 @@ export const updateOrder = createServerFn({ method: "POST" })
       multiPart: data.multiPart ?? order.multiPart ?? false,
       formaPagamento: data.formaPagamento ?? null,
       dataPagamento: data.dataPagamento ?? null,
-      clientId: data.clientId ?? null,
+      clientId: resolveClientId(clientsData.list, data.client, data.clientId),
       updatedAt: nowIso(),
     };
     await orders.save(orders.list.map((o) => (o.id === order.id ? updated : o)));
@@ -711,14 +766,8 @@ export const addClient = createServerFn({ method: "POST" })
       updatedAt: now,
     };
     await repo.save([client, ...repo.list]);
-    // BUG 2 FIX: retroactively link existing orders whose client name matches this new client
     const ordersData = await ordersRepo();
-    const nomeLower = data.nome.trim().toLowerCase();
-    const linkedOrders = ordersData.list.map((o) =>
-      !o.clientId && o.client.trim().toLowerCase() === nomeLower
-        ? { ...o, clientId: client.id, updatedAt: now }
-        : o,
-    );
+    const linkedOrders = relinkOrdersToClient(ordersData.list, client.id, [data.nome], now);
     await ordersData.save(linkedOrders);
     return { ok: true };
   });
@@ -737,6 +786,7 @@ export const updateClient = createServerFn({ method: "POST" })
     const repo = await clientsRepo();
     const existing = repo.list.find((c) => c.id === data.id);
     if (!existing) return { ok: false as const, reason: "not_found" as const };
+    const now = nowIso();
 
     const updated: Client = {
       ...existing,
@@ -744,9 +794,12 @@ export const updateClient = createServerFn({ method: "POST" })
       whatsapp: data.whatsapp ?? null,
       email: data.email ?? null,
       notas: data.notas ?? null,
-      updatedAt: nowIso(),
+      updatedAt: now,
     };
     await repo.save(repo.list.map((c) => (c.id === data.id ? updated : c)));
+    const ordersData = await ordersRepo();
+    const linkedOrders = relinkOrdersToClient(ordersData.list, updated.id, [existing.nome, updated.nome], now);
+    await ordersData.save(linkedOrders);
     return { ok: true as const };
   });
 

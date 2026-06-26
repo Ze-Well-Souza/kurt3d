@@ -135,6 +135,8 @@ function calc(p: {
 }
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const NO_CLIENT_SELECTED = "__none__";
+
 function formatTime(min: number) {
   const h = Math.floor(min / 60); const m = min % 60;
   if (h === 0) return `${m}m`;
@@ -157,7 +159,7 @@ function CalcPedidos() {
   /* ── mutations ── */
   const mutateAddProject = useMutation({ mutationFn: (input: any) => addPortfolioProject({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateRemoveProject = useMutation({ mutationFn: (id: string) => removePortfolioProject({ data: { id } }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
-  const mutateCreateOrder = useMutation({ mutationFn: (input: { portfolioProjectId: string; client: string; quantity: number }) => createOrderFromPortfolio({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
+  const mutateCreateOrder = useMutation({ mutationFn: (input: { portfolioProjectId: string; client: string; clientId?: string; quantity: number }) => createOrderFromPortfolio({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateStatus = useMutation({ mutationFn: (input: { orderId: string; status: "todo" | "printing" | "done" }) => updateOrderStatus({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateAddOrder = useMutation({ mutationFn: (input: any) => addOrder({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateFinalizar = useMutation({ mutationFn: (input: any) => finalizarDestino({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
@@ -185,9 +187,9 @@ function CalcPedidos() {
   }, { lucro: 0, receita: 0 }), [projects, settings]);
 
   /* ── order dialogs ── */
-  const [orderDialog, setOrderDialog] = useState<{ open: boolean; projectId: string; client: string; quantity: string }>({ open: false, projectId: "", client: "", quantity: "1" });
+  const [orderDialog, setOrderDialog] = useState<{ open: boolean; projectId: string; client: string; clientId: string; quantity: string }>({ open: false, projectId: "", client: "", clientId: "", quantity: "1" });
   const [showNewOrder, setShowNewOrder] = useState(false);
-  const [newOrder, setNewOrder] = useState({ client: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+  const [newOrder, setNewOrder] = useState({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; orderId: string; reason: string }>({ open: false, orderId: "", reason: "" });
   const [editOrder, setEditOrder] = useState<Order | null>(null);
@@ -226,8 +228,10 @@ function CalcPedidos() {
   }
   function submitNewOrder(e: React.FormEvent) {
     e.preventDefault();
+    const selectedClient = clients.find((client) => client.id === newOrder.clientId);
     mutateAddOrder.mutate({
-      client: newOrder.client.trim() || "Cliente", projectName: newOrder.projectName.trim() || "Pedido",
+      client: (selectedClient?.nome ?? newOrder.client.trim()) || "Cliente", clientId: selectedClient?.id,
+      projectName: newOrder.projectName.trim() || "Pedido",
       quantity: Number(newOrder.quantity) || 1, timeMinutes: Number(newOrder.timeMinutes) || 60,
       filamentoId: newOrder.filamentoId || undefined, gramsPerUnit: newOrder.gramsPerUnit ? Number(newOrder.gramsPerUnit) : undefined,
       linkProjeto: newOrder.linkProjeto || undefined, multiPart: newOrder.multiPart,
@@ -235,7 +239,7 @@ function CalcPedidos() {
       formaPagamento: newOrder.formaPagamento || undefined, dataPagamento: newOrder.dataPagamento || undefined,
     });
     setShowNewOrder(false);
-    setNewOrder({ client: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+    setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
   }
 
   /* ═══════════ JSX ═══════════ */
@@ -273,7 +277,41 @@ function CalcPedidos() {
       <Dialog open={orderDialog.open} onOpenChange={(open) => setOrderDialog((s) => ({ ...s, open }))}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Criar pedido</DialogTitle></DialogHeader>
-          <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); mutateCreateOrder.mutate({ portfolioProjectId: orderDialog.projectId, client: orderDialog.client.trim() || "Cliente", quantity: Number(orderDialog.quantity) || 1 }); setOrderDialog((s) => ({ ...s, open: false })); toast.success("Pedido criado na fila."); }}>
+          <form className="grid gap-4" onSubmit={(e) => {
+            e.preventDefault();
+            const selectedClient = clients.find((client) => client.id === orderDialog.clientId);
+            mutateCreateOrder.mutate({
+              portfolioProjectId: orderDialog.projectId,
+              client: (selectedClient?.nome ?? orderDialog.client.trim()) || "Cliente",
+              clientId: selectedClient?.id,
+              quantity: Number(orderDialog.quantity) || 1,
+            });
+            setOrderDialog((s) => ({ ...s, open: false }));
+            toast.success("Pedido criado na fila.");
+          }}>
+            <div className="grid gap-2">
+              <Label>Cliente Cadastrado</Label>
+              <Select
+                value={orderDialog.clientId || NO_CLIENT_SELECTED}
+                onValueChange={(value) => {
+                  const nextClientId = value === NO_CLIENT_SELECTED ? "" : value;
+                  const selectedClient = clients.find((client) => client.id === nextClientId);
+                  setOrderDialog((state) => ({
+                    ...state,
+                    clientId: nextClientId,
+                    client: selectedClient?.nome ?? state.client,
+                  }));
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Sem vínculo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CLIENT_SELECTED}>Sem vínculo</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>{client.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid gap-2"><Label>Cliente</Label><Input value={orderDialog.client} onChange={(e) => setOrderDialog((s) => ({ ...s, client: e.target.value }))} /></div>
             <div className="grid gap-2"><Label>Quantidade</Label><Input type="number" min={1} value={orderDialog.quantity} onChange={(e) => setOrderDialog((s) => ({ ...s, quantity: e.target.value }))} /></div>
             <DialogFooter>
@@ -289,6 +327,29 @@ function CalcPedidos() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Novo pedido</DialogTitle></DialogHeader>
           <form className="grid gap-4" onSubmit={submitNewOrder}>
+            <div className="grid gap-2">
+              <Label>Cliente Cadastrado</Label>
+              <Select
+                value={newOrder.clientId || NO_CLIENT_SELECTED}
+                onValueChange={(value) => {
+                  const nextClientId = value === NO_CLIENT_SELECTED ? "" : value;
+                  const selectedClient = clients.find((client) => client.id === nextClientId);
+                  setNewOrder((state) => ({
+                    ...state,
+                    clientId: nextClientId,
+                    client: selectedClient?.nome ?? state.client,
+                  }));
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Sem vínculo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CLIENT_SELECTED}>Sem vínculo</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>{client.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid gap-2"><Label>Cliente</Label><Input value={newOrder.client} onChange={(e) => setNewOrder((s) => ({ ...s, client: e.target.value }))} /></div>
             <div className="grid gap-2"><Label>Projeto</Label><Input value={newOrder.projectName} onChange={(e) => setNewOrder((s) => ({ ...s, projectName: e.target.value }))} /></div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -394,9 +455,11 @@ function CalcPedidos() {
             <form className="grid gap-4" onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
+              const selectedClientId = (fd.get("clientId") as string) || "";
+              const selectedClient = clients.find((client) => client.id === selectedClientId);
               mutateUpdateOrder.mutate({
                 orderId: editOrder.id,
-                client: (fd.get("client") as string)?.trim() || editOrder.client,
+                client: (selectedClient?.nome ?? (fd.get("client") as string)?.trim()) || editOrder.client,
                 projectName: (fd.get("projectName") as string)?.trim() || editOrder.projectName,
                 quantity: Number(fd.get("quantity")) || editOrder.quantity,
                 timeMinutes: Number(fd.get("timeMinutes")) || editOrder.timeMinutes,
@@ -407,10 +470,22 @@ function CalcPedidos() {
                 multiPart: fd.get("multiPart") === "on",
                 formaPagamento: (fd.get("formaPagamento") as string) || null,
                 dataPagamento: (fd.get("dataPagamento") as string) || null,
-                clientId: (fd.get("clientId") as string) || null,
+                clientId: selectedClient?.id ?? null,
               });
               setEditOrder(null);
             }}>
+              <div className="grid gap-2">
+                <Label>Cliente Cadastrado</Label>
+                <Select name="clientId" defaultValue={editOrder.clientId ?? NO_CLIENT_SELECTED}>
+                  <SelectTrigger><SelectValue placeholder="Sem vínculo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CLIENT_SELECTED}>Sem vínculo</SelectItem>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>{client.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-2"><Label>Cliente</Label>
                 <Input name="client" defaultValue={editOrder.client} />
               </div>
@@ -634,7 +709,7 @@ function CalcPedidos() {
                       <TableCell className={cn("text-right tabular-nums font-semibold", r.lucroLiquido >= 0 ? "filament-text" : "text-destructive")}>{brl(r.lucroLiquido)}</TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
-                          <Button size="sm" variant="outline" onClick={() => setOrderDialog({ open: true, projectId: p.id, client: "", quantity: String(p.quantidade ?? 1) })}>Criar pedido</Button>
+                          <Button size="sm" variant="outline" onClick={() => setOrderDialog({ open: true, projectId: p.id, client: "", clientId: "", quantity: String(p.quantidade ?? 1) })}>Criar pedido</Button>
                           <Button size="icon" variant="ghost" onClick={() => setEditProject(p)} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => mutateRemoveProject.mutate(p.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
                         </div>

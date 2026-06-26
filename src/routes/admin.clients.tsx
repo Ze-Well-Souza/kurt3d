@@ -49,7 +49,7 @@ function ClientsPage() {
   }, [clients, search]);
 
   function clientOrders(client: Client): Order[] {
-    return orders.filter((o) => o.clientId === client.id || o.client.toLowerCase() === client.nome.toLowerCase());
+    return orders.filter((o) => o.clientId === client.id);
   }
 
   const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

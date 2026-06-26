@@ -14,9 +14,15 @@ type PortfolioRepoMock = {
   list: any[];
 };
 
+type ClientRepoMock = {
+  list: any[];
+  save: ReturnType<typeof vi.fn>;
+};
+
 let ordersRepoMock: OrderRepoMock;
 let inventoryRepoMock: InventoryRepoMock;
 let portfolioRepoMock: PortfolioRepoMock;
+let clientsRepoMock: ClientRepoMock;
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
@@ -34,7 +40,7 @@ vi.mock("../server/db.server", () => ({
 }));
 
 vi.mock("../server/repositories.server", () => ({
-  clientsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
+  clientsRepo: vi.fn(async () => clientsRepoMock),
   expensesRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
   filamentoInstallmentsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
   filamentoPaymentsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
@@ -61,6 +67,10 @@ describe("removeOrder", () => {
     };
     portfolioRepoMock = {
       list: [],
+    };
+    clientsRepoMock = {
+      list: [],
+      save: vi.fn(async () => undefined),
     };
   });
 
@@ -122,5 +132,84 @@ describe("removeOrder", () => {
 
     expect(inventoryRepoMock.append).not.toHaveBeenCalled();
     expect(ordersRepoMock.save).toHaveBeenCalledWith([]);
+  });
+});
+
+describe("client linking", () => {
+  beforeEach(() => {
+    ordersRepoMock = {
+      list: [],
+      save: vi.fn(async () => undefined),
+    };
+    inventoryRepoMock = {
+      list: [],
+      append: vi.fn(async () => undefined),
+    };
+    portfolioRepoMock = {
+      list: [],
+    };
+    clientsRepoMock = {
+      list: [],
+      save: vi.fn(async () => undefined),
+    };
+  });
+
+  it("grava clientId estavel ao criar pedido com cliente selecionado", async () => {
+    clientsRepoMock.list = [
+      {
+        id: "client-1",
+        nome: "Cliente Oficial",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T10:00:00.000Z",
+      },
+    ];
+
+    const { addOrder } = await import("./data.functions");
+
+    await addOrder({
+      data: {
+        client: "Nome digitado",
+        clientId: "client-1",
+        projectName: "Projeto",
+        quantity: 1,
+        timeMinutes: 30,
+      },
+    });
+
+    expect(ordersRepoMock.save).toHaveBeenCalledTimes(1);
+    const savedOrders = ordersRepoMock.save.mock.calls[0][0];
+    expect(savedOrders[0].client).toBe("Nome digitado");
+    expect(savedOrders[0].clientId).toBe("client-1");
+  });
+
+  it("reconcilia pedidos antigos sem clientId no snapshot quando o nome e unico", async () => {
+    ordersRepoMock.list = [
+      {
+        id: "order-legacy",
+        client: "Cliente Antigo",
+        projectName: "Projeto",
+        quantity: 1,
+        timeMinutes: 30,
+        status: "todo",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T10:00:00.000Z",
+        clientId: null,
+      },
+    ];
+    clientsRepoMock.list = [
+      {
+        id: "client-legacy",
+        nome: "Cliente Antigo",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T10:00:00.000Z",
+      },
+    ];
+
+    const { listSnapshot } = await import("./data.functions");
+
+    const snapshot = await listSnapshot();
+
+    expect(snapshot.orders[0].clientId).toBe("client-legacy");
+    expect(ordersRepoMock.save).not.toHaveBeenCalled();
   });
 });
