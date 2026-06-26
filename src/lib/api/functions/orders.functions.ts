@@ -3,8 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../../domain/cost";
 import { clampGrams } from "../../domain/inventory";
+import { getOrderTrackingSummary, matchesOrderTrackingCode } from "../../domain/order-tracking";
 import type { Expense, Order, OrderDestino, Status, Venda } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
+import { notifyOrderStatusChange } from "../../server/order-notifications.server";
 import {
   clientsRepo,
   expensesRepo,
@@ -14,6 +16,7 @@ import {
   portfolioRepo,
   vendasRepo,
 } from "../../server/repositories.server";
+import { normalizePhone } from "../../utils/normalization";
 import {
   allowedStatusTransition,
   assertExplicitClientIdExists,
@@ -145,6 +148,11 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     }
 
     await orders.save(orders.list.map((item) => (item.id === order.id ? nextOrder : item)));
+    await notifyOrderStatusChange({
+      order: nextOrder,
+      previousStatus: order.status,
+      nextStatus: data.status,
+    });
     return { ok: true as const };
   });
 
@@ -188,6 +196,11 @@ export const finalizarDestino = createServerFn({ method: "POST" })
       updatedAt: now,
     };
     await orders.save(orders.list.map((item) => (item.id === order.id ? updatedOrder : item)));
+    await notifyOrderStatusChange({
+      order: updatedOrder,
+      previousStatus: order.status,
+      nextStatus: updatedOrder.status,
+    });
 
     if (destino === "Kurtido e Vendido" && typeof data.valorRecebido === "number" && data.valorRecebido > 0) {
       const project = order.portfolioProjectId ? portfolio.list.find((item) => item.id === order.portfolioProjectId) : undefined;
@@ -231,6 +244,54 @@ export const finalizarDestino = createServerFn({ method: "POST" })
 
     return { ok: true as const };
   });
+
+export const getPublicOrderTracking = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      code: z.string().trim().min(6).max(20),
+      phone: z.string().trim().min(8).max(30),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const [orders, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
+    const order = orders.list.find((item) => matchesOrderTrackingCode(item.id, data.code));
+    if (!order) {
+      return { ok: false as const, reason: "not_found" as const };
+    }
+    if (!phoneMatchesClient(order, clientsData.list, data.phone)) {
+      return { ok: false as const, reason: "not_found" as const };
+    }
+
+    const tracking = getOrderTrackingSummary(order);
+
+    return {
+      ok: true as const,
+      order: {
+        trackingCode: tracking.trackingCode,
+        projectName: order.projectName,
+        quantity: order.quantity,
+        status: order.status,
+        statusLabel: tracking.statusLabel,
+        statusDescription: tracking.statusDescription,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+        estimatedDeliveryAt: tracking.estimatedDeliveryAt,
+        step: tracking.step,
+        multiPart: order.multiPart ?? false,
+      },
+    };
+  });
+
+function phoneMatchesClient(order: Order, clients: Awaited<ReturnType<typeof clientsRepo>>["list"], phone: string) {
+  const normalizedInput = normalizePhone(phone);
+  if (!normalizedInput) return false;
+  const client = order.clientId ? clients.find((item) => item.id === order.clientId) : null;
+  const normalizedStored = normalizePhone(client?.whatsapp);
+  if (!normalizedStored || normalizedInput.length < 8) return false;
+  return normalizedStored === normalizedInput
+    || normalizedStored.endsWith(normalizedInput)
+    || normalizedInput.endsWith(normalizedStored);
+}
 
 export const updateOrder = createServerFn({ method: "POST" })
   .validator(

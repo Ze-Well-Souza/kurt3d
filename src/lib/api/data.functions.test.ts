@@ -306,6 +306,89 @@ describe("client linking", () => {
     expect("orders" in snapshot).toBe(false);
     expect("expenses" in snapshot).toBe(false);
   });
+
+  it("permite acompanhamento publico do pedido com codigo e telefone do cliente", async () => {
+    ordersRepoMock.list = [
+      {
+        id: "12345678-90ab-cdef-1234-567890abcdef",
+        client: "Cliente Oficial",
+        projectName: "Miniatura",
+        quantity: 2,
+        timeMinutes: 120,
+        status: "printing",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T12:00:00.000Z",
+        clientId: "client-1",
+      },
+    ];
+    clientsRepoMock.list = [
+      {
+        id: "client-1",
+        nome: "Cliente Oficial",
+        whatsapp: "5511999998888",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T10:00:00.000Z",
+      },
+    ];
+
+    const { getPublicOrderTracking } = await import("./data.functions");
+
+    const result = await getPublicOrderTracking({
+      data: {
+        code: "1234567890AB",
+        phone: "(11) 99999-8888",
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      order: {
+        trackingCode: "1234567890AB",
+        projectName: "Miniatura",
+        status: "printing",
+        step: 2,
+      },
+    });
+  });
+
+  it("nao revela pedido quando telefone nao confere", async () => {
+    ordersRepoMock.list = [
+      {
+        id: "12345678-90ab-cdef-1234-567890abcdef",
+        client: "Cliente Oficial",
+        projectName: "Miniatura",
+        quantity: 2,
+        timeMinutes: 120,
+        status: "printing",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T12:00:00.000Z",
+        clientId: "client-1",
+      },
+    ];
+    clientsRepoMock.list = [
+      {
+        id: "client-1",
+        nome: "Cliente Oficial",
+        whatsapp: "5511999998888",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T10:00:00.000Z",
+      },
+    ];
+
+    const { getPublicOrderTracking } = await import("./data.functions");
+
+    const result = await getPublicOrderTracking({
+      data: {
+        code: "1234567890AB",
+        phone: "(11) 90000-0000",
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+  });
 });
 
 describe("insumos e leads", () => {

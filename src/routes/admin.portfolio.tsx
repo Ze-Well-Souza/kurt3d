@@ -38,6 +38,7 @@ import type { Order, Status, Filamento, AppSettings, PortfolioProject, Client } 
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
+import { getOrderTrackingSummary } from "@/lib/domain/order-tracking";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizeText } from "@/lib/utils/normalization";
@@ -408,6 +409,8 @@ function CalcPedidos() {
             const fil = detailOrder.filamentoId ? filamentos.find((f) => f.id === detailOrder.filamentoId) : undefined;
             const cost = calcOrderCostHybrid({ order: detailOrder, filamento: fil, precoVendaUnit: detailOrder.precoVenda ?? 0, settings });
             const statusLabel = STATUS_BADGE[detailOrder.status]?.label ?? ({ todo: "A Fazer", printing: "Imprimindo", done: "Concluído" } as any)[detailOrder.status] ?? detailOrder.status;
+            const tracking = getOrderTrackingSummary(detailOrder);
+            const trackingPath = `/acompanhar`;
             return (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -426,7 +429,24 @@ function CalcPedidos() {
                   <DetailItem label="Data Pagamento" value={detailOrder.dataPagamento ? new Date(detailOrder.dataPagamento).toLocaleDateString("pt-BR") : "—"} />
                   {detailOrder.valorRecebido !== undefined && <DetailItem label="Valor Recebido" value={brl(detailOrder.valorRecebido)} />}
                   {detailOrder.destino && <DetailItem label="Destino" value={detailOrder.destino} />}
+                  <DetailItem label="Codigo de acompanhamento" value={tracking.trackingCode} mono />
+                  <DetailItem label="Previsao operacional" value={tracking.estimatedDeliveryAt ? new Date(tracking.estimatedDeliveryAt).toLocaleDateString("pt-BR") : "—"} />
                   <DetailItem label="Criado em" value={new Date(detailOrder.createdAt).toLocaleDateString("pt-BR")} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={async () => {
+                      const base = typeof window !== "undefined" ? window.location.origin : "";
+                      const url = `${base}${trackingPath}`;
+                      const text = `Codigo: ${tracking.trackingCode}\nWhatsApp do pedido: confirme com o cliente\nAcompanhe em: ${url}`;
+                      await navigator.clipboard.writeText(text);
+                      toast.success("Dados de acompanhamento copiados.");
+                    }}
+                  >
+                    Copiar acompanhamento
+                  </Button>
                 </div>
                 {detailOrder.linkProjeto && (
                   <a href={detailOrder.linkProjeto} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-600 hover:underline">

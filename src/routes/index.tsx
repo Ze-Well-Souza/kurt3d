@@ -68,6 +68,7 @@ function Nav() {
           <a href="#work" className="transition-colors hover:text-foreground">Portfólio</a>
           <a href="#services" className="transition-colors hover:text-foreground">Serviços</a>
           <a href="#contact" className="transition-colors hover:text-foreground">Contato</a>
+          <Link to="/acompanhar" className="transition-colors hover:text-foreground">Acompanhar pedido</Link>
         </nav>
         <div className="flex items-center gap-2">
           <SocialIcons className="hidden md:flex" />
