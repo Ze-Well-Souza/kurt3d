@@ -7,7 +7,7 @@ import {
 } from "@dnd-kit/core";
 import {
   Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays,
-  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search, Info, Wand2,
+  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search, Info, Wand2, Upload, Download,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
@@ -32,12 +32,13 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   addOrder, finalizarDestino, updateOrderStatus, removeOrder,
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
-  updateOrder, updatePortfolioProject,
+  updateOrder, updatePortfolioProject, uploadOrderAsset, resolveOrderAssetUrl,
 } from "@/lib/api/data.functions";
 import type { Order, Status, Filamento, AppSettings, PortfolioProject, Client } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
+import { getOrderAssetFileName, isOrderAssetReference } from "@/lib/domain/order-asset";
 import { getOrderTrackingSummary } from "@/lib/domain/order-tracking";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
@@ -149,12 +150,31 @@ function calc(p: {
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const NO_CLIENT_SELECTED = "__none__";
+const MAX_ORDER_ASSET_SIZE = 25 * 1024 * 1024;
 
 function formatTime(min: number) {
   const h = Math.floor(min / 60); const m = min % 60;
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m.toString().padStart(2, "0")}m`;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.ceil(bytes / 1024)} KB`;
+}
+
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      const base64 = result.includes(",") ? result.split(",")[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 /* ═══════════════════════ MAIN COMPONENT ═══════════════════════ */
@@ -180,6 +200,12 @@ function CalcPedidos() {
   const mutateRemoveOrder = useMutation({ mutationFn: (input: { orderId: string; reason: string }) => removeOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido excluído."); } });
   const mutateUpdateOrder = useMutation({ mutationFn: (input: any) => updateOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido atualizado."); }, onError: handleUpdateError });
   const mutateUpdateProject = useMutation({ mutationFn: (input: any) => updatePortfolioProject({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Projeto atualizado."); }, onError: handleUpdateError });
+  const mutateUploadOrderAsset = useMutation({
+    mutationFn: (input: { fileName: string; contentType: string; dataBase64: string }) => uploadOrderAsset({ data: input }),
+  });
+  const mutateResolveOrderAssetUrl = useMutation({
+    mutationFn: (reference: string) => resolveOrderAssetUrl({ data: { reference } }),
+  });
 
   /* ── calculator state ── */
   const numeric = useMemo(() => ({
@@ -204,12 +230,32 @@ function CalcPedidos() {
   const [orderDialog, setOrderDialog] = useState<{ open: boolean; projectId: string; client: string; clientId: string; quantity: string }>({ open: false, projectId: "", client: "", clientId: "", quantity: "1" });
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [newOrder, setNewOrder] = useState({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+  const [newOrderAsset, setNewOrderAsset] = useState<File | null>(null);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; orderId: string; reason: string }>({ open: false, orderId: "", reason: "" });
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editProject, setEditProject] = useState<PortfolioProject | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
+
+  function resetNewOrderForm() {
+    setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+    setNewOrderAsset(null);
+  }
+
+  async function openProjectReference(reference?: string | null) {
+    if (!reference) return;
+    try {
+      let resolvedUrl = reference;
+      if (isOrderAssetReference(reference)) {
+        const response = await mutateResolveOrderAssetUrl.mutateAsync(reference);
+        resolvedUrl = response.url;
+      }
+      window.open(resolvedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel abrir a referencia do projeto.");
+    }
+  }
 
   /* ── drag state ── */
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -240,20 +286,36 @@ function CalcPedidos() {
     setForm(initialForm);
     toast.success("Projeto salvo.");
   }
-  function submitNewOrder(e: React.FormEvent) {
+  async function submitNewOrder(e: React.FormEvent) {
     e.preventDefault();
     const selectedClient = clients.find((client) => client.id === newOrder.clientId);
-    mutateAddOrder.mutate({
-      client: (selectedClient?.nome ?? newOrder.client.trim()) || "Cliente", clientId: selectedClient?.id,
-      projectName: newOrder.projectName.trim() || "Pedido",
-      quantity: Number(newOrder.quantity) || 1, timeMinutes: Number(newOrder.timeMinutes) || 60,
-      filamentoId: newOrder.filamentoId || undefined, gramsPerUnit: newOrder.gramsPerUnit ? Number(newOrder.gramsPerUnit) : undefined,
-      linkProjeto: newOrder.linkProjeto || undefined, multiPart: newOrder.multiPart,
-      precoVenda: newOrder.precoVenda ? Number(newOrder.precoVenda) : undefined,
-      formaPagamento: newOrder.formaPagamento || undefined, dataPagamento: newOrder.dataPagamento || undefined,
-    });
-    setShowNewOrder(false);
-    setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+    try {
+      let linkProjeto = newOrder.linkProjeto || undefined;
+      if (newOrderAsset) {
+        const dataBase64 = await fileToBase64(newOrderAsset);
+        const uploaded = await mutateUploadOrderAsset.mutateAsync({
+          fileName: newOrderAsset.name,
+          contentType: newOrderAsset.type || "application/octet-stream",
+          dataBase64,
+        });
+        linkProjeto = uploaded.reference;
+      }
+
+      await mutateAddOrder.mutateAsync({
+        client: (selectedClient?.nome ?? newOrder.client.trim()) || "Cliente", clientId: selectedClient?.id,
+        projectName: newOrder.projectName.trim() || "Pedido",
+        quantity: Number(newOrder.quantity) || 1, timeMinutes: Number(newOrder.timeMinutes) || 60,
+        filamentoId: newOrder.filamentoId || undefined, gramsPerUnit: newOrder.gramsPerUnit ? Number(newOrder.gramsPerUnit) : undefined,
+        linkProjeto, multiPart: newOrder.multiPart,
+        precoVenda: newOrder.precoVenda ? Number(newOrder.precoVenda) : undefined,
+        formaPagamento: newOrder.formaPagamento || undefined, dataPagamento: newOrder.dataPagamento || undefined,
+      });
+      setShowNewOrder(false);
+      resetNewOrderForm();
+      toast.success("Pedido criado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel criar o pedido.");
+    }
   }
 
   /* ═══════════ JSX ═══════════ */
@@ -337,7 +399,7 @@ function CalcPedidos() {
       </Dialog>
 
       {/* ── New Order dialog ── */}
-      <Dialog open={showNewOrder} onOpenChange={setShowNewOrder}>
+      <Dialog open={showNewOrder} onOpenChange={(open) => { setShowNewOrder(open); if (!open) resetNewOrderForm(); }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader><DialogTitle>Novo pedido</DialogTitle></DialogHeader>
           <form className="grid gap-4" onSubmit={submitNewOrder}>
@@ -379,7 +441,50 @@ function CalcPedidos() {
               </div>
               <div className="grid gap-2"><Label>Gramas / unidade</Label><Input type="number" min={0} value={newOrder.gramsPerUnit} onChange={(e) => setNewOrder((s) => ({ ...s, gramsPerUnit: e.target.value }))} /></div>
             </div>
-            <div className="grid gap-2"><Label>Link do Projeto (opcional)</Label><Input type="url" value={newOrder.linkProjeto} onChange={(e) => setNewOrder((s) => ({ ...s, linkProjeto: e.target.value }))} placeholder="https://..." /></div>
+            <div className="grid gap-2">
+              <Label>Link externo (opcional)</Label>
+              <Input
+                type="url"
+                value={newOrder.linkProjeto}
+                onChange={(e) => setNewOrder((s) => ({ ...s, linkProjeto: e.target.value }))}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Arquivo STL ou 3MF (opcional)</Label>
+              <Input
+                type="file"
+                accept=".stl,.3mf,model/stl,application/sla,application/vnd.ms-package.3dmanufacturing-3dmodel+xml"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (!file) {
+                    setNewOrderAsset(null);
+                    return;
+                  }
+                  const extension = file.name.split(".").pop()?.toLowerCase();
+                  if (!extension || !["stl", "3mf"].includes(extension)) {
+                    toast.error("Envie apenas arquivos STL ou 3MF.");
+                    e.currentTarget.value = "";
+                    return;
+                  }
+                  if (file.size > MAX_ORDER_ASSET_SIZE) {
+                    toast.error("O arquivo excede o limite de 25 MB.");
+                    e.currentTarget.value = "";
+                    return;
+                  }
+                  setNewOrderAsset(file);
+                }}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                O arquivo fica salvo em Storage para reimpressao futura. Se enviar um arquivo, ele sera a referencia principal do pedido.
+              </p>
+              {newOrderAsset && (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                  <span className="truncate font-medium">{newOrderAsset.name}</span>
+                  <span className="shrink-0 text-muted-foreground">{formatFileSize(newOrderAsset.size)}</span>
+                </div>
+              )}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2"><Label>Preço de Venda (R$)</Label><Input type="number" min={0} step={0.01} value={newOrder.precoVenda} onChange={(e) => setNewOrder((s) => ({ ...s, precoVenda: e.target.value }))} placeholder="0,00" /></div>
               <div className="flex items-end"><Button type="button" variant={newOrder.multiPart ? "default" : "outline"} className="flex-1 gap-2" onClick={() => setNewOrder((s) => ({ ...s, multiPart: !s.multiPart }))}><Layers className="h-4 w-4" />{newOrder.multiPart ? "Multi-partes" : "Peça única"}</Button></div>
@@ -394,8 +499,10 @@ function CalcPedidos() {
               <div className="grid gap-2"><Label>Data do Pagamento</Label><Input type="date" value={newOrder.dataPagamento} onChange={(e) => setNewOrder((s) => ({ ...s, dataPagamento: e.target.value }))} /></div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowNewOrder(false)}>Cancelar</Button>
-              <Button type="submit" className="btn-filament">Criar</Button>
+              <Button type="button" variant="outline" onClick={() => { setShowNewOrder(false); resetNewOrderForm(); }}>Cancelar</Button>
+              <Button type="submit" className="btn-filament" disabled={mutateAddOrder.isPending || mutateUploadOrderAsset.isPending}>
+                {mutateAddOrder.isPending || mutateUploadOrderAsset.isPending ? "Salvando..." : "Criar"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -449,9 +556,15 @@ function CalcPedidos() {
                   </Button>
                 </div>
                 {detailOrder.linkProjeto && (
-                  <a href={detailOrder.linkProjeto} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-500 hover:text-blue-600 hover:underline">
-                    <ExternalLink className="h-4 w-4" /> Ver projeto
-                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-fit gap-2"
+                    onClick={() => void openProjectReference(detailOrder.linkProjeto)}
+                  >
+                    {isOrderAssetReference(detailOrder.linkProjeto) ? <Download className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
+                    {isOrderAssetReference(detailOrder.linkProjeto) ? `Abrir ${getOrderAssetFileName(detailOrder.linkProjeto) ?? "arquivo"}` : "Ver projeto"}
+                  </Button>
                 )}
               </div>
             );
@@ -499,7 +612,7 @@ function CalcPedidos() {
                 filamentoId: (fd.get("filamentoId") as string) || null,
                 gramsPerUnit: Number(fd.get("gramsPerUnit")) || null,
                 precoVenda: Number(fd.get("precoVenda")) || null,
-                linkProjeto: (fd.get("linkProjeto") as string) || null,
+                linkProjeto: ((fd.get("linkProjeto") as string)?.trim()) || (isOrderAssetReference(editOrder.linkProjeto) ? editOrder.linkProjeto : null),
                 multiPart: fd.get("multiPart") === "on",
                 formaPagamento: (fd.get("formaPagamento") as string) || null,
                 dataPagamento: (fd.get("dataPagamento") as string) || null,
@@ -540,7 +653,16 @@ function CalcPedidos() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2"><Label>Preço de Venda (R$)</Label><Input name="precoVenda" type="number" min={0} step={0.01} defaultValue={editOrder.precoVenda ?? ""} /></div>
-                <div className="grid gap-2"><Label>Link do Projeto</Label><Input name="linkProjeto" type="url" defaultValue={editOrder.linkProjeto ?? ""} /></div>
+                <div className="grid gap-2">
+                  <Label>Link do Projeto</Label>
+                  <Input name="linkProjeto" type="text" defaultValue={isOrderAssetReference(editOrder.linkProjeto) ? "" : (editOrder.linkProjeto ?? "")} placeholder={isOrderAssetReference(editOrder.linkProjeto) ? "Arquivo STL/3MF ja salvo neste pedido" : ""} />
+                  {isOrderAssetReference(editOrder.linkProjeto) && (
+                    <button type="button" className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline" onClick={() => void openProjectReference(editOrder.linkProjeto)}>
+                      <Download className="h-3.5 w-3.5" />
+                      Abrir {getOrderAssetFileName(editOrder.linkProjeto) ?? "arquivo salvo"}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2"><Label>Forma de Pagamento</Label>
@@ -773,10 +895,10 @@ function CalcPedidos() {
               <KanbanColumn key={col.id} id={col.id} title={col.title} hint={col.hint} orders={grouped[col.id]}
                 onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)} filamentos={filamentos}
                 onDelete={(id) => setDeleteDialog({ open: true, orderId: id, reason: "" })}
-                onDetail={(o) => setDetailOrder(o)} onEdit={(o) => setEditOrder(o)} orderSettings={settings} />
+                onDetail={(o) => setDetailOrder(o)} onEdit={(o) => setEditOrder(o)} orderSettings={settings} onOpenProjectReference={openProjectReference} />
             ))}
           </div>
-          <DragOverlay>{activeOrder ? (<div className="w-[280px]"><OrderCardView order={activeOrder} dragging onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)} filamentos={filamentos} onDelete={(id) => setDeleteDialog({ open: true, orderId: id, reason: "" })} onDetail={(o) => setDetailOrder(o)} orderSettings={settings} /></div>) : null}</DragOverlay>
+          <DragOverlay>{activeOrder ? (<div className="w-[280px]"><OrderCardView order={activeOrder} dragging onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)} filamentos={filamentos} onDelete={(id) => setDeleteDialog({ open: true, orderId: id, reason: "" })} onDetail={(o) => setDetailOrder(o)} orderSettings={settings} onOpenProjectReference={openProjectReference} /></div>) : null}</DragOverlay>
         </DndContext>
         {terminalOrders.length > 0 && (
           <div className="mt-6">
@@ -795,7 +917,12 @@ function CalcPedidos() {
                       <span className="text-muted-foreground">Custo: R$ {cost.total.toFixed(2)}</span>
                       {o.valorRecebido !== undefined && (<span className="font-medium filament-text">R$ {o.valorRecebido.toFixed(2)}</span>)}
                     </div>
-                    {o.linkProjeto && (<a href={o.linkProjeto} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] text-blue-500 hover:underline"><ExternalLink className="h-3 w-3" />Projeto</a>)}
+                    {o.linkProjeto && (
+                      <button type="button" className="mt-1 inline-flex items-center gap-1 text-[11px] text-blue-500 hover:underline" onClick={() => void openProjectReference(o.linkProjeto)}>
+                        {isOrderAssetReference(o.linkProjeto) ? <Download className="h-3 w-3" /> : <ExternalLink className="h-3 w-3" />}
+                        {isOrderAssetReference(o.linkProjeto) ? "Arquivo" : "Projeto"}
+                      </button>
+                    )}
                     {o.formaPagamento && (<div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground"><CreditCard className="h-3 w-3" /><span>{o.formaPagamento}</span>{o.dataPagamento && (<span className="text-muted-foreground/70">· {new Date(o.dataPagamento).toLocaleDateString("pt-BR")}</span>)}</div>)}
                   </Card>
                 );
@@ -866,7 +993,7 @@ function FilamentTag({ label, color }: { label: string; color?: string }) {
   );
 }
 
-function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings }: {
+function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings, onOpenProjectReference }: {
   order: Order; dragging?: boolean;
   onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>;
   filamentos?: Filamento[];
@@ -874,6 +1001,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
   onDetail?: (order: Order) => void;
   onEdit?: (order: Order) => void;
   orderSettings?: AppSettings;
+  onOpenProjectReference?: (reference?: string | null) => Promise<void> | void;
 }) {
   const [showDestino, setShowDestino] = useState(false);
   const [destinoValor, setDestinoValor] = useState("");
@@ -905,7 +1033,19 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
           <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{formatTime(order.timeMinutes)}</span></span>
           {order.multiPart && (<span className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700"><Layers className="h-3 w-3" />Multi</span>)}
         </div>
-        {order.linkProjeto && (<a href={order.linkProjeto} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}><ExternalLink className="h-3 w-3" />Ver projeto</a>)}
+        {order.linkProjeto && (
+          <button
+            type="button"
+            className="mt-2 inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              void onOpenProjectReference?.(order.linkProjeto);
+            }}
+          >
+            {isOrderAssetReference(order.linkProjeto) ? <Download className="h-3 w-3" /> : <ExternalLink className="h-3 w-3" />}
+            {isOrderAssetReference(order.linkProjeto) ? "Abrir arquivo" : "Ver projeto"}
+          </button>
+        )}
         {(order.precoVenda || custoTotal > 0) && (
           <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-[11px]">
             <span className="text-muted-foreground">Custo: <span className="font-medium">R$ {custoTotal.toFixed(2)}</span></span>
@@ -951,13 +1091,13 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
   );
 }
 
-function DraggableCard({ order, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings }: { order: Order; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; onEdit?: (order: Order) => void; orderSettings?: AppSettings }) {
+function DraggableCard({ order, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings, onOpenProjectReference }: { order: Order; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; onEdit?: (order: Order) => void; orderSettings?: AppSettings; onOpenProjectReference?: (reference?: string | null) => Promise<void> | void }) {
   const isTerminal = ["vendido", "presente", "falha"].includes(order.status);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: order.id, disabled: isTerminal });
-  return <div ref={setNodeRef} {...attributes} {...listeners} className={cn("touch-none", isDragging && "opacity-40")}><OrderCardView order={order} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} orderSettings={orderSettings} /></div>;
+  return <div ref={setNodeRef} {...attributes} {...listeners} className={cn("touch-none", isDragging && "opacity-40")}><OrderCardView order={order} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} orderSettings={orderSettings} onOpenProjectReference={onOpenProjectReference} /></div>;
 }
 
-function KanbanColumn({ id, title, hint, orders, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings }: { id: Status; title: string; hint: string; orders: Order[]; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; onEdit?: (order: Order) => void; orderSettings?: AppSettings }) {
+function KanbanColumn({ id, title, hint, orders, onFinalizar, filamentos, onDelete, onDetail, onEdit, orderSettings, onOpenProjectReference }: { id: Status; title: string; hint: string; orders: Order[]; onFinalizar: (args: { orderId: string; destino: string; valorRecebido?: number; formaPagamento?: string; dataPagamento?: string }) => Promise<unknown>; filamentos?: Filamento[]; onDelete?: (orderId: string) => void; onDetail?: (order: Order) => void; onEdit?: (order: Order) => void; orderSettings?: AppSettings; onOpenProjectReference?: (reference?: string | null) => Promise<void> | void }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const totalTime = orders.reduce((s, o) => s + o.timeMinutes, 0);
   return (
@@ -971,7 +1111,7 @@ function KanbanColumn({ id, title, hint, orders, onFinalizar, filamentos, onDele
         {orders.length > 0 && (<p className="mt-1 text-[11px] text-muted-foreground">Tempo total: <span className="font-medium text-foreground">{formatTime(totalTime)}</span></p>)}
       </div>
       <div ref={setNodeRef} className={cn("flex min-h-[400px] flex-1 flex-col gap-2 rounded-lg border border-dashed p-2 transition-colors", isOver ? "border-ring bg-secondary/60" : "border-border bg-secondary/30")}>
-        {orders.map((o) => (<DraggableCard key={o.id} order={o} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} orderSettings={orderSettings} />))}
+        {orders.map((o) => (<DraggableCard key={o.id} order={o} onFinalizar={onFinalizar} filamentos={filamentos} onDelete={onDelete} onDetail={onDetail} onEdit={onEdit} orderSettings={orderSettings} onOpenProjectReference={onOpenProjectReference} />))}
         {orders.length === 0 && (<p className="grid flex-1 place-items-center text-center text-xs text-muted-foreground">Solte um pedido aqui</p>)}
       </div>
     </div>

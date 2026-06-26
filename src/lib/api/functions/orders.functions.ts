@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../../domain/cost";
+import { isValidOrderProjectReference } from "../../domain/order-asset";
 import { clampGrams } from "../../domain/inventory";
 import { getOrderTrackingSummary, matchesOrderTrackingCode } from "../../domain/order-tracking";
 import type { Expense, Order, OrderDestino, Status, Venda } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
+import { createOrderAssetSignedUrl, uploadOrderAssetToStorage } from "../../server/order-assets.server";
 import { notifyOrderStatusChange } from "../../server/order-notifications.server";
 import {
   clientsRepo,
@@ -33,7 +35,9 @@ export const addOrder = createServerFn({ method: "POST" })
       timeMinutes: z.number().min(1).max(100000),
       filamentoId: z.string().min(1).optional(),
       gramsPerUnit: z.number().min(0.1).max(100000).optional(),
-      linkProjeto: z.string().url().max(500).optional(),
+      linkProjeto: z.string().trim().max(500).optional().refine(isValidOrderProjectReference, {
+        message: "Referencia do projeto invalida.",
+      }),
       multiPart: z.boolean().optional(),
       precoVenda: z.number().min(0).max(1000000).optional(),
       formaPagamento: z.string().trim().max(100).optional(),
@@ -282,6 +286,26 @@ export const getPublicOrderTracking = createServerFn({ method: "POST" })
     };
   });
 
+export const uploadOrderAsset = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      fileName: z.string().trim().min(1).max(255),
+      contentType: z.string().trim().max(120),
+      dataBase64: z.string().min(1),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const reference = await uploadOrderAssetToStorage(data);
+    return { ok: true as const, reference };
+  });
+
+export const resolveOrderAssetUrl = createServerFn({ method: "POST" })
+  .validator(z.object({ reference: z.string().trim().min(1).max(1000) }))
+  .handler(async ({ data }) => {
+    const url = await createOrderAssetSignedUrl(data.reference);
+    return { ok: true as const, url };
+  });
+
 function phoneMatchesClient(order: Order, clients: Awaited<ReturnType<typeof clientsRepo>>["list"], phone: string) {
   const normalizedInput = normalizePhone(phone);
   if (!normalizedInput) return false;
@@ -304,7 +328,9 @@ export const updateOrder = createServerFn({ method: "POST" })
       filamentoId: z.string().min(1).nullable(),
       gramsPerUnit: z.number().min(0.01).max(50000).nullable(),
       precoVenda: z.number().min(0).max(1000000).nullable(),
-      linkProjeto: z.string().max(2000).nullable(),
+      linkProjeto: z.string().max(2000).nullable().refine(isValidOrderProjectReference, {
+        message: "Referencia do projeto invalida.",
+      }),
       multiPart: z.boolean().nullable(),
       formaPagamento: z.string().max(100).nullable(),
       dataPagamento: z.string().max(30).nullable(),
