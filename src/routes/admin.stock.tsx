@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil, LayoutGrid, Table as TableIcon, CreditCard, Banknote, Check, Undo2, CalendarClock } from "lucide-react";
+import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil, LayoutGrid, Table as TableIcon, CreditCard, Banknote, Check, Undo2, CalendarClock, AlertTriangle } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,7 @@ import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { normalizeText } from "@/lib/utils/normalization";
 import { PaymentSchedule } from "@/components/admin/PaymentSchedule";
 import { DetailRow, Field, NumberField } from "@/components/admin/stock-fields";
+import { extractQuantityNumber, getFilamentoAlertLevel, getInsumoAlertLevel } from "@/lib/domain/stock-alert";
 
 export const Route = createFileRoute("/admin/stock")({
   component: Stock,
@@ -541,6 +542,10 @@ function Stock() {
     return insumos.filter((i) => normalizeText(i.nome).includes(s));
   }, [insumos, insSearch]);
 
+  const lowFilamentosCount = filteredFilamentos.filter((f) => getFilamentoAlertLevel(f) === "low").length;
+  const lowInsumosCount = filteredInsumos.filter((i) => getInsumoAlertLevel(i) === "low").length;
+  const unknownInsumosCount = filteredInsumos.filter((i) => getInsumoAlertLevel(i) === "unknown").length;
+
   return (
     <div className="space-y-8">
       <Toaster />
@@ -803,6 +808,12 @@ function Stock() {
             </div>
           </div>
         </div>
+        {lowFilamentosCount > 0 && (
+          <div className="flex items-center gap-2 border-b border-red-500/20 bg-red-500/5 px-6 py-3 text-sm text-red-700">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>{lowFilamentosCount} filamento(s) com estoque baixo considerando saldo disponivel.</span>
+          </div>
+        )}
         {filamentos.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
             Nenhum filamento cadastrado. Adicione seu primeiro rolo acima.
@@ -829,10 +840,12 @@ function Stock() {
               </TableHeader>
               <TableBody>
                 {filteredFilamentos.map((f) => {
-                  const percent = f.pesoInicial > 0 ? (f.pesoAtual / f.pesoInicial) * 100 : 0;
+                  const availableGrams = f.disponivelGrams ?? f.pesoAtual;
+                  const percent = f.pesoInicial > 0 ? (availableGrams / f.pesoInicial) * 100 : 0;
                   const custoPorGrama = f.pesoInicial > 0 ? f.precoPago / f.pesoInicial : 0;
-                  const isLow = percent < 20;
-                  const isMedium = percent >= 20 && percent < 50;
+                  const alertLevel = getFilamentoAlertLevel(f);
+                  const isLow = alertLevel === "low";
+                  const isMedium = alertLevel === "medium";
                   const levelColor = isLow
                     ? "#ef4444"
                     : isMedium
@@ -876,9 +889,12 @@ function Stock() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         <div className="font-semibold">
-                          {f.pesoAtual}g
+                          {availableGrams}g
                           <span className="text-muted-foreground"> / {f.pesoInicial}g</span>
                         </div>
+                        {f.reservedGrams ? (
+                          <div className="text-[10px] text-amber-700">{f.reservedGrams}g reservado(s)</div>
+                        ) : null}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-2">
@@ -988,10 +1004,12 @@ function Stock() {
           /* ───────── CARD VIEW ───────── */
           <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredFilamentos.map((f) => {
-              const percent = f.pesoInicial > 0 ? (f.pesoAtual / f.pesoInicial) * 100 : 0;
+              const availableGrams = f.disponivelGrams ?? f.pesoAtual;
+              const percent = f.pesoInicial > 0 ? (availableGrams / f.pesoInicial) * 100 : 0;
               const custoPorGrama = f.pesoInicial > 0 ? f.precoPago / f.pesoInicial : 0;
-              const isLow = percent < 20;
-              const isMedium = percent >= 20 && percent < 50;
+              const alertLevel = getFilamentoAlertLevel(f);
+              const isLow = alertLevel === "low";
+              const isMedium = alertLevel === "medium";
 
               return (
                 <div
@@ -1061,7 +1079,7 @@ function Stock() {
                     <div className="flex items-end justify-between text-xs">
                       <span className="text-muted-foreground">Estoque restante</span>
                       <span className="font-semibold tabular-nums">
-                        {f.pesoAtual}g / {f.pesoInicial}g
+                        {availableGrams}g / {f.pesoInicial}g
                       </span>
                     </div>
                     <Progress
@@ -1075,6 +1093,7 @@ function Stock() {
                       >
                         {percent.toFixed(0)}%
                       </span>
+                      {f.reservedGrams ? <span>{f.reservedGrams}g reservado(s)</span> : null}
                       <span>Custo/g: {brl(custoPorGrama)}</span>
                     </div>
                   </div>
@@ -1394,6 +1413,21 @@ function Stock() {
             </span>
           </div>
         </div>
+        {(lowInsumosCount > 0 || unknownInsumosCount > 0) && (
+          <div className="space-y-2 border-b border-amber-500/20 bg-amber-500/5 px-6 py-3 text-sm text-amber-800">
+            {lowInsumosCount > 0 && (
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{lowInsumosCount} insumo(s) com quantidade baixa detectada automaticamente.</span>
+              </div>
+            )}
+            {unknownInsumosCount > 0 && (
+              <div className="text-xs text-amber-900/80">
+                {unknownInsumosCount} item(ns) usam quantidade textual sem numero; nesses casos o sistema nao consegue inferir alerta automatico.
+              </div>
+            )}
+          </div>
+        )}
         {insumos.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
             Nenhum insumo cadastrado ainda. Registre ferramentas e materiais de apoio acima.
@@ -1404,6 +1438,7 @@ function Stock() {
               <TableRow>
                 <TableHead>Item</TableHead>
                 <TableHead>Quantidade</TableHead>
+                <TableHead>Alerta</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Link</TableHead>
                 <TableHead className="text-right">Preço Total</TableHead>
@@ -1411,10 +1446,27 @@ function Stock() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInsumos.map((i) => (
+              {filteredInsumos.map((i) => {
+                const alertLevel = getInsumoAlertLevel(i);
+                const quantityNumber = extractQuantityNumber(i.quantidade);
+                return (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.nome}</TableCell>
-                  <TableCell>{i.quantidade}</TableCell>
+                  <TableCell>
+                    <div>{i.quantidade}</div>
+                    {quantityNumber !== null ? (
+                      <div className="text-[10px] text-muted-foreground">Base numerica: {quantityNumber}</div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    {alertLevel === "low" ? (
+                      <Badge variant="destructive" className="text-[10px]">Estoque baixo</Badge>
+                    ) : alertLevel === "unknown" ? (
+                      <Badge variant="outline" className="text-[10px]">Sem leitura automatica</Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[10px]">OK</Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
                     {new Date(i.dataCompra).toLocaleDateString("pt-BR")}
                   </TableCell>
@@ -1464,7 +1516,7 @@ function Stock() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
         )}
