@@ -64,6 +64,15 @@ const FILAMENT_SWATCHES: Record<string, string> = {
   white: "#f5f5f5", orange: "#ff8a3d", purple: "#8b5cf6",
 };
 
+function getPaymentBadge(order: Order) {
+  const hasFinancialIntent = order.status === "vendido" || !!order.formaPagamento || order.valorRecebido !== undefined;
+  if (!hasFinancialIntent) return null;
+  if (order.dataPagamento) {
+    return { label: "Pago", className: "border-green-600/30 bg-green-50 text-green-700" };
+  }
+  return { label: "Pendente", className: "border-yellow-600/30 bg-yellow-50 text-yellow-700" };
+}
+
 /* Bambu Lab printer presets — wattagem média durante impressão.
    Fonte: bambucostpro.com / specs oficiais Bambu Lab. */
 const BAMBU_PRESETS = [
@@ -851,6 +860,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
   const costResult = calcOrderCostHybrid({ order, filamento, precoVendaUnit: order.precoVenda ?? 0, settings: orderSettings });
   const custoTotal = costResult.total;
   const lucro = order.precoVenda ? (order.precoVenda * order.quantity) - custoTotal : null;
+  const paymentBadge = getPaymentBadge(order);
 
   return (
     <>
@@ -885,6 +895,11 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
           </div>
         )}
         {order.formaPagamento && (<div className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground"><CreditCard className="h-3 w-3" /><span className="font-medium">{order.formaPagamento}</span>{order.dataPagamento && (<span className="text-muted-foreground/70">· {new Date(order.dataPagamento).toLocaleDateString("pt-BR")}</span>)}</div>)}
+        {paymentBadge && (
+          <Badge variant="outline" className={cn("mt-2 text-[10px] font-semibold", paymentBadge.className)}>
+            {paymentBadge.label}
+          </Badge>
+        )}
         {order.status === "done" && (<Button size="sm" variant="outline" className="mt-2 w-full gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setShowDestino(true); }}><MapPin className="h-3 w-3" />Finalizar Destino</Button>)}
       </Card>
       <Dialog open={showDestino} onOpenChange={setShowDestino}>

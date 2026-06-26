@@ -44,6 +44,7 @@ import {
   removeInsumo,
   revertInstallment,
   settlePayment,
+  updateInsumo,
   updateFilamentoPayment,
   updateInstallment,
   upsertFilamento,
@@ -189,6 +190,11 @@ function Stock() {
     onSuccess: invalidate,
   });
 
+  const mutateUpdateInsumo = useMutation({
+    mutationFn: (input: z.infer<typeof insumoSchema> & { id: string }) => updateInsumo({ data: input as any }),
+    onSuccess: invalidate,
+  });
+
   const mutateRemoveInsumo = useMutation({
     mutationFn: (id: string) => removeInsumo({ data: { id } }),
     onSuccess: invalidate,
@@ -246,6 +252,7 @@ function Stock() {
     primeiraVencimento: addCalendarMonthsIso(todayIso(), 1),
   }));
   const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
+  const [editInsumo, setEditInsumo] = useState<(InsumoForm & { id: string }) | null>(null);
 
   const [filSearch, setFilSearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
@@ -367,6 +374,9 @@ function Stock() {
   const setIField = <K extends keyof InsumoForm>(key: K, value: InsumoForm[K]) =>
     setIForm((f) => ({ ...f, [key]: value }));
 
+  const setEditInsumoField = <K extends keyof InsumoForm>(key: K, value: InsumoForm[K]) =>
+    setEditInsumo((current) => (current ? { ...current, [key]: value } : current));
+
   // ── Filament submit ──
   const submitFilamento = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -472,6 +482,32 @@ function Stock() {
     mutateInsumo.mutate(parsed.data);
     setIForm(initialInsumoForm);
     toast.success(`Insumo "${parsed.data.nome}" cadastrado.`);
+  };
+
+  const submitEditInsumo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editInsumo) return;
+
+    const parsed = insumoSchema.safeParse({
+      nome: editInsumo.nome,
+      dataCompra: editInsumo.dataCompra,
+      quantidade: editInsumo.quantidade,
+      precoTotal: Number(editInsumo.precoTotal),
+      linkProduto: editInsumo.linkProduto || undefined,
+    });
+
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
+      return;
+    }
+
+    try {
+      await mutateUpdateInsumo.mutateAsync({ id: editInsumo.id, ...parsed.data });
+      toast.success(`Insumo "${parsed.data.nome}" atualizado.`);
+      setEditInsumo(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Falha ao atualizar insumo.");
+    }
   };
 
   // ── Summary stats ──
@@ -1330,7 +1366,7 @@ function Stock() {
             />
           </Field>
         </div>
-        <div className="flex justify-end">
+          <div className="flex justify-end">
           <Button type="submit" size="lg" className="btn-filament gap-2 px-6">
             <Plus className="h-4 w-4" /> Adicionar Insumo
           </Button>
@@ -1361,7 +1397,7 @@ function Stock() {
                 <TableHead>Data</TableHead>
                 <TableHead>Link</TableHead>
                 <TableHead className="text-right">Preço Total</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="w-24 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1386,17 +1422,36 @@ function Stock() {
                     {brl(i.precoTotal)}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        mutateRemoveInsumo.mutate(i.id);
-                        toast.success("Insumo removido.");
-                      }}
-                      aria-label="Excluir insumo"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() =>
+                          setEditInsumo({
+                            id: i.id,
+                            nome: i.nome,
+                            dataCompra: i.dataCompra,
+                            quantidade: i.quantidade,
+                            precoTotal: String(i.precoTotal),
+                            linkProduto: i.linkProduto ?? "",
+                          })
+                        }
+                        aria-label="Editar insumo"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          mutateRemoveInsumo.mutate(i.id);
+                          toast.success("Insumo removido.");
+                        }}
+                        aria-label="Excluir insumo"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -1404,6 +1459,63 @@ function Stock() {
           </Table>
         )}
       </div>
+
+      <Dialog open={!!editInsumo} onOpenChange={(open) => !open && setEditInsumo(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Insumo</DialogTitle>
+          </DialogHeader>
+          {editInsumo && (
+            <form className="space-y-5 py-2" onSubmit={submitEditInsumo}>
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Nome do Item" className="md:col-span-2">
+                  <Input
+                    value={editInsumo.nome}
+                    onChange={(e) => setEditInsumoField("nome", e.target.value)}
+                    maxLength={200}
+                  />
+                </Field>
+                <Field label="Data da Compra">
+                  <Input
+                    type="date"
+                    value={editInsumo.dataCompra}
+                    onChange={(e) => setEditInsumoField("dataCompra", e.target.value)}
+                  />
+                </Field>
+                <Field label="Quantidade / Volume">
+                  <Input
+                    value={editInsumo.quantidade}
+                    onChange={(e) => setEditInsumoField("quantidade", e.target.value)}
+                    maxLength={100}
+                  />
+                </Field>
+                <NumberField
+                  label="Preço Total Pago (R$)"
+                  value={editInsumo.precoTotal}
+                  onChange={(value) => setEditInsumoField("precoTotal", value)}
+                  placeholder="25,00"
+                />
+                <Field label="Link do Produto (opcional)" className="md:col-span-2">
+                  <Input
+                    type="url"
+                    value={editInsumo.linkProduto}
+                    onChange={(e) => setEditInsumoField("linkProduto", e.target.value)}
+                    maxLength={500}
+                  />
+                </Field>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setEditInsumo(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" className="btn-filament" disabled={mutateUpdateInsumo.isPending}>
+                  Salvar alterações
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ═══════════ FILAMENT DETAIL DIALOG ═══════════ */}
       <Dialog open={!!detailFilament} onOpenChange={(o) => !o && setDetailFilament(null)}>

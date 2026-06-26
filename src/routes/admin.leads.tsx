@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { MessageSquare, Phone, Calendar, Search, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquare, Phone, Calendar, Search, ExternalLink, Image as ImageIcon, UserPlus, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
-import { listSnapshot } from "@/lib/api/data.functions";
+import { toast } from "sonner";
+import { convertLeadToClient, listSnapshot } from "@/lib/api/data.functions";
 
 export const Route = createFileRoute("/admin/leads")({
   head: () => ({ meta: [{ title: "Leads — Kurti 3D" }] }),
@@ -14,9 +16,40 @@ export const Route = createFileRoute("/admin/leads")({
 });
 
 function LeadsPage() {
+  const qc = useQueryClient();
   const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
   const leads = snap.data?.leads ?? [];
+  const clients = snap.data?.clients ?? [];
   const [search, setSearch] = useState("");
+
+  const mutateConvertLead = useMutation({
+    mutationFn: (leadId: string) => convertLeadToClient({ data: { leadId } }),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["snapshot"] });
+      toast.success(result.created ? "Lead convertido em cliente." : "Lead vinculado a cliente existente.");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Falha ao converter lead.");
+    },
+  });
+
+  function normalizeText(value?: string | null) {
+    return (value ?? "").trim().toLowerCase();
+  }
+
+  function normalizePhone(value?: string | null) {
+    return (value ?? "").replace(/\D/g, "");
+  }
+
+  function findLinkedClient(lead: (typeof leads)[number]) {
+    const leadPhone = normalizePhone(lead.whatsapp);
+    const leadName = normalizeText(lead.nome);
+    return clients.find((client) => {
+      const samePhone = leadPhone && normalizePhone(client.whatsapp) === leadPhone;
+      const sameName = normalizeText(client.nome) === leadName;
+      return samePhone || sameName;
+    });
+  }
 
   const filtered = leads.filter((l) => {
     const q = search.toLowerCase();
@@ -65,6 +98,10 @@ function LeadsPage() {
       <div className="grid gap-3">
         {filtered.map((lead) => (
           <Card key={lead.id}>
+            {(() => {
+              const linkedClient = findLinkedClient(lead);
+              return (
+                <>
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="space-y-1">
@@ -82,6 +119,23 @@ function LeadsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {linkedClient ? (
+                    <Badge variant="outline" className="gap-1 text-xs text-green-700 border-green-600/30 bg-green-50">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Convertido
+                    </Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={mutateConvertLead.isPending}
+                      onClick={() => mutateConvertLead.mutate(lead.id)}
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Converter em Cliente
+                    </Button>
+                  )}
                   <Badge variant="secondary" className="text-xs">
                     <Calendar className="mr-1 h-3 w-3" />
                     {new Date(lead.createdAt).toLocaleDateString("pt-BR")}
@@ -90,6 +144,11 @@ function LeadsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-0">
+              {linkedClient && (
+                <div className="rounded-md border border-green-600/20 bg-green-50 px-3 py-2 text-xs text-green-700">
+                  Cliente vinculado: <strong>{linkedClient.nome}</strong>
+                </div>
+              )}
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {lead.mensagem || <em className="text-muted-foreground/50">Sem mensagem</em>}
               </p>
@@ -133,6 +192,9 @@ function LeadsPage() {
                 </div>
               )}
             </CardContent>
+                </>
+              );
+            })()}
           </Card>
         ))}
       </div>

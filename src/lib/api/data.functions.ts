@@ -40,6 +40,29 @@ function normalizeClientName(name: string) {
   return name.trim().toLowerCase();
 }
 
+function normalizePhone(value?: string | null) {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function buildLeadConversionNote(lead: Lead) {
+  const parts = [
+    `[Lead convertido em ${nowIso().slice(0, 10)}]`,
+    lead.mensagem ? `Mensagem: ${lead.mensagem}` : null,
+    lead.linkProjeto ? `Projeto: ${lead.linkProjeto}` : null,
+  ].filter(Boolean);
+  return parts.join("\n");
+}
+
+function mergeNotes(existingNotes?: string | null, nextNote?: string | null) {
+  const base = existingNotes?.trim();
+  const addition = nextNote?.trim();
+
+  if (!addition) return base ?? null;
+  if (!base) return addition;
+  if (base.includes(addition)) return base;
+  return `${base}\n\n${addition}`;
+}
+
 function resolveClientId(
   clients: Client[],
   clientName: string,
@@ -294,6 +317,52 @@ export const removeInsumo = createServerFn({ method: "POST" })
     const expRepo = await expensesRepo();
     await expRepo.save(expRepo.list.filter((e) => !(e.source === "insumo" && e.refId === data.id)));
     return { ok: true };
+  });
+
+export const updateInsumo = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      id: z.string().min(1),
+      nome: z.string().trim().min(1).max(200),
+      dataCompra: z.string().min(1).max(30),
+      quantidade: z.string().trim().min(1).max(100),
+      precoTotal: z.number().min(0.01).max(1000000),
+      linkProduto: z.string().url().max(500).nullable().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const [repo, expRepo] = await Promise.all([insumosRepo(), expensesRepo()]);
+    const existing = repo.list.find((insumo) => insumo.id === data.id);
+    if (!existing) return { ok: false as const, reason: "not_found" as const };
+
+    const updated: Insumo = {
+      ...existing,
+      nome: data.nome,
+      dataCompra: data.dataCompra,
+      quantidade: data.quantidade,
+      precoTotal: data.precoTotal,
+      linkProduto: data.linkProduto ?? null,
+    };
+
+    await repo.save(repo.list.map((insumo) => (insumo.id === data.id ? updated : insumo)));
+
+    const linkedExpense = expRepo.list.find((expense) => expense.source === "insumo" && expense.refId === data.id);
+    const nextExpense: Expense = {
+      id: linkedExpense?.id ?? randomUUID(),
+      source: "insumo",
+      refId: data.id,
+      valor: updated.precoTotal,
+      data: updated.dataCompra,
+      descricao: `Compra de insumo: ${updated.nome}`,
+      categoria: linkedExpense?.categoria ?? null,
+    };
+
+    const nextExpenses = linkedExpense
+      ? expRepo.list.map((expense) => (expense.id === linkedExpense.id ? nextExpense : expense))
+      : [nextExpense, ...expRepo.list];
+    await expRepo.save(nextExpenses);
+
+    return { ok: true as const };
   });
 
 export const addPortfolioProject = createServerFn({ method: "POST" })
@@ -643,6 +712,54 @@ export const submitLead = createServerFn({ method: "POST" })
     };
     await repo.insert(lead);
     return { ok: true };
+  });
+
+export const convertLeadToClient = createServerFn({ method: "POST" })
+  .inputValidator(z.object({ leadId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const [leadsData, clientsData, ordersData] = await Promise.all([leadsRepo(), clientsRepo(), ordersRepo()]);
+    const lead = leadsData.list.find((item) => item.id === data.leadId);
+    if (!lead) return { ok: false as const, reason: "not_found" as const };
+
+    const normalizedLeadPhone = normalizePhone(lead.whatsapp);
+    const normalizedLeadName = normalizeClientName(lead.nome);
+    const note = buildLeadConversionNote(lead);
+    const now = nowIso();
+
+    const existingClient = clientsData.list.find((client) => {
+      const samePhone = normalizedLeadPhone && normalizePhone(client.whatsapp) === normalizedLeadPhone;
+      const sameName = normalizeClientName(client.nome) === normalizedLeadName;
+      return samePhone || sameName;
+    });
+
+    if (existingClient) {
+      const updatedClient: Client = {
+        ...existingClient,
+        whatsapp: existingClient.whatsapp ?? lead.whatsapp ?? null,
+        notas: mergeNotes(existingClient.notas, note),
+        updatedAt: now,
+      };
+      await clientsData.save(
+        clientsData.list.map((client) => (client.id === existingClient.id ? updatedClient : client)),
+      );
+      const linkedOrders = relinkOrdersToClient(ordersData.list, existingClient.id, [lead.nome, existingClient.nome], now);
+      await ordersData.save(linkedOrders);
+      return { ok: true as const, clientId: existingClient.id, created: false as const };
+    }
+
+    const client: Client = {
+      id: randomUUID(),
+      nome: lead.nome,
+      whatsapp: lead.whatsapp ?? null,
+      email: null,
+      notas: note,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await clientsData.save([client, ...clientsData.list]);
+    const linkedOrders = relinkOrdersToClient(ordersData.list, client.id, [lead.nome], now);
+    await ordersData.save(linkedOrders);
+    return { ok: true as const, clientId: client.id, created: true as const };
   });
 
 // ============================================================

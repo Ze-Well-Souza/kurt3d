@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check } from "lucide-react";
+import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check, Download, FileText } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,8 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   falha: { label: "Falha", color: "var(--filament-magenta)" },
 };
 
+type FinancePeriodPreset = "all" | "month" | "quarter";
+
 function Finances() {
   const qc = useQueryClient();
   const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
@@ -50,6 +52,8 @@ function Finances() {
   const [showExpense, setShowExpense] = useState(false);
   const [stockView, setStockView] = useState<"list" | "table">("table");
   const [expForm, setExpForm] = useState({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" });
+  const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
+  const [periodAnchor, setPeriodAnchor] = useState(new Date().toISOString().slice(0, 7));
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); };
   const mutateAddExp = useMutation({ mutationFn: (data: any) => addManualExpense({ data }), onSuccess: () => { invalidate(); toast.success("Despesa adicionada."); setShowExpense(false); setExpForm({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" }); } });
@@ -65,14 +69,55 @@ function Finances() {
     onSuccess: () => { invalidate(); toast.success("Todas as parcelas quitadas."); },
   });
 
+  const periodLabel = useMemo(() => {
+    if (periodPreset === "all") return "Período completo";
+    const [year, month] = periodAnchor.split("-").map(Number);
+    if (!year || !month) return "Período selecionado";
+    if (periodPreset === "month") {
+      return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    }
+    const quarter = Math.floor((month - 1) / 3) + 1;
+    return `${quarter}º trimestre de ${year}`;
+  }, [periodAnchor, periodPreset]);
+
+  const isDateInSelectedPeriod = (dateIso?: string | null) => {
+    if (!dateIso) return periodPreset === "all";
+    if (periodPreset === "all") return true;
+    const [anchorYear, anchorMonth] = periodAnchor.split("-").map(Number);
+    const [dateYear, dateMonth] = dateIso.slice(0, 7).split("-").map(Number);
+    if (!anchorYear || !anchorMonth || !dateYear || !dateMonth) return false;
+    if (periodPreset === "month") {
+      return anchorYear === dateYear && anchorMonth === dateMonth;
+    }
+    return anchorYear === dateYear && Math.floor((anchorMonth - 1) / 3) === Math.floor((dateMonth - 1) / 3);
+  };
+
+  const periodFilteredVendas = useMemo(
+    () => vendas.filter((v) => isDateInSelectedPeriod(v.data)),
+    [vendas, periodAnchor, periodPreset],
+  );
+
+  const filteredExpenses = useMemo(
+    () => expenses.filter((expense) => isDateInSelectedPeriod(expense.data)),
+    [expenses, periodAnchor, periodPreset],
+  );
+
+  const filteredInstallments = useMemo(
+    () =>
+      filamentoInstallments.filter((installment) =>
+        isDateInSelectedPeriod(installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento),
+      ),
+    [filamentoInstallments, periodAnchor, periodPreset],
+  );
+
   const totals = useMemo(() => {
-    const receita = vendas.reduce((s, v) => s + v.valor, 0);
-    const custo = vendas.reduce((s, v) => s + v.custo, 0);
-    const despesas = expenses.reduce((s, e) => s + e.valor, 0);
+    const receita = periodFilteredVendas.reduce((s, v) => s + v.valor, 0);
+    const custo = periodFilteredVendas.reduce((s, v) => s + v.custo, 0);
+    const despesas = filteredExpenses.reduce((s, e) => s + e.valor, 0);
     const lucro = receita - custo - despesas;
-    const depreciacaoAcumulada = vendas.reduce((s, v) => s + v.depreciacao, 0);
+    const depreciacaoAcumulada = periodFilteredVendas.reduce((s, v) => s + v.depreciacao, 0);
     return { receita, custo, lucro, depreciacaoAcumulada, despesas };
-  }, [vendas, expenses]);
+  }, [periodFilteredVendas, filteredExpenses]);
 
   // Stock summary with full cost accounting per filament
   const stockSummary = useMemo(() => {
@@ -117,9 +162,9 @@ function Finances() {
     );
   }, [stockSummary]);
 
-  const despesasManuais = expenses.filter((e) => e.source === "manual").reduce((s, e) => s + e.valor, 0);
-  const despesasFalha = expenses.filter((e) => e.source === "falha").reduce((s, e) => s + e.valor, 0);
-  const despesasInsumos = expenses.filter((e) => e.source === "insumo").reduce((s, e) => s + e.valor, 0);
+  const despesasManuais = filteredExpenses.filter((e) => e.source === "manual").reduce((s, e) => s + e.valor, 0);
+  const despesasFalha = filteredExpenses.filter((e) => e.source === "falha").reduce((s, e) => s + e.valor, 0);
+  const despesasInsumos = filteredExpenses.filter((e) => e.source === "insumo").reduce((s, e) => s + e.valor, 0);
 
   // Installment (parcelas) KPIs
   const installmentKpis = useMemo(() => {
@@ -129,7 +174,7 @@ function Finances() {
     let pagoNoMes = 0;
     let vencendoEm30 = 0;
     let atrasadas = 0;
-    for (const inst of filamentoInstallments) {
+    for (const inst of filteredInstallments) {
       if (!inst.pago) {
         pendente += inst.valor;
         if (inst.vencimento <= today) atrasadas++;
@@ -140,11 +185,11 @@ function Finances() {
       }
     }
     return { pendente, pagoNoMes, vencendoEm30, atrasadas };
-  }, [filamentoInstallments]);
+  }, [filteredInstallments]);
 
   const upcomingInstallments = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    return filamentoInstallments
+    return filteredInstallments
       .filter((i) => !i.pago)
       .map((i) => {
         const payment = filamentoPayments.find((p) => p.id === i.paymentId);
@@ -154,13 +199,156 @@ function Finances() {
         return { inst: i, payment, batchSkus, overdue: i.vencimento <= today };
       })
       .sort((a, b) => a.inst.vencimento.localeCompare(b.inst.vencimento));
-  }, [filamentoInstallments, filamentoPayments, filamentos]);
+  }, [filteredInstallments, filamentoPayments, filamentos]);
 
   const filteredVendas = useMemo(() => {
-    if (!search.trim()) return vendas;
+    if (!search.trim()) return periodFilteredVendas;
     const s = search.toLowerCase().trim();
-    return vendas.filter((v) => v.projectName.toLowerCase().includes(s) || v.client.toLowerCase().includes(s));
-  }, [vendas, search]);
+    return periodFilteredVendas.filter((v) => v.projectName.toLowerCase().includes(s) || v.client.toLowerCase().includes(s));
+  }, [periodFilteredVendas, search]);
+
+  const exportRows = useMemo(() => {
+    const vendaRows = periodFilteredVendas.map((venda) => ({
+      tipo: "Venda",
+      data: venda.data,
+      descricao: venda.projectName,
+      categoria: "Receita",
+      cliente: venda.client,
+      valor: venda.valor,
+      custo: venda.custo,
+      depreciacao: venda.depreciacao,
+      status: "Recebido",
+      observacao: "",
+    }));
+
+    const expenseRows = filteredExpenses.map((expense) => ({
+      tipo: "Despesa",
+      data: expense.data,
+      descricao: expense.descricao,
+      categoria: expense.categoria ?? SOURCE_LABELS[expense.source]?.label ?? expense.source,
+      cliente: "",
+      valor: expense.valor,
+      custo: "",
+      depreciacao: "",
+      status: expense.source === "manual" ? "Lançada" : "Automática",
+      observacao: expense.source,
+    }));
+
+    const installmentRows = filteredInstallments.map((installment) => ({
+      tipo: "Parcela",
+      data: installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento,
+      descricao: `Parcela ${installment.numero}`,
+      categoria: "Filamento",
+      cliente: "",
+      valor: installment.pago ? installment.valorPago ?? installment.valor : installment.valor,
+      custo: "",
+      depreciacao: "",
+      status: installment.pago ? "Pago" : "Pendente",
+      observacao: installment.observacao ?? "",
+    }));
+
+    return [...vendaRows, ...expenseRows, ...installmentRows].sort((a, b) => a.data.localeCompare(b.data));
+  }, [filteredExpenses, filteredInstallments, periodFilteredVendas]);
+
+  const exportCsv = () => {
+    const headers = ["tipo", "data", "descricao", "categoria", "cliente", "valor", "custo", "depreciacao", "status", "observacao"];
+    const csvLines = [
+      headers.join(";"),
+      ...exportRows.map((row) =>
+        headers
+          .map((header) => {
+            const value = row[header as keyof typeof row] ?? "";
+            const text = typeof value === "number" ? value.toFixed(2).replace(".", ",") : String(value);
+            return `"${text.replaceAll('"', '""')}"`;
+          })
+          .join(";"),
+      ),
+    ];
+    const blob = new Blob(["\uFEFF" + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `financeiro-${periodPreset}-${periodAnchor}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPdf = () => {
+    const popup = window.open("", "_blank", "noopener,noreferrer,width=1200,height=900");
+    if (!popup) {
+      toast.error("Não foi possível abrir a janela de exportação PDF.");
+      return;
+    }
+
+    const summaryCards = [
+      ["Período", periodLabel],
+      ["Receita", brl(totals.receita)],
+      ["Despesas", brl(totals.despesas)],
+      ["Lucro", brl(totals.lucro)],
+      ["Parcelas pendentes", brl(installmentKpis.pendente)],
+      ["Parcelas pagas", brl(installmentKpis.pagoNoMes)],
+    ]
+      .map(([label, value]) => `<div class="chip"><span>${label}</span><strong>${value}</strong></div>`)
+      .join("");
+
+    const tableRows = exportRows
+      .map(
+        (row) => `
+          <tr>
+            <td>${row.tipo}</td>
+            <td>${new Date(row.data).toLocaleDateString("pt-BR")}</td>
+            <td>${escapeHtml(row.descricao)}</td>
+            <td>${escapeHtml(row.categoria)}</td>
+            <td>${escapeHtml(row.cliente)}</td>
+            <td>${typeof row.valor === "number" ? brl(row.valor) : row.valor}</td>
+            <td>${row.status}</td>
+            <td>${escapeHtml(String(row.observacao ?? ""))}</td>
+          </tr>`,
+      )
+      .join("");
+
+    popup.document.write(`<!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <title>Financeiro ${periodLabel}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+            h1 { margin: 0 0 8px; }
+            p { margin: 0 0 16px; color: #4b5563; }
+            .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+            .chip { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+            .chip span { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; }
+            .chip strong { font-size: 18px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; }
+            th { background: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório Financeiro</h1>
+          <p>${periodLabel}</p>
+          <div class="grid">${summaryCards}</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Data</th>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th>Cliente</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+      </html>`);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  };
 
   // Falha count
   const falhasCount = orders.filter((o) => o.status === "falha").length;
@@ -172,6 +360,42 @@ function Finances() {
         <p className="text-sm text-muted-foreground">
           Receita, custos e fundo de reserva de depreciação.
         </p>
+      </div>
+
+      <div className="filament-top flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-border bg-card p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <Label>Período</Label>
+            <Select value={periodPreset} onValueChange={(value) => setPeriodPreset(value as FinancePeriodPreset)}>
+              <SelectTrigger className="min-w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Mês</SelectItem>
+                <SelectItem value="quarter">Trimestre</SelectItem>
+                <SelectItem value="all">Tudo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Mês de referência</Label>
+            <Input
+              type="month"
+              value={periodAnchor}
+              onChange={(e) => setPeriodAnchor(e.target.value)}
+              disabled={periodPreset === "all"}
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">{periodLabel}</Badge>
+          <Button variant="outline" className="gap-2" onClick={exportCsv}>
+            <Download className="h-4 w-4" />
+            Exportar CSV
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={exportPdf}>
+            <FileText className="h-4 w-4" />
+            Exportar PDF
+          </Button>
+        </div>
       </div>
 
       {/* Manual / Como funciona */}
@@ -667,7 +891,7 @@ function Finances() {
           </div>
           <Button size="sm" className="btn-filament gap-2" onClick={() => setShowExpense(true)}><Plus className="h-4 w-4" />Nova despesa</Button>
         </div>
-        {expenses.length === 0 ? (
+        {filteredExpenses.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-muted-foreground">Nenhuma despesa registrada.</div>
         ) : (
           <Table>
@@ -682,7 +906,7 @@ function Finances() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenses.map((e) => {
+              {filteredExpenses.map((e) => {
                 const src = SOURCE_LABELS[e.source] ?? { label: e.source, color: "#999" };
                 return (
                   <TableRow key={e.id}>
@@ -713,9 +937,9 @@ function Finances() {
             <Badge variant="secondary">{filteredVendas.length} registros</Badge>
           </div>
         </div>
-        {vendas.length === 0 ? (
+        {periodFilteredVendas.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
-            Nenhuma venda registrada ainda. Finalize pedidos como &ldquo;Kurtido e
+            Nenhuma venda registrada no período selecionado. Finalize pedidos como &ldquo;Kurtido e
             Vendido&rdquo; na Fila de Pedidos.
           </div>
         ) : (
@@ -826,4 +1050,13 @@ function StatChip({ label, value }: { label: string; value: string }) {
       <div className="text-xs font-semibold tabular-nums text-foreground">{value}</div>
     </div>
   );
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
