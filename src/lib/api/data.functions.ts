@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../domain/cost";
 import type { AppSettings, Client, Expense, Filamento, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo, Lead, LeadImagem, Order, OrderDestino, PortfolioProject, Status, Venda } from "../domain/types";
 import { clampGrams, computeReservedByFilament } from "../domain/inventory";
+import { addCalendarMonthsIso } from "../domain/installments";
 import { nowIso } from "../server/db.server";
 import { clientsRepo, expensesRepo, filamentoInstallmentsRepo, filamentoPaymentsRepo, filamentosHistoryRepo, filamentosRepo, insumosRepo, inventoryRepo, leadsRepo, ordersRepo, portfolioRepo, settingsRepo, vendasRepo } from "../server/repositories.server";
 
@@ -820,18 +821,6 @@ export const updateFilamentoPeso = createServerFn({ method: "POST" })
 // Filamento payment tracking
 // ============================================================
 
-// BUG 3 FIX: use calendar months instead of fixed 30-day intervals.
-// Handles month-end edge cases (e.g. Jan 31 + 1 month = Feb 28, not Mar 3).
-function addMonthsIso(dateIso: string, months: number): string {
-  const d = new Date(dateIso + "T00:00:00");
-  const day = d.getDate();
-  d.setDate(1); // anchor to 1st to avoid month overflow during setMonth
-  d.setMonth(d.getMonth() + months);
-  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  d.setDate(Math.min(day, lastDay));
-  return d.toISOString().slice(0, 10);
-}
-
 export const createFilamentoPayment = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
@@ -866,7 +855,7 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
         paymentId,
         numero: i + 1,
         valor,
-        vencimento: addMonthsIso(data.primeiraVencimento, i),
+        vencimento: addCalendarMonthsIso(data.primeiraVencimento, i),
         pago: false,
         dataPagamento: null,
         valorPago: null,
@@ -924,7 +913,7 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
         paymentId: data.paymentId,
         numero,
         valor,
-        vencimento: addMonthsIso(data.primeiraVencimento, i),
+        vencimento: addCalendarMonthsIso(data.primeiraVencimento, i),
         pago: false,
         dataPagamento: null,
         valorPago: null,

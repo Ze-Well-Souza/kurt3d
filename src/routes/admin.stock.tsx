@@ -48,6 +48,7 @@ import {
   updateInstallment,
   upsertFilamento,
 } from "@/lib/api/data.functions";
+import { addCalendarMonthsIso, todayIso } from "@/lib/domain/installments";
 import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 
@@ -241,8 +242,8 @@ function Stock() {
   const [fForm, setFForm] = useState<FilamentoForm>(() => ({
     ...initialFilamentoForm,
     sku: generateSku(allUsedSkus),
-    dataCompra: new Date().toISOString().slice(0, 10),
-    primeiraVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    dataCompra: todayIso(),
+    primeiraVencimento: addCalendarMonthsIso(todayIso(), 1),
   }));
   const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
 
@@ -435,8 +436,8 @@ function Stock() {
       setFForm({
         ...initialFilamentoForm,
         sku: generateSku([...usedLower]),
-        dataCompra: new Date().toISOString().slice(0, 10),
-        primeiraVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        dataCompra: todayIso(),
+        primeiraVencimento: addCalendarMonthsIso(todayIso(), 1),
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao cadastrar rolo.");
