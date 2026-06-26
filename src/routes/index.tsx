@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { submitLead } from "@/lib/api/data.functions";
 import { getSiteContent } from "@/lib/api/auth.functions";
 import { KurtiLogo } from "@/components/KurtiLogo";
 import { DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
+import { calcCostFromInputs } from "@/lib/domain/cost";
 import { usePublicSnapshot } from "@/lib/hooks/use-public-snapshot";
 import heroImg from "@/assets/hero-printer.jpg";
 import work1 from "@/assets/work-1.jpg";
@@ -51,6 +52,8 @@ function Landing() {
       <Hero />
       <Features />
       <Gallery />
+      <PublicQuote />
+      <Testimonials />
       <Contact />
       <Footer />
     </div>
@@ -66,6 +69,8 @@ function Nav() {
         </Link>
         <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
           <a href="#work" className="transition-colors hover:text-foreground">Portfólio</a>
+          <a href="#quote" className="transition-colors hover:text-foreground">Pré-orçamento</a>
+          <a href="#testimonials" className="transition-colors hover:text-foreground">Depoimentos</a>
           <a href="#services" className="transition-colors hover:text-foreground">Serviços</a>
           <a href="#contact" className="transition-colors hover:text-foreground">Contato</a>
           <Link to="/acompanhar" className="transition-colors hover:text-foreground">Acompanhar pedido</Link>
@@ -181,6 +186,32 @@ function Features() {
 function Gallery() {
   const snap = usePublicSnapshot();
   const portfolio = snap.data?.portfolio ?? [];
+  const [categoryFilter, setCategoryFilter] = useState("Todos");
+  const [materialFilter, setMaterialFilter] = useState("Todos");
+  const [colorFilter, setColorFilter] = useState("Todas");
+
+  const categories = useMemo(
+    () => ["Todos", ...Array.from(new Set(portfolio.map((p) => p.categoria).filter(Boolean)))],
+    [portfolio],
+  );
+  const materials = useMemo(
+    () => ["Todos", ...Array.from(new Set(portfolio.map((p) => p.filamentoMaterial).filter(Boolean)))],
+    [portfolio],
+  );
+  const colors = useMemo(
+    () => ["Todas", ...Array.from(new Set(portfolio.map((p) => p.filamentoCor).filter(Boolean)))],
+    [portfolio],
+  );
+  const filteredPortfolio = useMemo(
+    () =>
+      portfolio.filter((p) => {
+        const categoryMatches = categoryFilter === "Todos" || p.categoria === categoryFilter;
+        const materialMatches = materialFilter === "Todos" || p.filamentoMaterial === materialFilter;
+        const colorMatches = colorFilter === "Todas" || p.filamentoCor === colorFilter;
+        return categoryMatches && materialMatches && colorMatches;
+      }),
+    [categoryFilter, colorFilter, materialFilter, portfolio],
+  );
 
   const hasProjects = portfolio.length > 0;
 
@@ -197,11 +228,19 @@ function Gallery() {
       </div>
 
       {hasProjects ? (
+        <div className="mb-8 flex flex-wrap gap-3">
+          <FilterGroup label="Categoria" options={categories} value={categoryFilter} onChange={setCategoryFilter} />
+          <FilterGroup label="Material" options={materials} value={materialFilter} onChange={setMaterialFilter} />
+          <FilterGroup label="Cor" options={colors} value={colorFilter} onChange={setColorFilter} />
+        </div>
+      ) : null}
+
+      {hasProjects ? (
         <div className="grid auto-rows-[200px] grid-cols-2 gap-4 md:grid-cols-4">
           {/* Video card placeholder — ready for MP4/Reels */}
           <VideoCard />
 
-          {portfolio.map((p) => (
+          {filteredPortfolio.map((p) => (
             <figure
               key={p.id}
               className="group relative overflow-hidden rounded-xl border border-border bg-card"
@@ -209,6 +248,10 @@ function Gallery() {
               <div className="flex h-full flex-col justify-between p-5">
                 <div>
                   <Badge variant="secondary" className="mb-2">{p.categoria}</Badge>
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {p.filamentoMaterial ? <Badge variant="outline" className="text-[10px]">{p.filamentoMaterial}</Badge> : null}
+                    {p.filamentoCor ? <Badge variant="outline" className="text-[10px]">{p.filamentoCor}</Badge> : null}
+                  </div>
                   <p className="font-display text-lg font-bold leading-tight">{p.nome}</p>
                 </div>
                 <div className="flex items-end justify-between">
@@ -260,6 +303,226 @@ function Gallery() {
       )}
     </section>
   );
+}
+
+function PublicQuote() {
+  const snap = usePublicSnapshot();
+  const portfolio = snap.data?.portfolio ?? [];
+  const settings = snap.data?.settings;
+  const [projectId, setProjectId] = useState("");
+  const [pesoPeca, setPesoPeca] = useState("");
+  const [tempoMin, setTempoMin] = useState("");
+  const [quantidade, setQuantidade] = useState("1");
+  const [precoVenda, setPrecoVenda] = useState("");
+  const selectedProject = portfolio.find((item) => item.id === projectId) ?? null;
+
+  const derivedMarkup = useMemo(() => {
+    const ratios = portfolio
+      .map((item) => {
+        const breakdown = calcCostFromInputs({
+          custoRolo: item.custoRolo,
+          pesoRolo: item.pesoRolo,
+          pesoPeca: item.pesoPeca,
+          tempoMin: item.tempoMin,
+          quantidade: 1,
+          precoVenda: item.precoVenda,
+          settings,
+        });
+        return breakdown.custoUnidade > 0 ? item.precoVenda / breakdown.custoUnidade : null;
+      })
+      .filter((value): value is number => value !== null && Number.isFinite(value) && value > 0)
+      .sort((a, b) => a - b);
+
+    if (ratios.length === 0) return 1.6;
+    return Math.min(3, Math.max(1.2, ratios[Math.floor(ratios.length / 2)]));
+  }, [portfolio, settings]);
+
+  const calculated = useMemo(() => {
+    const quantity = Math.max(1, Number(quantidade) || 1);
+    const peso = Math.max(0, Number(pesoPeca) || 0);
+    const tempo = Math.max(0, Number(tempoMin) || 0);
+    const unitPrice = Math.max(0, Number(precoVenda) || 0);
+    const sellingPrice = unitPrice > 0 ? unitPrice : Number((calcCostFromInputs({
+      custoRolo: selectedProject?.custoRolo ?? 120,
+      pesoRolo: selectedProject?.pesoRolo ?? 1000,
+      pesoPeca: peso,
+      tempoMin: tempo,
+      quantidade: 1,
+      precoVenda: 0,
+      settings,
+    }).custoUnidade * derivedMarkup).toFixed(2));
+
+    return calcCostFromInputs({
+      custoRolo: selectedProject?.custoRolo ?? 120,
+      pesoRolo: selectedProject?.pesoRolo ?? 1000,
+      pesoPeca: peso,
+      tempoMin: tempo,
+      quantidade: quantity,
+      precoVenda: sellingPrice,
+      settings,
+    });
+  }, [derivedMarkup, pesoPeca, precoVenda, quantidade, selectedProject, settings, tempoMin]);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    setPesoPeca(String(selectedProject.pesoPeca));
+    setTempoMin(String(selectedProject.tempoMin));
+    setPrecoVenda(String(selectedProject.precoVenda));
+  }, [selectedProject]);
+
+  return (
+    <section id="quote" className="bg-card/50">
+      <div className="filament-divider" />
+      <div className="mx-auto max-w-7xl px-6 py-24">
+        <div className="mb-10">
+          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-green)" }}>Pré-orçamento</div>
+          <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+            Simule um orçamento online
+          </h2>
+          <p className="mt-4 max-w-2xl text-muted-foreground">
+            Use um projeto do portfólio como base ou preencha peso, tempo e quantidade para receber uma estimativa inicial.
+          </p>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Usar projeto do portfólio como base</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={projectId}
+                  onChange={(e) => setProjectId(e.target.value)}
+                >
+                  <option value="">Projeto personalizado</option>
+                  {portfolio.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome} · {item.categoria}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Peso por peça (g)</Label>
+                <Input value={pesoPeca} onChange={(e) => setPesoPeca(e.target.value)} placeholder="Ex.: 45" />
+              </div>
+              <div className="space-y-2">
+                <Label>Tempo por peça (min)</Label>
+                <Input value={tempoMin} onChange={(e) => setTempoMin(e.target.value)} placeholder="Ex.: 180" />
+              </div>
+              <div className="space-y-2">
+                <Label>Quantidade</Label>
+                <Input value={quantidade} onChange={(e) => setQuantidade(e.target.value)} placeholder="1" />
+              </div>
+              <div className="space-y-2">
+                <Label>Preço unitário alvo (opcional)</Label>
+                <Input value={precoVenda} onChange={(e) => setPrecoVenda(e.target.value)} placeholder="Se vazio, calculamos uma sugestão" />
+              </div>
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Esta simulacao gera uma estimativa inicial. O valor final pode variar conforme acabamento, suporte, pintura ou montagem.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="space-y-4">
+              <div>
+                <div className="text-xs uppercase tracking-widest text-muted-foreground">Resumo estimado</div>
+                <h3 className="mt-2 font-display text-2xl font-bold">
+                  {selectedProject?.nome ?? "Projeto personalizado"}
+                </h3>
+              </div>
+              <QuoteRow label="Custo estimado do lote" value={formatMoney(calculated.custoLote)} />
+              <QuoteRow label="Receita estimada do lote" value={formatMoney(calculated.receitaTotal)} />
+              <QuoteRow label="Custo por unidade" value={formatMoney(calculated.custoUnidade)} />
+              <QuoteRow label="Filamento por unidade" value={formatMoney(calculated.custoFilamento)} />
+              <QuoteRow label="Energia por unidade" value={formatMoney(calculated.custoEnergia)} />
+              <QuoteRow label="Base comercial usada" value={`${derivedMarkup.toFixed(2)}x o custo`} />
+              <a href="#contact" className="btn-filament inline-flex h-11 w-full items-center justify-center px-4 text-sm font-semibold">
+                Solicitar orçamento final
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="filament-divider" />
+    </section>
+  );
+}
+
+function Testimonials() {
+  const contentQ = useQuery({ queryKey: ["siteContent"], queryFn: () => getSiteContent() });
+  const testimonials = (contentQ.data ?? DEFAULT_SITE_CONTENT).testimonials;
+
+  return (
+    <section id="testimonials" className="mx-auto max-w-7xl px-6 py-24">
+      <div className="mb-10">
+        <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-yellow)" }}>Depoimentos</div>
+        <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+          O que os clientes dizem
+        </h2>
+      </div>
+      <div className="grid gap-6 md:grid-cols-3">
+        {testimonials.map((testimonial) => (
+          <div key={`${testimonial.nome}-${testimonial.cargo}`} className="rounded-2xl border border-border bg-card p-6">
+            <p className="text-sm leading-6 text-muted-foreground">"{testimonial.texto}"</p>
+            <div className="mt-5">
+              <div className="font-semibold">{testimonial.nome}</div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">{testimonial.cargo}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FilterGroup({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <Button
+            key={option}
+            type="button"
+            variant={option === value ? "default" : "outline"}
+            size="sm"
+            className={option === value ? "btn-filament" : ""}
+            onClick={() => onChange(option)}
+          >
+            {option}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function QuoteRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 }
 
 type ContactImage = { file: File; preview: string };

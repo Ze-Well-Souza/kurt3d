@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -524,6 +525,38 @@ function SiteContentCard() {
               next[i] = { ...next[i], descricao: e.target.value };
               set("features", next);
             }} />
+          </div>
+        ))}
+        {form.testimonials.map((testimonial, i) => (
+          <div key={i} className="space-y-1.5 sm:col-span-2 rounded-xl border border-border/70 p-4">
+            <Label className="text-sm font-medium">Depoimento {i + 1}: Nome</Label>
+            <Input
+              value={testimonial.nome}
+              onChange={(e) => {
+                const next = [...form.testimonials];
+                next[i] = { ...next[i], nome: e.target.value };
+                set("testimonials", next);
+              }}
+            />
+            <Label className="text-[11px] text-muted-foreground">Cargo / contexto</Label>
+            <Input
+              value={testimonial.cargo}
+              onChange={(e) => {
+                const next = [...form.testimonials];
+                next[i] = { ...next[i], cargo: e.target.value };
+                set("testimonials", next);
+              }}
+            />
+            <Label className="text-[11px] text-muted-foreground">Texto</Label>
+            <Textarea
+              rows={3}
+              value={testimonial.texto}
+              onChange={(e) => {
+                const next = [...form.testimonials];
+                next[i] = { ...next[i], texto: e.target.value };
+                set("testimonials", next);
+              }}
+            />
           </div>
         ))}
       </div>

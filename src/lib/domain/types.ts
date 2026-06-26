@@ -112,6 +112,11 @@ export type PortfolioProject = {
   updatedAt: string;
 };
 
+export type PublicPortfolioProject = PortfolioProject & {
+  filamentoMaterial?: string | null;
+  filamentoCor?: string | null;
+};
+
 export type InventoryTxnType = "reserve" | "release" | "consume";
 
 export type InventoryTxn = {
@@ -171,6 +176,12 @@ export type AdminUser = {
   updatedAt: string;
 };
 
+export type SiteTestimonial = {
+  nome: string;
+  cargo: string;
+  texto: string;
+};
+
 export type SiteContent = {
   heroTitulo: string;
   heroSubtitulo: string;
@@ -178,6 +189,7 @@ export type SiteContent = {
   features: { titulo: string; descricao: string }[];
   instagramUrl: string;
   youtubeUrl: string;
+  testimonials: SiteTestimonial[];
 };
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
@@ -195,6 +207,23 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   ],
   instagramUrl: "https://instagram.com/kurti3d",
   youtubeUrl: "https://youtube.com/@kurti3d",
+  testimonials: [
+    {
+      nome: "Cliente satisfeito",
+      cargo: "Pedido recorrente",
+      texto: "Atendimento rapido, acabamento excelente e cores muito fieis ao que eu imaginava.",
+    },
+    {
+      nome: "Parceiro maker",
+      cargo: "Prototipos e brindes",
+      texto: "A qualidade das pecas e a previsibilidade dos prazos ajudaram bastante no meu fluxo.",
+    },
+    {
+      nome: "Cliente de decoracao",
+      cargo: "Pecas personalizadas",
+      texto: "Recebi exatamente o que pedi e com uma apresentacao muito caprichada.",
+    },
+  ],
 };
 
 export type AppSettings = {

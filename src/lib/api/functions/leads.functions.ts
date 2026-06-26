@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Client, Lead, LeadImagem } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
+import { syncLeadToCrm } from "../../server/lead-crm.server";
 import { clientsRepo, leadsRepo, ordersRepo } from "../../server/repositories.server";
 import {
   buildLeadConversionNote,
@@ -47,6 +48,7 @@ export const submitLead = createServerFn({ method: "POST" })
       createdAt: nowIso(),
     };
     await repo.insert(lead);
+    await syncLeadToCrm(lead);
     return { ok: true };
   });
 

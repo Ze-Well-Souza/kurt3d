@@ -18,10 +18,19 @@ import {
 import { buildFilamentoLabel, hydrateOrderClientLinks } from "./shared";
 
 export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(async () => {
-  const [portfolio, settingsData] = await Promise.all([portfolioRepo(), settingsRepo()]);
+  const [portfolio, filamentos, settingsData] = await Promise.all([portfolioRepo(), filamentosRepo(), settingsRepo()]);
+
+  const publicPortfolio = portfolio.list.map((item) => {
+    const filamento = item.filamentoId ? filamentos.list.find((candidate) => candidate.id === item.filamentoId) : null;
+    return {
+      ...item,
+      filamentoMaterial: filamento?.material ?? null,
+      filamentoCor: filamento?.cor ?? null,
+    };
+  });
 
   return {
-    portfolio: portfolio.list,
+    portfolio: publicPortfolio,
     settings: settingsData.settings,
   };
 });
