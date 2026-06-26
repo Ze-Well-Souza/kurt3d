@@ -214,6 +214,22 @@ describe("client linking", () => {
     expect(savedOrders[0].clientId).toBe("client-1");
   });
 
+  it("rejeita pedido com clientId explicito inexistente", async () => {
+    clientsRepoMock.list = [];
+
+    const { addOrder } = await import("./data.functions");
+
+    await expect(addOrder({
+      data: {
+        client: "Cliente Invalido",
+        clientId: "client-missing",
+        projectName: "Projeto",
+        quantity: 1,
+        timeMinutes: 30,
+      },
+    })).rejects.toThrow("client_not_found");
+  });
+
   it("reconcilia pedidos antigos sem clientId no snapshot quando o nome e unico", async () => {
     ordersRepoMock.list = [
       {
@@ -243,6 +259,52 @@ describe("client linking", () => {
 
     expect(snapshot.orders[0].clientId).toBe("client-legacy");
     expect(ordersRepoMock.save).not.toHaveBeenCalled();
+  });
+
+  it("retorna apenas dados publicos no snapshot da landing", async () => {
+    portfolioRepoMock.list = [
+      {
+        id: "project-1",
+        nome: "Projeto Publico",
+        categoria: "Chaveiro",
+        custoRolo: 100,
+        pesoRolo: 1000,
+        pesoPeca: 10,
+        tempoMin: 20,
+        quantidade: 1,
+        precoVenda: 15,
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T10:00:00.000Z",
+      },
+    ];
+    clientsRepoMock.list = [
+      {
+        id: "client-1",
+        nome: "Cliente Sigiloso",
+        whatsapp: "(11) 99999-9999",
+        email: "privado@example.com",
+        notas: "nao deve sair",
+        createdAt: "2026-06-26T10:00:00.000Z",
+        updatedAt: "2026-06-26T10:00:00.000Z",
+      },
+    ];
+
+    const { listPublicSnapshot } = await import("./data.functions");
+
+    const snapshot = await listPublicSnapshot();
+
+    expect(snapshot).toMatchObject({
+      portfolio: [
+        expect.objectContaining({
+          id: "project-1",
+          nome: "Projeto Publico",
+        }),
+      ],
+      settings: {},
+    });
+    expect("clients" in snapshot).toBe(false);
+    expect("orders" in snapshot).toBe(false);
+    expect("expenses" in snapshot).toBe(false);
   });
 });
 

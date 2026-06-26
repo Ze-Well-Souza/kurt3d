@@ -17,6 +17,15 @@ import {
 } from "../../server/repositories.server";
 import { buildFilamentoLabel, hydrateOrderClientLinks } from "./shared";
 
+export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(async () => {
+  const [portfolio, settingsData] = await Promise.all([portfolioRepo(), settingsRepo()]);
+
+  return {
+    portfolio: portfolio.list,
+    settings: settingsData.settings,
+  };
+});
+
 export const listSnapshot = createServerFn({ method: "GET" }).handler(async () => {
   const [
     orders,

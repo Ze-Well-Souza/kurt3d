@@ -70,6 +70,14 @@ export function resolveClientId(
   return matchedClient?.id ?? null;
 }
 
+export function assertExplicitClientIdExists(clients: Client[], explicitClientId?: string | null) {
+  if (!explicitClientId) return;
+  const explicitClient = clients.find((client) => client.id === explicitClientId);
+  if (!explicitClient) {
+    throw new Error("client_not_found");
+  }
+}
+
 export function relinkOrdersToClient(
   orders: Order[],
   clientId: string,

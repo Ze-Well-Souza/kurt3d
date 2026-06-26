@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Order, PortfolioProject } from "../../domain/types";
 import { clientsRepo, ordersRepo, portfolioRepo } from "../../server/repositories.server";
 import { nowIso } from "../../server/db.server";
-import { resolveClientId } from "./shared";
+import { assertExplicitClientIdExists, resolveClientId } from "./shared";
 
 export const addPortfolioProject = createServerFn({ method: "POST" })
   .validator(
@@ -98,6 +98,7 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
     const [orders, portfolio, clientsData] = await Promise.all([ordersRepo(), portfolioRepo(), clientsRepo()]);
     const project = portfolio.list.find((item) => item.id === data.portfolioProjectId);
     if (!project) return { ok: false as const };
+    assertExplicitClientIdExists(clientsData.list, data.clientId);
     const now = nowIso();
     const order: Order = {
       id: randomUUID(),

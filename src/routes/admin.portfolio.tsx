@@ -619,7 +619,7 @@ function CalcPedidos() {
             <Field label="Filamento (Rolo)" tip="Selecione um rolo do seu estoque para preencher automaticamente Custo do Rolo e Peso do Rolo." className="md:col-span-2">
               <Select value={form.filamentoId} onValueChange={(v) => { setField("filamentoId", v); const f = filamentos.find((x) => x.id === v); if (f) { setField("custoRolo", String(f.precoPago)); setField("pesoRolo", String(f.pesoInicial)); } }}>
                 <SelectTrigger><SelectValue placeholder="Selecione o rolo" /></SelectTrigger>
-                <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>[{f.sku}] {f.marca} - {f.cor} (Restam {f.pesoAtual}g)</SelectItem>))}</SelectContent>
+                <SelectContent>{filamentos.map((f: any) => (<SelectItem key={f.id} value={f.id}>[{f.sku}] {f.marca} - {f.cor} (Disponível {(f.disponivelGrams ?? f.pesoAtual)}g)</SelectItem>))}</SelectContent>
               </Select>
             </Field>
           </div>

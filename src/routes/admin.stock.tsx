@@ -87,6 +87,11 @@ type FilamentoForm = {
   primeiraVencimento: string;
 };
 
+type EditFilamentoForm = FilamentoForm & {
+  id: string;
+  pesoAtual: string;
+};
+
 const initialFilamentoForm: FilamentoForm = {
   sku: "",
   marca: "",
@@ -261,7 +266,7 @@ function Stock() {
     () => (localStorage.getItem("stock-view-preference") as "cards" | "table") ?? "cards"
   );
   const [detailFilament, setDetailFilament] = useState<Filamento | null>(null);
-  const [editForm, setEditForm] = useState<FilamentoForm & { id: string } | null>(null);
+  const [editForm, setEditForm] = useState<EditFilamentoForm | null>(null);
 
   const openEdit = (f: Filamento) => {
     const payment = f.paymentId ? filamentoPayments.find((p) => p.id === f.paymentId) : null;
@@ -274,6 +279,7 @@ function Stock() {
       cor: f.cor,
       material: f.material as Material,
       pesoInicial: String(f.pesoInicial),
+      pesoAtual: String(f.pesoAtual),
       precoPago: String(f.precoPago),
       dataCompra: f.dataCompra,
       linkProduto: f.linkProduto ?? "",
@@ -285,7 +291,7 @@ function Stock() {
     });
   };
 
-  const setEditField = <K extends keyof FilamentoForm>(key: K, value: FilamentoForm[K]) =>
+  const setEditField = <K extends keyof EditFilamentoForm>(key: K, value: EditFilamentoForm[K]) =>
     setEditForm((f) => (f ? { ...f, [key]: value } : f));
 
   const submitEdit = async (e: React.FormEvent) => {
@@ -297,6 +303,7 @@ function Stock() {
       cor: editForm.cor,
       material: editForm.material,
       pesoInicial: Number(editForm.pesoInicial),
+      pesoAtual: Number(editForm.pesoAtual),
       precoPago: Number(editForm.precoPago),
       dataCompra: editForm.dataCompra,
       linkProduto: editForm.linkProduto || undefined,
@@ -1719,6 +1726,13 @@ function Stock() {
                   label="Peso Inicial (g)"
                   value={editForm.pesoInicial}
                   onChange={(v) => setEditField("pesoInicial", v)}
+                  placeholder="1000"
+                  step="1"
+                />
+                <NumberField
+                  label="Peso Atual (g)"
+                  value={editForm.pesoAtual}
+                  onChange={(v) => setEditField("pesoAtual", v)}
                   placeholder="1000"
                   step="1"
                 />

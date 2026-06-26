@@ -13,6 +13,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       cor: z.string().trim().min(1).max(100),
       material: z.string().trim().min(1).max(20),
       pesoInicial: z.number().min(1).max(100000),
+      pesoAtual: z.number().min(0).max(100000).optional(),
       precoPago: z.number().min(0.01).max(100000),
       dataCompra: z.string().min(1).max(30),
       linkProduto: z.string().url().max(500).optional(),
@@ -38,6 +39,11 @@ export const upsertFilamento = createServerFn({ method: "POST" })
         throw new Error(`SKU "${data.sku}" já foi utilizado em um filamento arquivado.`);
       }
     }
+    const nextPesoAtual = data.pesoAtual !== undefined
+      ? Math.min(data.pesoAtual, data.pesoInicial)
+      : existing
+        ? Math.min(existing.pesoAtual, data.pesoInicial)
+        : data.pesoInicial;
     const filamento: Filamento = {
       id,
       sku: data.sku,
@@ -45,7 +51,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       cor: data.cor,
       material: data.material,
       pesoInicial: data.pesoInicial,
-      pesoAtual: existing ? existing.pesoAtual : data.pesoInicial,
+      pesoAtual: nextPesoAtual,
       precoPago: data.precoPago,
       dataCompra: data.dataCompra,
       dataFim: existing?.dataFim ?? null,

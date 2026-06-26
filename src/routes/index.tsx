@@ -13,7 +13,7 @@ import { submitLead } from "@/lib/api/data.functions";
 import { getSiteContent } from "@/lib/api/auth.functions";
 import { KurtiLogo } from "@/components/KurtiLogo";
 import { DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { usePublicSnapshot } from "@/lib/hooks/use-public-snapshot";
 import heroImg from "@/assets/hero-printer.jpg";
 import work1 from "@/assets/work-1.jpg";
 import work2 from "@/assets/work-2.jpg";
@@ -178,7 +178,7 @@ function Features() {
 }
 
 function Gallery() {
-  const snap = useSnapshot();
+  const snap = usePublicSnapshot();
   const portfolio = snap.data?.portfolio ?? [];
 
   const hasProjects = portfolio.length > 0;
@@ -279,7 +279,7 @@ function Contact() {
   const [loading, setLoading] = useState(false);
   const [linkProjeto, setLinkProjeto] = useState("");
   const [images, setImages] = useState<ContactImage[]>([]);
-  const snap = useSnapshot();
+  const snap = usePublicSnapshot();
   const whatsappNumero = snap.data?.settings?.whatsappNumero ?? "5511999999999";
 
   const handleFiles = async (files: FileList | null) => {

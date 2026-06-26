@@ -16,6 +16,7 @@ import {
 } from "../../server/repositories.server";
 import {
   allowedStatusTransition,
+  assertExplicitClientIdExists,
   computeOrderReservedGrams,
   resolveClientId,
 } from "./shared";
@@ -39,6 +40,7 @@ export const addOrder = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const [repo, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
+    assertExplicitClientIdExists(clientsData.list, data.clientId);
     const now = nowIso();
     const order: Order = {
       id: randomUUID(),
@@ -255,6 +257,7 @@ export const updateOrder = createServerFn({ method: "POST" })
     if (order.status === "vendido" || order.status === "presente" || order.status === "falha") {
       return { ok: false as const, reason: "terminal_state" as const };
     }
+    assertExplicitClientIdExists(clientsData.list, data.clientId);
 
     const updated: Order = {
       ...order,
