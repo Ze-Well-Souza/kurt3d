@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, Package, Wrench, Archive, ThumbsUp, ThumbsDown, Minus, ExternalLink, Eye, Pencil, LayoutGrid, Table as TableIcon, CreditCard, Banknote, Check, Undo2, CalendarClock } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,6 @@ import {
   addInsumo,
   createFilamentoPayment,
   deleteFilamentoPayment,
-  listSnapshot,
   payInstallment,
   removeFilamento,
   removeInsumo,
@@ -52,6 +51,8 @@ import {
 import { addCalendarMonthsIso, todayIso } from "@/lib/domain/installments";
 import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
+import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/stock")({
   component: Stock,
@@ -157,7 +158,7 @@ type FilamentoView = Filamento & { reservedGrams?: number; disponivelGrams?: num
 
 function Stock() {
   const qc = useQueryClient();
-  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const snap = useSnapshot();
   const filamentos = (snap.data?.filamentos ?? []) as FilamentoView[];
   const filamentosHistory = (snap.data?.filamentosHistory ?? []) as FilamentoHistory[];
   const insumos = (snap.data?.insumos ?? []) as Insumo[];
@@ -410,7 +411,7 @@ function Stock() {
     }
 
     // Build SKU list for this batch (auto-increment when qty > 1; verify uniqueness against existing)
-    const usedLower = new Set(allUsedSkus.map((s) => s.trim().toLowerCase()));
+    const usedLower = new Set(allUsedSkus.map((s) => normalizeText(s)));
     const skus: string[] = [];
     let firstSku = parsed.data.sku.trim();
     if (usedLower.has(firstSku.toLowerCase())) {
@@ -521,14 +522,14 @@ function Stock() {
   // ── Filtered lists ──
   const filteredFilamentos = useMemo(() => {
     if (!filSearch.trim()) return filamentos;
-    const s = filSearch.toLowerCase().trim();
-    return filamentos.filter((f) => f.sku.toLowerCase().includes(s) || f.marca.toLowerCase().includes(s) || f.cor.toLowerCase().includes(s) || f.material.toLowerCase().includes(s));
+    const s = normalizeText(filSearch);
+    return filamentos.filter((f) => normalizeText(f.sku).includes(s) || normalizeText(f.marca).includes(s) || normalizeText(f.cor).includes(s) || normalizeText(f.material).includes(s));
   }, [filamentos, filSearch]);
 
   const filteredInsumos = useMemo(() => {
     if (!insSearch.trim()) return insumos;
-    const s = insSearch.toLowerCase().trim();
-    return insumos.filter((i) => i.nome.toLowerCase().includes(s));
+    const s = normalizeText(insSearch);
+    return insumos.filter((i) => normalizeText(i.nome).includes(s));
   }, [insumos, insSearch]);
 
   return (

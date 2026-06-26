@@ -12,11 +12,13 @@ import { cn } from "@/lib/utils";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { listSnapshot, saveSettings } from "@/lib/api/data.functions";
+import { saveSettings } from "@/lib/api/data.functions";
 import { changePassword, listUsers, createUser, deleteUser, getSiteContent, saveSiteContent } from "@/lib/api/auth.functions";
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
+import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Configurações — Kurti 3D" }] }),
@@ -51,10 +53,30 @@ function toForm(s: AppSettings): SettingsForm {
 
 function SettingsPage() {
   const qc = useQueryClient();
-  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const snap = useSnapshot();
   const currentSettings = snap.data?.settings ?? DEFAULT_APP_SETTINGS;
   const [form, setForm] = useState<SettingsForm>(toForm(currentSettings));
   const [hasChanges, setHasChanges] = useState(false);
+  const handleSaveError = useToastErrorHandler({ fallbackMessage: "Erro ao salvar." });
+  const handleChangePasswordError = useToastErrorHandler({ fallbackMessage: "Erro ao alterar senha." });
+  const handleCreateUserError = useToastErrorHandler({
+    fallbackMessage: "Erro ao criar.",
+    mapMessage: (error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "phone_exists") return "Telefone já cadastrado.";
+      if (message === "username_exists") return "Usuário já existe.";
+      return null;
+    },
+  });
+  const handleDeleteUserError = useToastErrorHandler({
+    fallbackMessage: "Erro.",
+    mapMessage: (error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "cannot_delete_self") return "Não é possível remover a si mesmo.";
+      if (message === "cannot_delete_last_user") return "Não é possível remover o último usuário.";
+      return null;
+    },
+  });
 
   const mutate = useMutation({
     mutationFn: (input: AppSettings) => saveSettings({ data: input }),
@@ -63,9 +85,7 @@ function SettingsPage() {
       setHasChanges(false);
       toast.success("Configurações salvas com sucesso.");
     },
-    onError: (err: any) => {
-      toast.error(err?.message ?? "Erro ao salvar.");
-    },
+    onError: handleSaveError,
   });
 
   function setField<K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) {
@@ -265,7 +285,7 @@ function ChangePasswordCard() {
       setNewPass("");
       setConfirm("");
     },
-    onError: (err: any) => toast.error(err?.message ?? "Erro ao alterar senha."),
+    onError: handleChangePasswordError,
   });
 
   function submit(e: React.FormEvent) {
@@ -319,7 +339,7 @@ function UserManagementCard() {
       setForm({ nome: "", phone: "", username: "", password: "" });
       setShowDialog(false);
     },
-    onError: (err: any) => toast.error(err?.message === "phone_exists" ? "Telefone já cadastrado." : err?.message === "username_exists" ? "Usuário já existe." : err?.message ?? "Erro ao criar."),
+    onError: handleCreateUserError,
   });
 
   const mutateDelete = useMutation({
@@ -329,7 +349,7 @@ function UserManagementCard() {
       toast.success("Usuário removido.");
       setDeleteId(null);
     },
-    onError: (err: any) => toast.error(err?.message === "cannot_delete_self" ? "Não é possível remover a si mesmo." : err?.message === "cannot_delete_last_user" ? "Não é possível remover o último usuário." : err?.message ?? "Erro."),
+    onError: handleDeleteUserError,
   });
 
   const users = usersQ.data ?? [];
@@ -434,7 +454,7 @@ function SiteContentCard() {
       setDirty(false);
       toast.success("Conteúdo do site salvo.");
     },
-    onError: (err: any) => toast.error(err?.message ?? "Erro ao salvar."),
+    onError: handleSaveError,
   });
 
   function set<K extends keyof SiteContent>(key: K, value: SiteContent[K]) {

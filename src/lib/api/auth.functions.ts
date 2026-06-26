@@ -17,6 +17,7 @@ import { clearRateLimit, getClientIp, inspectRateLimit, recordRateLimitFailure }
 import { isSecureRequest } from "../server/request-security.server";
 import { siteContentRepo } from "../server/repositories.server";
 import type { SiteContent } from "../domain/types";
+import { normalizePhone, normalizeText } from "../utils/normalization";
 
 type SessionData = { userId?: string; username?: string };
 
@@ -37,8 +38,8 @@ async function getSession() {
 function buildLoginRateLimitKey(phone: string) {
   const request = getRequest();
   const ip = getClientIp(request);
-  const normalizedPhone = phone.replace(/\D/g, "");
-  return `login:${ip}:${normalizedPhone || phone.trim().toLowerCase()}`;
+  const normalizedPhone = normalizePhone(phone);
+  return `login:${ip}:${normalizedPhone || normalizeText(phone)}`;
 }
 
 function assertPasswordPolicy(password: string) {

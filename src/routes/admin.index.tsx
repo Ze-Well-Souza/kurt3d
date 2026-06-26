@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { listSnapshot } from "@/lib/api/data.functions";
+import { useSnapshot } from "@/lib/hooks/use-snapshot";
 
 export const Route = createFileRoute("/admin/")({
   component: Dashboard,
@@ -12,7 +11,7 @@ const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Dashboard() {
-  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const snap = useSnapshot();
   const orders = snap.data?.orders ?? [];
   const vendas = snap.data?.vendas ?? [];
   const expenses = snap.data?.expenses ?? [];

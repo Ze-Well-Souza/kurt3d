@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, Phone, Mail, ChevronDown, ChevronUp, Package, DollarSign } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,10 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { SearchInput } from "@/components/SearchInput";
-import { listSnapshot, addClient, updateClient, removeClient } from "@/lib/api/data.functions";
+import { addClient, updateClient, removeClient } from "@/lib/api/data.functions";
 import type { Client, Order } from "@/lib/domain/types";
+import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/clients")({
   head: () => ({ meta: [{ title: "Clientes — Kurti 3D" }] }),
@@ -24,7 +26,7 @@ export const Route = createFileRoute("/admin/clients")({
 
 function ClientsPage() {
   const qc = useQueryClient();
-  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const snap = useSnapshot();
   const clients = snap.data?.clients ?? [];
   const orders = snap.data?.orders ?? [];
   const [search, setSearch] = useState("");
@@ -40,11 +42,11 @@ function ClientsPage() {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return clients;
-    const s = search.toLowerCase().trim();
+    const s = normalizeText(search);
     return clients.filter((c) =>
-      c.nome.toLowerCase().includes(s) ||
-      (c.whatsapp ?? "").toLowerCase().includes(s) ||
-      (c.email ?? "").toLowerCase().includes(s)
+      normalizeText(c.nome).includes(s) ||
+      normalizeText(c.whatsapp).includes(s) ||
+      normalizeText(c.email).includes(s)
     );
   }, [clients, search]);
 

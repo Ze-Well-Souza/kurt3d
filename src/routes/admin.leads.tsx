@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, Phone, Calendar, Search, ExternalLink, Image as ImageIcon, UserPlus, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { convertLeadToClient, listSnapshot } from "@/lib/api/data.functions";
+import { convertLeadToClient } from "@/lib/api/data.functions";
+import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
+import { normalizePhone, normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/leads")({
   head: () => ({ meta: [{ title: "Leads — Kurti 3D" }] }),
@@ -17,10 +20,11 @@ export const Route = createFileRoute("/admin/leads")({
 
 function LeadsPage() {
   const qc = useQueryClient();
-  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const snap = useSnapshot();
   const leads = snap.data?.leads ?? [];
   const clients = snap.data?.clients ?? [];
   const [search, setSearch] = useState("");
+  const handleConvertLeadError = useToastErrorHandler({ fallbackMessage: "Falha ao converter lead." });
 
   const mutateConvertLead = useMutation({
     mutationFn: (leadId: string) => convertLeadToClient({ data: { leadId } }),
@@ -28,18 +32,8 @@ function LeadsPage() {
       qc.invalidateQueries({ queryKey: ["snapshot"] });
       toast.success(result.created ? "Lead convertido em cliente." : "Lead vinculado a cliente existente.");
     },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Falha ao converter lead.");
-    },
+    onError: handleConvertLeadError,
   });
-
-  function normalizeText(value?: string | null) {
-    return (value ?? "").trim().toLowerCase();
-  }
-
-  function normalizePhone(value?: string | null) {
-    return (value ?? "").replace(/\D/g, "");
-  }
 
   function findLinkedClient(lead: (typeof leads)[number]) {
     const leadPhone = normalizePhone(lead.whatsapp);
@@ -52,11 +46,11 @@ function LeadsPage() {
   }
 
   const filtered = leads.filter((l) => {
-    const q = search.toLowerCase();
+    const q = normalizeText(search);
     return (
-      l.nome.toLowerCase().includes(q) ||
-      l.whatsapp.includes(q) ||
-      l.mensagem.toLowerCase().includes(q)
+      normalizeText(l.nome).includes(q) ||
+      normalizePhone(l.whatsapp).includes(normalizePhone(q)) ||
+      normalizeText(l.mensagem).includes(q)
     );
   });
 
@@ -109,7 +103,7 @@ function LeadsPage() {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Phone className="h-3.5 w-3.5" />
                     <a
-                      href={`https://wa.me/55${lead.whatsapp.replace(/\D/g, "")}`}
+                      href={`https://wa.me/55${normalizePhone(lead.whatsapp)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="hover:underline"

@@ -1,5 +1,6 @@
 import type { Client, Filamento, Lead, Order, Status } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
+import { normalizeClientName, normalizePhone } from "../../utils/normalization";
 
 export function buildFilamentoLabel(filamento: Filamento) {
   return `[${filamento.sku}] ${filamento.marca} ${filamento.cor}`;
@@ -33,13 +34,7 @@ export function computeOrderReservedGrams(
   return Math.max(0, grams);
 }
 
-export function normalizeClientName(name: string) {
-  return name.trim().toLowerCase();
-}
-
-export function normalizePhone(value?: string | null) {
-  return (value ?? "").replace(/\D/g, "");
-}
+export { normalizeClientName, normalizePhone };
 
 export function buildLeadConversionNote(lead: Lead) {
   const parts = [

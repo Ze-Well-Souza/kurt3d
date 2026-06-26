@@ -4,6 +4,7 @@ import { getPasswordPolicyMessage } from "../domain/password-policy";
 import { nowIso } from "./db.server";
 import { getServerConfig } from "../config.server";
 import { usersRepo } from "./repositories.server";
+import { normalizePhone } from "../utils/normalization";
 
 const scryptAsync = promisify(scrypt);
 
@@ -78,7 +79,7 @@ export async function setupAdminUser(input: { username: string; password: string
 
 export async function validateLogin(input: { phone: string; password: string }) {
   const repo = await usersRepo();
-  const normalizedPhone = input.phone.replace(/\D/g, "");
+  const normalizedPhone = normalizePhone(input.phone);
   const user = repo.list.find(
     (u) => u.phone === normalizedPhone || u.phone === input.phone || u.username === input.phone,
   );

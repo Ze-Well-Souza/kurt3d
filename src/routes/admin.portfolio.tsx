@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  listSnapshot, addOrder, finalizarDestino, updateOrderStatus, removeOrder,
+  addOrder, finalizarDestino, updateOrderStatus, removeOrder,
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
   updateOrder, updatePortfolioProject,
 } from "@/lib/api/data.functions";
@@ -38,6 +38,9 @@ import type { Order, Status, Filamento, AppSettings, PortfolioProject, Client } 
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
+import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
+import { normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/portfolio")({
   head: () => ({ meta: [{ title: "Calculadora e Pedidos — Kurti 3D" }] }),
@@ -156,7 +159,7 @@ function formatTime(min: number) {
 /* ═══════════════════════ MAIN COMPONENT ═══════════════════════ */
 function CalcPedidos() {
   const qc = useQueryClient();
-  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const snap = useSnapshot();
   const orders = snap.data?.orders ?? [];
   const filamentos = snap.data?.filamentos ?? [];
   const projects = snap.data?.portfolio ?? [];
@@ -173,8 +176,8 @@ function CalcPedidos() {
   const mutateAddOrder = useMutation({ mutationFn: (input: any) => addOrder({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateFinalizar = useMutation({ mutationFn: (input: any) => finalizarDestino({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
   const mutateRemoveOrder = useMutation({ mutationFn: (input: { orderId: string; reason: string }) => removeOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido excluído."); } });
-  const mutateUpdateOrder = useMutation({ mutationFn: (input: any) => updateOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido atualizado."); }, onError: (err: any) => toast.error(err?.message ?? "Erro ao atualizar.") });
-  const mutateUpdateProject = useMutation({ mutationFn: (input: any) => updatePortfolioProject({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Projeto atualizado."); }, onError: (err: any) => toast.error(err?.message ?? "Erro ao atualizar.") });
+  const mutateUpdateOrder = useMutation({ mutationFn: (input: any) => updateOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido atualizado."); }, onError: handleUpdateError });
+  const mutateUpdateProject = useMutation({ mutationFn: (input: any) => updatePortfolioProject({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Projeto atualizado."); }, onError: handleUpdateError });
 
   /* ── calculator state ── */
   const numeric = useMemo(() => ({
@@ -205,23 +208,24 @@ function CalcPedidos() {
   const [editProject, setEditProject] = useState<PortfolioProject | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
+  const handleUpdateError = useToastErrorHandler({ fallbackMessage: "Erro ao atualizar." });
 
   /* ── drag state ── */
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const grouped = useMemo(() => {
     const g: Record<Status, Order[]> = { todo: [], printing: [], done: [], vendido: [], presente: [], falha: [] };
-    const searchLower = orderSearch.toLowerCase().trim();
+    const searchLower = normalizeText(orderSearch);
     for (const o of orders) {
-      if (searchLower && !o.projectName.toLowerCase().includes(searchLower) && !o.client.toLowerCase().includes(searchLower)) continue;
+      if (searchLower && !normalizeText(o.projectName).includes(searchLower) && !normalizeText(o.client).includes(searchLower)) continue;
       g[o.status]?.push(o);
     }
     return g;
   }, [orders, orderSearch]);
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return projects;
-    const s = projectSearch.toLowerCase().trim();
-    return projects.filter((p) => p.nome.toLowerCase().includes(s) || p.categoria.toLowerCase().includes(s));
+    const s = normalizeText(projectSearch);
+    return projects.filter((p) => normalizeText(p.nome).includes(s) || normalizeText(p.categoria).includes(s));
   }, [projects, projectSearch]);
   const activeOrder = activeId ? orders.find((o) => o.id === activeId) ?? null : null;
   const terminalOrders = [...(grouped.vendido ?? []), ...(grouped.presente ?? []), ...(grouped.falha ?? [])];

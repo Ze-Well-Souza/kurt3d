@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check, Download, FileText } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
@@ -18,8 +18,10 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { SearchInput } from "@/components/SearchInput";
-import { listSnapshot, addManualExpense, removeExpense, payInstallment, settlePayment } from "@/lib/api/data.functions";
+import { addManualExpense, removeExpense, payInstallment, settlePayment } from "@/lib/api/data.functions";
 import type { FilamentoPayment, FilamentoPaymentInstallment } from "@/lib/domain/types";
+import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/finances")({
   component: Finances,
@@ -40,7 +42,7 @@ type FinancePeriodPreset = "all" | "month" | "quarter";
 
 function Finances() {
   const qc = useQueryClient();
-  const snap = useQuery({ queryKey: ["snapshot"], queryFn: () => listSnapshot() });
+  const snap = useSnapshot();
   const vendas = snap.data?.vendas ?? [];
   const orders = snap.data?.orders ?? [];
   const filamentos = snap.data?.filamentos ?? [];
@@ -203,8 +205,8 @@ function Finances() {
 
   const filteredVendas = useMemo(() => {
     if (!search.trim()) return periodFilteredVendas;
-    const s = search.toLowerCase().trim();
-    return periodFilteredVendas.filter((v) => v.projectName.toLowerCase().includes(s) || v.client.toLowerCase().includes(s));
+    const s = normalizeText(search);
+    return periodFilteredVendas.filter((v) => normalizeText(v.projectName).includes(s) || normalizeText(v.client).includes(s));
   }, [periodFilteredVendas, search]);
 
   const exportRows = useMemo(() => {
