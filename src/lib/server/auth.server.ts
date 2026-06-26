@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID, scrypt } from "node:crypto";
 import { promisify } from "node:util";
+import { getPasswordPolicyMessage } from "../domain/password-policy";
 import { nowIso } from "./db.server";
 import { getServerConfig } from "../config.server";
 import { usersRepo } from "./repositories.server";
@@ -36,6 +37,11 @@ export async function hashPassword(password: string): Promise<string> {
   return encodeHash({ algo: "scrypt", salt, key: key.toString("base64url") });
 }
 
+function assertPasswordPolicy(password: string) {
+  const message = getPasswordPolicyMessage(password);
+  if (message) throw new Error(message);
+}
+
 export async function verifyPassword(password: string, rawHash: string): Promise<boolean> {
   const decoded = decodeHash(rawHash);
   if (!decoded) return false;
@@ -53,6 +59,7 @@ export async function setupAdminUser(input: { username: string; password: string
   if (repo.list.length > 0) {
     throw new Error("setup_already_done");
   }
+  assertPasswordPolicy(input.password);
   const now = nowIso();
   const passwordHash = await hashPassword(input.password);
   const admin = {
@@ -85,6 +92,7 @@ export async function changeUserPassword(userId: string, newPassword: string) {
   const repo = await usersRepo();
   const user = repo.list.find((u) => u.id === userId);
   if (!user) throw new Error("user_not_found");
+  assertPasswordPolicy(newPassword);
   user.passwordHash = await hashPassword(newPassword);
   user.updatedAt = nowIso();
   await repo.save(repo.list);
@@ -105,6 +113,7 @@ export async function listAdminUsers() {
 
 export async function createAdminUser(input: { username: string; password: string; phone?: string; nome?: string }) {
   const repo = await usersRepo();
+  assertPasswordPolicy(input.password);
   const now = nowIso();
   const passwordHash = await hashPassword(input.password);
   const exists = repo.list.find((u) => u.username === input.username);

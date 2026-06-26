@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { listSnapshot, saveSettings } from "@/lib/api/data.functions";
 import { changePassword, listUsers, createUser, deleteUser, getSiteContent, saveSiteContent } from "@/lib/api/auth.functions";
+import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
 
@@ -269,7 +270,8 @@ function ChangePasswordCard() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (newPass.length < 8) { toast.error("Senha deve ter pelo menos 8 caracteres."); return; }
+    const passwordMessage = getPasswordPolicyMessage(newPass);
+    if (passwordMessage) { toast.error(passwordMessage); return; }
     if (newPass !== confirm) { toast.error("As senhas não conferem."); return; }
     mutate.mutate();
   }
@@ -286,7 +288,7 @@ function ChangePasswordCard() {
       <form onSubmit={submit} className="grid gap-5 p-6 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label className="text-sm font-medium">Nova senha</Label>
-          <Input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="mínimo 8 caracteres" />
+          <Input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="8+ caracteres, maiuscula, minuscula e numero" />
         </div>
         <div className="space-y-1.5">
           <Label className="text-sm font-medium">Confirmar nova senha</Label>
@@ -372,7 +374,7 @@ function UserManagementCard() {
       <Dialog open={showDialog} onOpenChange={(o) => !o && setShowDialog(false)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Novo Usuário Admin</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); if (form.password.length < 8) { toast.error("Senha deve ter pelo menos 8 caracteres."); return; } mutateCreate.mutate(); }} className="space-y-4">
+          <form onSubmit={(e) => { e.preventDefault(); const passwordMessage = getPasswordPolicyMessage(form.password); if (passwordMessage) { toast.error(passwordMessage); return; } mutateCreate.mutate(); }} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Nome</Label>
               <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Nome do usuário" />
@@ -387,7 +389,7 @@ function UserManagementCard() {
             </div>
             <div className="space-y-1.5">
               <Label>Senha</Label>
-              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="mínimo 8 caracteres" />
+              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8+ caracteres, maiuscula, minuscula e numero" />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>

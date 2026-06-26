@@ -2,6 +2,8 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { logger } from "./lib/server/logger.server";
+import { applySecurityHeaders, createHttpsRedirect, shouldRedirectToHttps } from "./lib/server/request-security.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -30,7 +32,9 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     return response;
   }
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  logger.error("server.h3_swallowed_error", {
+    error: consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`),
+  });
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -39,16 +43,25 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    if (shouldRedirectToHttps(request)) {
+      return createHttpsRedirect(request);
+    }
+
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      return applySecurityHeaders(request, normalized);
     } catch (error) {
-      console.error(error);
-      return new Response(renderErrorPage(), {
+      logger.error("server.fetch_unhandled", {
+        error,
+        method: request.method,
+        url: request.url,
+      });
+      return applySecurityHeaders(request, new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      }));
     }
   },
 };

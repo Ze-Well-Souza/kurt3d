@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { authStatus, login, setupAdmin } from "@/lib/api/auth.functions";
+import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: async () => {
@@ -20,7 +21,9 @@ export const Route = createFileRoute("/login")({
 
 const setupSchema = z.object({
   username: z.string().min(1).max(50),
-  password: z.string().min(8).max(200),
+  password: z.string().min(8).max(200).refine((value) => !getPasswordPolicyMessage(value), {
+    message: "A senha deve ter 8+ caracteres, letra maiuscula, minuscula e numero.",
+  }),
   phone: z.string().min(1).max(20),
   nome: z.string().min(1).max(100),
 });
@@ -60,7 +63,7 @@ function LoginPage() {
       }
       const res = await login({ data: parsed.data });
       if (!res.ok) {
-        toast.error("Telefone ou senha inválidos.");
+        toast.error(res.reason === "rate_limited" ? "Muitas tentativas. Aguarde alguns minutos e tente novamente." : "Telefone ou senha inválidos.");
         return;
       }
       toast.success("Bem-vindo.");
@@ -103,7 +106,7 @@ function LoginPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="mínimo 8 caracteres"
+                  placeholder="8+ caracteres, maiuscula, minuscula e numero"
                 />
               </div>
             </>
