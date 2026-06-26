@@ -248,7 +248,9 @@ function Stock() {
 
   const [filSearch, setFilSearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
-  const [stockView, setStockView] = useState<"cards" | "table">("cards");
+  const [stockView, setStockView] = useState<"cards" | "table">(
+    () => (localStorage.getItem("stock-view-preference") as "cards" | "table") ?? "cards"
+  );
   const [detailFilament, setDetailFilament] = useState<Filamento | null>(null);
   const [editForm, setEditForm] = useState<FilamentoForm & { id: string } | null>(null);
 
@@ -737,7 +739,7 @@ function Stock() {
                 size="sm"
                 variant={stockView === "cards" ? "default" : "ghost"}
                 className="h-8 gap-1.5 px-3 text-xs"
-                onClick={() => setStockView("cards")}
+                onClick={() => { setStockView("cards"); localStorage.setItem("stock-view-preference", "cards"); }}
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
                 Cards
@@ -746,7 +748,7 @@ function Stock() {
                 size="sm"
                 variant={stockView === "table" ? "default" : "ghost"}
                 className="h-8 gap-1.5 px-3 text-xs"
-                onClick={() => setStockView("table")}
+                onClick={() => { setStockView("table"); localStorage.setItem("stock-view-preference", "table"); }}
               >
                 <TableIcon className="h-3.5 w-3.5" />
                 Tabela
