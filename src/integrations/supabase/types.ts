@@ -448,6 +448,59 @@ export type Database = {
         }
         Relationships: []
       }
+      order_parts: {
+        Row: {
+          created_at: string
+          grams_per_unit: number
+          id: string
+          link_projeto: string | null
+          nome: string
+          notes: string | null
+          order_id: string
+          position: number
+          quantity: number
+          status: string
+          time_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grams_per_unit: number
+          id: string
+          link_projeto?: string | null
+          nome: string
+          notes?: string | null
+          order_id: string
+          position?: number
+          quantity?: number
+          status?: string
+          time_minutes: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grams_per_unit?: number
+          id?: string
+          link_projeto?: string | null
+          nome?: string
+          notes?: string | null
+          order_id?: string
+          position?: number
+          quantity?: number
+          status?: string
+          time_minutes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_parts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       portfolio_projects: {
         Row: {
           categoria: string

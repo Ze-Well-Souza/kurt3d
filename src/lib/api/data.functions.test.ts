@@ -19,6 +19,11 @@ type ClientRepoMock = {
   save: ReturnType<typeof vi.fn>;
 };
 
+type OrderPartRepoMock = {
+  list: any[];
+  saveForOrder: ReturnType<typeof vi.fn>;
+};
+
 type ExpenseRepoMock = {
   list: any[];
   save: ReturnType<typeof vi.fn>;
@@ -39,6 +44,7 @@ let ordersRepoMock: OrderRepoMock;
 let inventoryRepoMock: InventoryRepoMock;
 let portfolioRepoMock: PortfolioRepoMock;
 let clientsRepoMock: ClientRepoMock;
+let orderPartsRepoMock: OrderPartRepoMock;
 let expensesRepoMock: ExpenseRepoMock;
 let insumosRepoMock: InsumoRepoMock;
 let leadsRepoMock: LeadRepoMock;
@@ -68,6 +74,7 @@ vi.mock("../server/repositories.server", () => ({
   insumosRepo: vi.fn(async () => insumosRepoMock),
   inventoryRepo: vi.fn(async () => inventoryRepoMock),
   leadsRepo: vi.fn(async () => leadsRepoMock),
+  orderPartsRepo: vi.fn(async () => orderPartsRepoMock),
   ordersRepo: vi.fn(async () => ordersRepoMock),
   portfolioRepo: vi.fn(async () => portfolioRepoMock),
   settingsRepo: vi.fn(async () => ({ settings: {}, save: vi.fn() })),
@@ -90,6 +97,10 @@ describe("removeOrder", () => {
     clientsRepoMock = {
       list: [],
       save: vi.fn(async () => undefined),
+    };
+    orderPartsRepoMock = {
+      list: [],
+      saveForOrder: vi.fn(async () => undefined),
     };
   });
 
@@ -171,6 +182,10 @@ describe("client linking", () => {
       list: [],
       save: vi.fn(async () => undefined),
     };
+    orderPartsRepoMock = {
+      list: [],
+      saveForOrder: vi.fn(async () => undefined),
+    };
     expensesRepoMock = {
       list: [],
       save: vi.fn(async () => undefined),
@@ -228,6 +243,70 @@ describe("client linking", () => {
         timeMinutes: 30,
       },
     })).rejects.toThrow("client_not_found");
+  });
+
+  it("agrega tempo e material ao criar pedido multi-partes e persiste as partes", async () => {
+    const { addOrder } = await import("./data.functions");
+
+    await addOrder({
+      data: {
+        client: "Cliente Multi",
+        projectName: "Batman 28cm",
+        quantity: 1,
+        timeMinutes: 10,
+        multiPart: true,
+        parts: [
+          {
+            nome: "Cabeca",
+            quantity: 1,
+            timeMinutes: 120,
+            gramsPerUnit: 80,
+          },
+          {
+            nome: "Base",
+            quantity: 2,
+            timeMinutes: 45,
+            gramsPerUnit: 20,
+            notes: "Imprimir com brim",
+          },
+        ],
+      },
+    });
+
+    expect(ordersRepoMock.save).toHaveBeenCalledTimes(1);
+    const savedOrders = ordersRepoMock.save.mock.calls[0][0];
+    expect(savedOrders[0]).toMatchObject({
+      client: "Cliente Multi",
+      projectName: "Batman 28cm",
+      quantity: 1,
+      multiPart: true,
+      timeMinutes: 210,
+      gramsPerUnit: 120,
+    });
+
+    expect(orderPartsRepoMock.saveForOrder).toHaveBeenCalledTimes(1);
+    const [savedOrderId, savedParts] = orderPartsRepoMock.saveForOrder.mock.calls[0];
+    expect(savedOrderId).toBe(savedOrders[0].id);
+    expect(savedParts).toHaveLength(2);
+    expect(savedParts[0]).toMatchObject({
+      orderId: savedOrders[0].id,
+      nome: "Cabeca",
+      quantity: 1,
+      timeMinutes: 120,
+      gramsPerUnit: 80,
+      status: "todo",
+      position: 0,
+    });
+    expect(savedParts[1]).toMatchObject({
+      orderId: savedOrders[0].id,
+      nome: "Base",
+      quantity: 2,
+      timeMinutes: 45,
+      gramsPerUnit: 20,
+      status: "todo",
+      position: 1,
+      notes: "Imprimir com brim",
+    });
   });
 
   it("reconcilia pedidos antigos sem clientId no snapshot quando o nome e unico", async () => {
@@ -407,6 +486,10 @@ describe("insumos e leads", () => {
     clientsRepoMock = {
       list: [],
       save: vi.fn(async () => undefined),
+    };
+    orderPartsRepoMock = {
+      list: [],
+      saveForOrder: vi.fn(async () => undefined),
     };
     expensesRepoMock = {
       list: [],

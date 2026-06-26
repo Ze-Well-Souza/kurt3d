@@ -2,6 +2,23 @@ export type Status = "todo" | "printing" | "done" | "vendido" | "presente" | "fa
 
 export type OrderDestino = "Kurtido e Vendido" | "Dado de Presente" | "Falha de Impressão";
 
+export type OrderPartStatus = "todo" | "printing" | "done" | "falha";
+
+export type OrderPart = {
+  id: string;
+  orderId: string;
+  nome: string;
+  position: number;
+  quantity: number;
+  timeMinutes: number;
+  gramsPerUnit: number;
+  status: OrderPartStatus;
+  linkProjeto?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Order = {
   id: string;
   client: string;
@@ -26,6 +43,7 @@ export type Order = {
   formaPagamento?: string | null;
   dataPagamento?: string | null;
   clientId?: string | null;
+  parts?: OrderPart[];
 };
 
 export type Venda = {

@@ -12,6 +12,7 @@ import type {
   InventoryTxn,
   Lead,
   Order,
+  OrderPart,
   PortfolioProject,
   SiteContent,
   Venda,
@@ -178,6 +179,40 @@ export function toOrderRow(row: Order) {
     forma_pagamento: row.formaPagamento ?? null,
     data_pagamento: row.dataPagamento ?? null,
     client_id: row.clientId ?? null,
+  };
+}
+
+export function fromOrderPartRow(row: any): OrderPart {
+  return {
+    id: row.id,
+    orderId: row.order_id,
+    nome: row.nome,
+    position: row.position ?? 0,
+    quantity: row.quantity ?? 1,
+    timeMinutes: row.time_minutes,
+    gramsPerUnit: row.grams_per_unit,
+    status: row.status ?? "todo",
+    linkProjeto: row.link_projeto ?? null,
+    notes: row.notes ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function toOrderPartRow(row: OrderPart) {
+  return {
+    id: row.id,
+    order_id: row.orderId,
+    nome: row.nome,
+    position: row.position,
+    quantity: row.quantity,
+    time_minutes: row.timeMinutes,
+    grams_per_unit: row.gramsPerUnit,
+    status: row.status,
+    link_projeto: row.linkProjeto ?? null,
+    notes: row.notes ?? null,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
   };
 }
 

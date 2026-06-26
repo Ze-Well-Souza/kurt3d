@@ -6,6 +6,7 @@ export { filamentosHistoryRepo } from "./repositories/filamentos-history.repo";
 export { filamentoPaymentsRepo } from "./repositories/filamento-payments.repo";
 export { filamentoInstallmentsRepo } from "./repositories/filamento-installments.repo";
 export { ordersRepo } from "./repositories/orders.repo";
+export { orderPartsRepo } from "./repositories/order-parts.repo";
 export { portfolioRepo } from "./repositories/portfolio.repo";
 export { insumosRepo } from "./repositories/insumos.repo";
 export { vendasRepo } from "./repositories/vendas.repo";

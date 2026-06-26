@@ -65,6 +65,21 @@ create table if not exists public.orders (
   client_id text null
 );
 
+create table if not exists public.order_parts (
+  id text primary key,
+  order_id text not null references public.orders(id) on delete cascade,
+  nome text not null,
+  position integer not null default 0,
+  quantity integer not null default 1,
+  time_minutes double precision not null,
+  grams_per_unit double precision not null,
+  status text not null default 'todo',
+  link_projeto text null,
+  notes text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.portfolio_projects (
   id text primary key,
   nome text not null,
@@ -159,6 +174,8 @@ insert into public.app_settings (id) values ('main') on conflict (id) do nothing
 
 create index if not exists idx_orders_status on public.orders(status);
 create index if not exists idx_orders_created_at on public.orders(created_at desc);
+create index if not exists idx_order_parts_order on public.order_parts(order_id, position);
+create index if not exists idx_order_parts_status on public.order_parts(status);
 create index if not exists idx_inventory_txns_film_order on public.inventory_txns(filament_id, order_id);
 create index if not exists idx_vendas_data on public.vendas(data desc);
 create index if not exists idx_expenses_data on public.expenses(data desc);

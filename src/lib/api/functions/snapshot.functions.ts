@@ -10,6 +10,7 @@ import {
   insumosRepo,
   inventoryRepo,
   leadsRepo,
+  orderPartsRepo,
   ordersRepo,
   portfolioRepo,
   settingsRepo,
@@ -38,6 +39,7 @@ export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(asyn
 export const listSnapshot = createServerFn({ method: "GET" }).handler(async () => {
   const [
     orders,
+    orderParts,
     filamentos,
     filamentosHistory,
     portfolio,
@@ -52,6 +54,7 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     installments,
   ] = await Promise.all([
     ordersRepo(),
+    orderPartsRepo(),
     filamentosRepo(),
     filamentosHistoryRepo(),
     portfolioRepo(),
@@ -74,10 +77,19 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     label: buildFilamentoLabel(filamento),
   }));
 
-  const ordersView = hydrateOrderClientLinks(orders.list, clients.list);
+  const partsByOrderId = orderParts.list.reduce<Record<string, typeof orderParts.list>>((acc, part) => {
+    (acc[part.orderId] ??= []).push(part);
+    return acc;
+  }, {});
+
+  const ordersView = hydrateOrderClientLinks(orders.list, clients.list).map((order) => ({
+    ...order,
+    parts: partsByOrderId[order.id] ?? [],
+  }));
 
   return {
     orders: ordersView,
+    orderParts: orderParts.list,
     filamentos: filamentosView,
     filamentosHistory: filamentosHistory.list,
     portfolio: portfolio.list,

@@ -7,7 +7,7 @@ import {
 } from "@dnd-kit/core";
 import {
   Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays,
-  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search, Info, Wand2, Upload, Download,
+  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search, Info, Wand2, Download,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
@@ -32,13 +32,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   addOrder, finalizarDestino, updateOrderStatus, removeOrder,
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
-  updateOrder, updatePortfolioProject, uploadOrderAsset, resolveOrderAssetUrl,
+  updateOrder, updatePortfolioProject, uploadOrderAsset, resolveOrderAssetUrl, updateOrderPartStatus,
 } from "@/lib/api/data.functions";
-import type { Order, Status, Filamento, AppSettings, PortfolioProject, Client } from "@/lib/domain/types";
+import type { Order, OrderPart, OrderPartStatus, Status, Filamento, AppSettings, PortfolioProject } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
 import { getOrderAssetFileName, isOrderAssetReference } from "@/lib/domain/order-asset";
+import { computeOrderTotalsFromParts, summarizeOrderParts } from "@/lib/domain/order-parts";
 import { getOrderTrackingSummary } from "@/lib/domain/order-tracking";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
@@ -151,6 +152,24 @@ function calc(p: {
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const NO_CLIENT_SELECTED = "__none__";
 const MAX_ORDER_ASSET_SIZE = 25 * 1024 * 1024;
+const ORDER_ASSET_ACCEPT = ".stl,.3mf,model/stl,application/sla,application/vnd.ms-package.3dmanufacturing-3dmodel+xml";
+const ORDER_PART_STATUS_LABEL: Record<OrderPartStatus, string> = {
+  todo: "A fazer",
+  printing: "Imprimindo",
+  done: "Concluida",
+  falha: "Falha",
+};
+
+type NewOrderPartForm = {
+  id: string;
+  nome: string;
+  quantity: string;
+  timeMinutes: string;
+  gramsPerUnit: string;
+  linkProjeto: string;
+  notes: string;
+  file: File | null;
+};
 
 function formatTime(min: number) {
   const h = Math.floor(min / 60); const m = min % 60;
@@ -175,6 +194,31 @@ function fileToBase64(file: File) {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+function validateOrderAssetFile(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (!extension || !["stl", "3mf"].includes(extension)) {
+    return "Envie apenas arquivos STL ou 3MF.";
+  }
+  if (file.size > MAX_ORDER_ASSET_SIZE) {
+    return "O arquivo excede o limite de 25 MB.";
+  }
+  return null;
+}
+
+function buildEmptyOrderPart(): NewOrderPartForm {
+  const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `part-${Date.now()}-${Math.random()}`;
+  return {
+    id,
+    nome: "",
+    quantity: "1",
+    timeMinutes: "",
+    gramsPerUnit: "",
+    linkProjeto: "",
+    notes: "",
+    file: null,
+  };
 }
 
 /* ═══════════════════════ MAIN COMPONENT ═══════════════════════ */
@@ -206,6 +250,11 @@ function CalcPedidos() {
   const mutateResolveOrderAssetUrl = useMutation({
     mutationFn: (reference: string) => resolveOrderAssetUrl({ data: { reference } }),
   });
+  const mutateUpdateOrderPartStatus = useMutation({
+    mutationFn: (input: { orderId: string; partId: string; status: OrderPartStatus }) => updateOrderPartStatus({ data: input }),
+    onError: handleUpdateError,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+  });
 
   /* ── calculator state ── */
   const numeric = useMemo(() => ({
@@ -231,16 +280,19 @@ function CalcPedidos() {
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [newOrder, setNewOrder] = useState({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
   const [newOrderAsset, setNewOrderAsset] = useState<File | null>(null);
+  const [newOrderParts, setNewOrderParts] = useState<NewOrderPartForm[]>([buildEmptyOrderPart()]);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; orderId: string; reason: string }>({ open: false, orderId: "", reason: "" });
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editProject, setEditProject] = useState<PortfolioProject | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
+  const [updatingPartId, setUpdatingPartId] = useState<string | null>(null);
 
   function resetNewOrderForm() {
     setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
     setNewOrderAsset(null);
+    setNewOrderParts([buildEmptyOrderPart()]);
   }
 
   async function openProjectReference(reference?: string | null) {
@@ -276,6 +328,29 @@ function CalcPedidos() {
   }, [projects, projectSearch]);
   const activeOrder = activeId ? orders.find((o) => o.id === activeId) ?? null : null;
   const terminalOrders = [...(grouped.vendido ?? []), ...(grouped.presente ?? []), ...(grouped.falha ?? [])];
+  const newOrderPartsTotals = useMemo(() => computeOrderTotalsFromParts(
+    newOrderParts.map((part) => ({
+      quantity: Math.max(0, Number(part.quantity) || 0),
+      timeMinutes: Math.max(0, Number(part.timeMinutes) || 0),
+      gramsPerUnit: Math.max(0, Number(part.gramsPerUnit) || 0),
+    })),
+  ), [newOrderParts]);
+  const newOrderPartSummary = useMemo(() => summarizeOrderParts(newOrderParts.map(() => ({ status: "todo" as const }))), [newOrderParts]);
+
+  function updateNewOrderPartField(partId: string, field: keyof NewOrderPartForm, value: string | File | null) {
+    setNewOrderParts((current) => current.map((part) => (part.id === partId ? { ...part, [field]: value } : part)));
+  }
+
+  function addNewOrderPart() {
+    setNewOrderParts((current) => [...current, buildEmptyOrderPart()]);
+  }
+
+  function removeNewOrderPart(partId: string) {
+    setNewOrderParts((current) => {
+      if (current.length <= 1) return current;
+      return current.filter((part) => part.id !== partId);
+    });
+  }
 
   /* ── handlers ── */
   function submitProject(e: React.FormEvent) {
@@ -290,6 +365,66 @@ function CalcPedidos() {
     e.preventDefault();
     const selectedClient = clients.find((client) => client.id === newOrder.clientId);
     try {
+      let partsPayload: Array<{
+        nome: string;
+        quantity: number;
+        timeMinutes: number;
+        gramsPerUnit: number;
+        linkProjeto?: string;
+        notes?: string;
+      }> | undefined;
+
+      if (newOrder.multiPart) {
+        if (newOrderParts.length === 0) {
+          toast.error("Adicione pelo menos uma parte ao pedido multi-partes.");
+          return;
+        }
+
+        partsPayload = [];
+        for (const [index, part] of newOrderParts.entries()) {
+          const nome = part.nome.trim();
+          const quantity = Number(part.quantity);
+          const timeMinutes = Number(part.timeMinutes);
+          const gramsPerUnit = Number(part.gramsPerUnit);
+          if (!nome) {
+            toast.error(`Informe o nome da parte ${index + 1}.`);
+            return;
+          }
+          if (!Number.isInteger(quantity) || quantity < 1) {
+            toast.error(`Informe uma quantidade valida para a parte ${index + 1}.`);
+            return;
+          }
+          if (!Number.isFinite(timeMinutes) || timeMinutes <= 0) {
+            toast.error(`Informe o tempo de impressao da parte ${index + 1}.`);
+            return;
+          }
+          if (!Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) {
+            toast.error(`Informe o peso em gramas da parte ${index + 1}.`);
+            return;
+          }
+
+          let partLink = part.linkProjeto.trim() || undefined;
+          if (part.file) {
+            const dataBase64 = await fileToBase64(part.file);
+            const uploaded = await mutateUploadOrderAsset.mutateAsync({
+              fileName: part.file.name,
+              contentType: part.file.type || "application/octet-stream",
+              dataBase64,
+            });
+            partLink = uploaded.reference;
+          }
+
+          partsPayload.push({
+            nome,
+            quantity,
+            timeMinutes,
+            gramsPerUnit,
+            linkProjeto: partLink,
+            notes: part.notes.trim() || undefined,
+          });
+        }
+      }
+
       let linkProjeto = newOrder.linkProjeto || undefined;
       if (newOrderAsset) {
         const dataBase64 = await fileToBase64(newOrderAsset);
@@ -304,11 +439,14 @@ function CalcPedidos() {
       await mutateAddOrder.mutateAsync({
         client: (selectedClient?.nome ?? newOrder.client.trim()) || "Cliente", clientId: selectedClient?.id,
         projectName: newOrder.projectName.trim() || "Pedido",
-        quantity: Number(newOrder.quantity) || 1, timeMinutes: Number(newOrder.timeMinutes) || 60,
-        filamentoId: newOrder.filamentoId || undefined, gramsPerUnit: newOrder.gramsPerUnit ? Number(newOrder.gramsPerUnit) : undefined,
+        quantity: Number(newOrder.quantity) || 1,
+        timeMinutes: partsPayload?.length ? newOrderPartsTotals.timeMinutes : (Number(newOrder.timeMinutes) || 60),
+        filamentoId: newOrder.filamentoId || undefined,
+        gramsPerUnit: partsPayload?.length ? newOrderPartsTotals.gramsPerUnit : (newOrder.gramsPerUnit ? Number(newOrder.gramsPerUnit) : undefined),
         linkProjeto, multiPart: newOrder.multiPart,
         precoVenda: newOrder.precoVenda ? Number(newOrder.precoVenda) : undefined,
         formaPagamento: newOrder.formaPagamento || undefined, dataPagamento: newOrder.dataPagamento || undefined,
+        parts: partsPayload,
       });
       setShowNewOrder(false);
       resetNewOrderForm();
@@ -430,7 +568,16 @@ function CalcPedidos() {
             <div className="grid gap-2"><Label>Projeto</Label><Input value={newOrder.projectName} onChange={(e) => setNewOrder((s) => ({ ...s, projectName: e.target.value }))} /></div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2"><Label>Quantidade</Label><Input type="number" min={1} value={newOrder.quantity} onChange={(e) => setNewOrder((s) => ({ ...s, quantity: e.target.value }))} /></div>
-              <div className="grid gap-2"><Label>Tempo (min)</Label><Input type="number" min={1} value={newOrder.timeMinutes} onChange={(e) => setNewOrder((s) => ({ ...s, timeMinutes: e.target.value }))} /></div>
+              <div className="grid gap-2">
+                <Label>{newOrder.multiPart ? "Tempo total (calculado)" : "Tempo (min)"}</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={newOrder.multiPart ? (newOrderPartsTotals.timeMinutes > 0 ? String(newOrderPartsTotals.timeMinutes) : "") : newOrder.timeMinutes}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, timeMinutes: e.target.value }))}
+                  disabled={newOrder.multiPart}
+                />
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2"><Label>Filamento</Label>
@@ -439,7 +586,16 @@ function CalcPedidos() {
                   <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>))}</SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2"><Label>Gramas / unidade</Label><Input type="number" min={0} value={newOrder.gramsPerUnit} onChange={(e) => setNewOrder((s) => ({ ...s, gramsPerUnit: e.target.value }))} /></div>
+              <div className="grid gap-2">
+                <Label>{newOrder.multiPart ? "Gramas totais (calculado)" : "Gramas / unidade"}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={newOrder.multiPart ? (newOrderPartsTotals.gramsPerUnit > 0 ? String(newOrderPartsTotals.gramsPerUnit) : "") : newOrder.gramsPerUnit}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, gramsPerUnit: e.target.value }))}
+                  disabled={newOrder.multiPart}
+                />
+              </div>
             </div>
             <div className="grid gap-2">
               <Label>Link externo (opcional)</Label>
@@ -487,8 +643,114 @@ function CalcPedidos() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2"><Label>Preço de Venda (R$)</Label><Input type="number" min={0} step={0.01} value={newOrder.precoVenda} onChange={(e) => setNewOrder((s) => ({ ...s, precoVenda: e.target.value }))} placeholder="0,00" /></div>
-              <div className="flex items-end"><Button type="button" variant={newOrder.multiPart ? "default" : "outline"} className="flex-1 gap-2" onClick={() => setNewOrder((s) => ({ ...s, multiPart: !s.multiPart }))}><Layers className="h-4 w-4" />{newOrder.multiPart ? "Multi-partes" : "Peça única"}</Button></div>
+              <div className="flex items-end"><Button type="button" variant={newOrder.multiPart ? "default" : "outline"} className="flex-1 gap-2" onClick={() => {
+                setNewOrder((s) => ({ ...s, multiPart: !s.multiPart }));
+                setNewOrderParts((current) => (current.length > 0 ? current : [buildEmptyOrderPart()]));
+              }}><Layers className="h-4 w-4" />{newOrder.multiPart ? "Multi-partes" : "Peça única"}</Button></div>
             </div>
+            {newOrder.multiPart && (
+              <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Partes do pedido</p>
+                    <p className="text-xs text-muted-foreground">
+                      Cadastre cada parte com seu tempo, peso e arquivo opcional. Os totais do pedido sao somados automaticamente.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="gap-2" onClick={addNewOrderPart}>
+                    <Plus className="h-4 w-4" />
+                    Adicionar parte
+                  </Button>
+                </div>
+                <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                  <div className="rounded-lg border border-border bg-background px-3 py-2">
+                    <span className="font-medium text-foreground">{newOrderPartSummary.total}</span> partes
+                  </div>
+                  <div className="rounded-lg border border-border bg-background px-3 py-2">
+                    <span className="font-medium text-foreground">{formatTime(Math.round(newOrderPartsTotals.timeMinutes))}</span> tempo total
+                  </div>
+                  <div className="rounded-lg border border-border bg-background px-3 py-2">
+                    <span className="font-medium text-foreground">{newOrderPartsTotals.gramsPerUnit.toFixed(2)}g</span> consumo total
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {newOrderParts.map((part, index) => (
+                    <div key={part.id} className="space-y-3 rounded-xl border border-border bg-background p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">Parte {index + 1}</p>
+                          <p className="text-xs text-muted-foreground">Cada linha representa uma subpeca do pedido final.</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeNewOrderPart(part.id)}
+                          disabled={newOrderParts.length <= 1}
+                          aria-label={`Remover parte ${index + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-2 sm:col-span-2">
+                          <Label>Nome da parte</Label>
+                          <Input value={part.nome} onChange={(e) => updateNewOrderPartField(part.id, "nome", e.target.value)} placeholder="Ex.: Cabeca, Base, Braço esquerdo" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Quantidade desta parte</Label>
+                          <Input type="number" min={1} value={part.quantity} onChange={(e) => updateNewOrderPartField(part.id, "quantity", e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Tempo por unidade (min)</Label>
+                          <Input type="number" min={0.1} step={0.1} value={part.timeMinutes} onChange={(e) => updateNewOrderPartField(part.id, "timeMinutes", e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Gramas por unidade</Label>
+                          <Input type="number" min={0.01} step={0.01} value={part.gramsPerUnit} onChange={(e) => updateNewOrderPartField(part.id, "gramsPerUnit", e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Link externo da parte</Label>
+                          <Input type="url" value={part.linkProjeto} onChange={(e) => updateNewOrderPartField(part.id, "linkProjeto", e.target.value)} placeholder="https://..." />
+                        </div>
+                        <div className="grid gap-2 sm:col-span-2">
+                          <Label>Arquivo STL ou 3MF da parte (opcional)</Label>
+                          <Input
+                            type="file"
+                            accept={ORDER_ASSET_ACCEPT}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] ?? null;
+                              if (!file) {
+                                updateNewOrderPartField(part.id, "file", null);
+                                return;
+                              }
+                              const validationMessage = validateOrderAssetFile(file);
+                              if (validationMessage) {
+                                toast.error(validationMessage);
+                                e.currentTarget.value = "";
+                                return;
+                              }
+                              updateNewOrderPartField(part.id, "file", file);
+                            }}
+                          />
+                          {part.file && (
+                            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                              <span className="truncate font-medium">{part.file.name}</span>
+                              <span className="shrink-0 text-muted-foreground">{formatFileSize(part.file.size)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="grid gap-2 sm:col-span-2">
+                          <Label>Observacoes</Label>
+                          <Textarea rows={2} value={part.notes} onChange={(e) => updateNewOrderPartField(part.id, "notes", e.target.value)} placeholder="Observacoes de encaixe, orientacao, cor, suporte..." />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2"><Label>Forma de Pagamento</Label>
                 <Select value={newOrder.formaPagamento} onValueChange={(v) => setNewOrder((s) => ({ ...s, formaPagamento: v }))}>
@@ -518,6 +780,10 @@ function CalcPedidos() {
             const statusLabel = STATUS_BADGE[detailOrder.status]?.label ?? ({ todo: "A Fazer", printing: "Imprimindo", done: "Concluído" } as any)[detailOrder.status] ?? detailOrder.status;
             const tracking = getOrderTrackingSummary(detailOrder);
             const trackingPath = `/acompanhar`;
+            const parts = detailOrder.parts ?? [];
+            const partsSummary = summarizeOrderParts(parts);
+            const partsTotals = parts.length > 0 ? computeOrderTotalsFromParts(parts) : null;
+            const partStatusLocked = ["vendido", "presente", "falha"].includes(detailOrder.status);
             return (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -529,6 +795,7 @@ function CalcPedidos() {
                   <DetailItem label="Gramas / un." value={detailOrder.gramsPerUnit ? `${detailOrder.gramsPerUnit}g` : "—"} />
                   <DetailItem label="Status" value={statusLabel} />
                   <DetailItem label="Multi-partes" value={detailOrder.multiPart ? "Sim" : "Não"} />
+                  {parts.length > 0 && <DetailItem label="Partes" value={`${partsSummary.total} cadastradas`} />}
                   <DetailItem label="Preço de Venda" value={detailOrder.precoVenda ? brl(detailOrder.precoVenda) : "—"} />
                   <DetailItem label="Custo Total" value={brl(cost.total)} />
                   {detailOrder.precoVenda && <DetailItem label="Lucro" value={brl((detailOrder.precoVenda * detailOrder.quantity) - cost.total)} accent={(detailOrder.precoVenda * detailOrder.quantity) - cost.total >= 0} />}
@@ -540,6 +807,90 @@ function CalcPedidos() {
                   <DetailItem label="Previsao operacional" value={tracking.estimatedDeliveryAt ? new Date(tracking.estimatedDeliveryAt).toLocaleDateString("pt-BR") : "—"} />
                   <DetailItem label="Criado em" value={new Date(detailOrder.createdAt).toLocaleDateString("pt-BR")} />
                 </div>
+                {parts.length > 0 && (
+                  <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">Partes do pedido</p>
+                        <p className="text-xs text-muted-foreground">
+                          {partsSummary.done} concluidas, {partsSummary.printing} imprimindo, {partsSummary.todo} a fazer, {partsSummary.failed} com falha.
+                        </p>
+                      </div>
+                      {partsTotals && (
+                        <div className="text-xs text-muted-foreground">
+                          Total: <span className="font-medium text-foreground">{formatTime(Math.round(partsTotals.timeMinutes))}</span>
+                          {" · "}
+                          <span className="font-medium text-foreground">{partsTotals.gramsPerUnit.toFixed(2)}g</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-3">
+                      {parts.map((part) => (
+                        <div key={part.id} className="rounded-xl border border-border bg-background p-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium">{part.nome}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {part.quantity}x · {formatTime(Math.round(part.timeMinutes))}/un. · {part.gramsPerUnit.toFixed(2)}g/un.
+                              </p>
+                            </div>
+                            <Select
+                              value={part.status}
+                              disabled={partStatusLocked || updatingPartId === part.id}
+                              onValueChange={(value) => {
+                                const nextStatus = value as OrderPartStatus;
+                                setUpdatingPartId(part.id);
+                                void mutateUpdateOrderPartStatus.mutateAsync({
+                                  orderId: detailOrder.id,
+                                  partId: part.id,
+                                  status: nextStatus,
+                                }).then(() => {
+                                  setDetailOrder((current) => current && current.id === detailOrder.id
+                                    ? {
+                                      ...current,
+                                      updatedAt: new Date().toISOString(),
+                                      parts: (current.parts ?? []).map((currentPart) => (
+                                        currentPart.id === part.id
+                                          ? { ...currentPart, status: nextStatus, updatedAt: new Date().toISOString() }
+                                          : currentPart
+                                      )),
+                                    }
+                                    : current);
+                                  toast.success("Status da parte atualizado.");
+                                }).catch(() => {
+                                  // handled by mutation onError
+                                }).finally(() => {
+                                  setUpdatingPartId(null);
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-[170px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(ORDER_PART_STATUS_LABEL).map(([value, label]) => (
+                                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {part.notes && <p className="mt-2 text-xs text-muted-foreground">{part.notes}</p>}
+                          {part.linkProjeto && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="mt-2 h-auto px-0 text-xs text-blue-500 hover:text-blue-600"
+                              onClick={() => void openProjectReference(part.linkProjeto)}
+                            >
+                              {isOrderAssetReference(part.linkProjeto) ? <Download className="mr-1 h-3 w-3" /> : <ExternalLink className="mr-1 h-3 w-3" />}
+                              {isOrderAssetReference(part.linkProjeto) ? `Abrir ${getOrderAssetFileName(part.linkProjeto) ?? "arquivo da parte"}` : "Ver referencia da parte"}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -613,7 +964,7 @@ function CalcPedidos() {
                 gramsPerUnit: Number(fd.get("gramsPerUnit")) || null,
                 precoVenda: Number(fd.get("precoVenda")) || null,
                 linkProjeto: ((fd.get("linkProjeto") as string)?.trim()) || (isOrderAssetReference(editOrder.linkProjeto) ? editOrder.linkProjeto : null),
-                multiPart: fd.get("multiPart") === "on",
+                multiPart: editOrder.parts?.length ? true : (editOrder.multiPart ?? false),
                 formaPagamento: (fd.get("formaPagamento") as string) || null,
                 dataPagamento: (fd.get("dataPagamento") as string) || null,
                 clientId: selectedClient?.id ?? null,
@@ -640,7 +991,7 @@ function CalcPedidos() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2"><Label>Quantidade</Label><Input name="quantity" type="number" min={1} defaultValue={editOrder.quantity} /></div>
-                <div className="grid gap-2"><Label>Tempo (min)</Label><Input name="timeMinutes" type="number" min={1} defaultValue={editOrder.timeMinutes} /></div>
+                <div className="grid gap-2"><Label>{editOrder.parts?.length ? "Tempo total (calculado)" : "Tempo (min)"}</Label><Input name="timeMinutes" type="number" min={1} defaultValue={editOrder.timeMinutes} disabled={Boolean(editOrder.parts?.length)} /></div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2"><Label>Filamento</Label>
@@ -649,8 +1000,13 @@ function CalcPedidos() {
                     <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2"><Label>Gramas / unidade</Label><Input name="gramsPerUnit" type="number" min={0} defaultValue={editOrder.gramsPerUnit ?? ""} /></div>
+                <div className="grid gap-2"><Label>{editOrder.parts?.length ? "Gramas totais (calculado)" : "Gramas / unidade"}</Label><Input name="gramsPerUnit" type="number" min={0} defaultValue={editOrder.gramsPerUnit ?? ""} disabled={Boolean(editOrder.parts?.length)} /></div>
               </div>
+              {editOrder.parts?.length ? (
+                <p className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  Este pedido usa multi-partes. Tempo e consumo total sao recalculados automaticamente a partir das partes no detalhe do pedido.
+                </p>
+              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2"><Label>Preço de Venda (R$)</Label><Input name="precoVenda" type="number" min={0} step={0.01} defaultValue={editOrder.precoVenda ?? ""} /></div>
                 <div className="grid gap-2">
@@ -1013,6 +1369,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
   const custoTotal = costResult.total;
   const lucro = order.precoVenda ? (order.precoVenda * order.quantity) - custoTotal : null;
   const paymentBadge = getPaymentBadge(order);
+  const partSummary = order.parts?.length ? summarizeOrderParts(order.parts) : null;
 
   return (
     <>
@@ -1033,6 +1390,15 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
           <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{formatTime(order.timeMinutes)}</span></span>
           {order.multiPart && (<span className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700"><Layers className="h-3 w-3" />Multi</span>)}
         </div>
+        {partSummary && (
+          <div className="mt-2 flex flex-wrap gap-1 text-[10px]">
+            <Badge variant="secondary">Partes: {partSummary.total}</Badge>
+            {partSummary.todo > 0 && <Badge variant="outline">A fazer: {partSummary.todo}</Badge>}
+            {partSummary.printing > 0 && <Badge variant="outline">Imprimindo: {partSummary.printing}</Badge>}
+            {partSummary.done > 0 && <Badge variant="outline">Concluidas: {partSummary.done}</Badge>}
+            {partSummary.failed > 0 && <Badge variant="outline">Falha: {partSummary.failed}</Badge>}
+          </div>
+        )}
         {order.linkProjeto && (
           <button
             type="button"
@@ -1118,11 +1484,11 @@ function KanbanColumn({ id, title, hint, orders, onFinalizar, filamentos, onDele
   );
 }
 
-function DetailItem({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function DetailItem({ label, value, accent, mono }: { label: string; value: string; accent?: boolean; mono?: boolean }) {
   return (
     <div className="space-y-0.5">
       <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</dt>
-      <dd className={cn("text-sm font-medium", accent === true && "filament-text", accent === false && "text-destructive")}>{value}</dd>
+      <dd className={cn("text-sm font-medium", mono && "font-mono", accent === true && "filament-text", accent === false && "text-destructive")}>{value}</dd>
     </div>
   );
 }

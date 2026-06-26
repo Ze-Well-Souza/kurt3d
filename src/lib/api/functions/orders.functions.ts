@@ -3,9 +3,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../../domain/cost";
 import { isValidOrderProjectReference } from "../../domain/order-asset";
+import { computeOrderTotalsFromParts, normalizeOrderParts } from "../../domain/order-parts";
 import { clampGrams } from "../../domain/inventory";
 import { getOrderTrackingSummary, matchesOrderTrackingCode } from "../../domain/order-tracking";
-import type { Expense, Order, OrderDestino, Status, Venda } from "../../domain/types";
+import type { Expense, Order, OrderDestino, OrderPart, Status, Venda } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { createOrderAssetSignedUrl, uploadOrderAssetToStorage } from "../../server/order-assets.server";
 import { notifyOrderStatusChange } from "../../server/order-notifications.server";
@@ -14,6 +15,7 @@ import {
   expensesRepo,
   filamentosRepo,
   inventoryRepo,
+  orderPartsRepo,
   ordersRepo,
   portfolioRepo,
   vendasRepo,
@@ -25,6 +27,17 @@ import {
   computeOrderReservedGrams,
   resolveClientId,
 } from "./shared";
+
+const orderPartInputSchema = z.object({
+  nome: z.string().trim().min(1).max(140),
+  quantity: z.number().int().min(1).max(999),
+  timeMinutes: z.number().min(0.1).max(100000),
+  gramsPerUnit: z.number().min(0.01).max(50000),
+  linkProjeto: z.string().trim().max(500).optional().refine(isValidOrderProjectReference, {
+    message: "Referencia da parte invalida.",
+  }),
+  notes: z.string().trim().max(500).optional(),
+});
 
 export const addOrder = createServerFn({ method: "POST" })
   .validator(
@@ -43,31 +56,54 @@ export const addOrder = createServerFn({ method: "POST" })
       formaPagamento: z.string().trim().max(100).optional(),
       dataPagamento: z.string().max(30).optional(),
       clientId: z.string().min(1).optional(),
+      parts: z.array(orderPartInputSchema).max(50).optional(),
     }),
   )
   .handler(async ({ data }) => {
-    const [repo, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
+    const [repo, clientsData, partsRepo] = await Promise.all([ordersRepo(), clientsRepo(), orderPartsRepo()]);
     assertExplicitClientIdExists(clientsData.list, data.clientId);
     const now = nowIso();
+    const orderId = randomUUID();
+    const normalizedParts: OrderPart[] = normalizeOrderParts(
+      (data.parts ?? []).map((part, index) => ({
+        id: randomUUID(),
+        orderId,
+        nome: part.nome,
+        position: index,
+        quantity: part.quantity,
+        timeMinutes: part.timeMinutes,
+        gramsPerUnit: part.gramsPerUnit,
+        status: "todo",
+        linkProjeto: part.linkProjeto ?? null,
+        notes: part.notes ?? null,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
+    const aggregated = normalizedParts.length > 0 ? computeOrderTotalsFromParts(normalizedParts) : null;
     const order: Order = {
-      id: randomUUID(),
+      id: orderId,
       status: "todo",
       createdAt: now,
       updatedAt: now,
       client: data.client,
       projectName: data.projectName,
       quantity: data.quantity,
-      timeMinutes: data.timeMinutes,
+      timeMinutes: aggregated?.timeMinutes ?? data.timeMinutes,
       filamentoId: data.filamentoId,
-      gramsPerUnit: data.gramsPerUnit,
+      gramsPerUnit: aggregated?.gramsPerUnit ?? data.gramsPerUnit,
       linkProjeto: data.linkProjeto ?? null,
-      multiPart: data.multiPart ?? false,
+      multiPart: normalizedParts.length > 0 ? true : (data.multiPart ?? false),
       precoVenda: data.precoVenda ?? null,
       formaPagamento: data.formaPagamento ?? null,
       dataPagamento: data.dataPagamento ?? null,
       clientId: resolveClientId(clientsData.list, data.client, data.clientId),
+      parts: normalizedParts,
     };
     await repo.save([order, ...repo.list]);
+    if (normalizedParts.length > 0) {
+      await partsRepo.saveForOrder(orderId, normalizedParts);
+    }
     return { ok: true };
   });
 
@@ -338,7 +374,7 @@ export const updateOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const [orders, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
+    const [orders, clientsData, partsRepo] = await Promise.all([ordersRepo(), clientsRepo(), orderPartsRepo()]);
     const order = orders.list.find((item) => item.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };
     if (order.status === "vendido" || order.status === "presente" || order.status === "falha") {
@@ -346,22 +382,50 @@ export const updateOrder = createServerFn({ method: "POST" })
     }
     assertExplicitClientIdExists(clientsData.list, data.clientId);
 
+    const existingParts = partsRepo.list.filter((part) => part.orderId === order.id);
+    const aggregated = existingParts.length > 0 ? computeOrderTotalsFromParts(existingParts) : null;
+
     const updated: Order = {
       ...order,
       client: data.client,
       projectName: data.projectName,
       quantity: data.quantity,
-      timeMinutes: data.timeMinutes,
+      timeMinutes: aggregated?.timeMinutes ?? data.timeMinutes,
       filamentoId: data.filamentoId ?? undefined,
-      gramsPerUnit: data.gramsPerUnit ?? undefined,
+      gramsPerUnit: aggregated?.gramsPerUnit ?? (data.gramsPerUnit ?? undefined),
       precoVenda: data.precoVenda ?? null,
       linkProjeto: data.linkProjeto ?? null,
-      multiPart: data.multiPart ?? order.multiPart ?? false,
+      multiPart: existingParts.length > 0 ? true : (data.multiPart ?? order.multiPart ?? false),
       formaPagamento: data.formaPagamento ?? null,
       dataPagamento: data.dataPagamento ?? null,
       clientId: resolveClientId(clientsData.list, data.client, data.clientId),
       updatedAt: nowIso(),
     };
     await orders.save(orders.list.map((item) => (item.id === order.id ? updated : item)));
+    return { ok: true as const };
+  });
+
+export const updateOrderPartStatus = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      orderId: z.string().min(1),
+      partId: z.string().min(1),
+      status: z.enum(["todo", "printing", "done", "falha"]),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const [orders, partsRepo] = await Promise.all([ordersRepo(), orderPartsRepo()]);
+    const order = orders.list.find((item) => item.id === data.orderId);
+    if (!order) return { ok: false as const, reason: "not_found" as const };
+    const part = partsRepo.list.find((item) => item.id === data.partId && item.orderId === data.orderId);
+    if (!part) return { ok: false as const, reason: "part_not_found" as const };
+
+    const now = nowIso();
+    const nextParts = partsRepo.list
+      .filter((item) => item.orderId === data.orderId)
+      .map((item) => (item.id === data.partId ? { ...item, status: data.status, updatedAt: now } : item));
+
+    await partsRepo.saveForOrder(data.orderId, nextParts);
+    await orders.save(orders.list.map((item) => (item.id === order.id ? { ...item, updatedAt: now } : item)));
     return { ok: true as const };
   });
