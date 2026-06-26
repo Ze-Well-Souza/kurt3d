@@ -262,6 +262,7 @@ function Stock() {
   }));
   const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
   const [editInsumo, setEditInsumo] = useState<(InsumoForm & { id: string }) | null>(null);
+  const [createFilamentOpen, setCreateFilamentOpen] = useState(false);
 
   const [filSearch, setFilSearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
@@ -460,6 +461,7 @@ function Stock() {
         dataCompra: todayIso(),
         primeiraVencimento: addCalendarMonthsIso(todayIso(), 1),
       });
+      setCreateFilamentOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha ao cadastrar rolo.");
     }
@@ -584,196 +586,11 @@ function Stock() {
         </div>
       </div>
 
-      {/* ═══════════ FILAMENT FORM ═══════════ */}
-      <form
-        onSubmit={submitFilamento}
-        className="filament-top space-y-6 rounded-2xl border border-border bg-card p-6"
-      >
-        <h2 className="font-display text-lg font-semibold">Cadastrar Novo Rolo</h2>
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          <Field label="SKU (Código)" className="md:col-span-1">
-            <Input
-              value={fForm.sku}
-              onChange={(e) => setFField("sku", e.target.value.toUpperCase())}
-              placeholder="FIL-004"
-              maxLength={50}
-            />
-          </Field>
-          <Field label="Marca">
-            <Input
-              value={fForm.marca}
-              onChange={(e) => setFField("marca", e.target.value)}
-              placeholder="Creality, Bambu Lab..."
-              maxLength={100}
-            />
-          </Field>
-          <Field label="Cor">
-            <Input
-              value={fForm.cor}
-              onChange={(e) => setFField("cor", e.target.value)}
-              placeholder="Cyan, Magenta, Black..."
-              maxLength={100}
-            />
-          </Field>
-          <Field label="Material">
-            <Select
-              value={fForm.material}
-              onValueChange={(v) => setFField("material", v as Material)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MATERIALS.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <NumberField
-            label="Peso Inicial (g)"
-            value={fForm.pesoInicial}
-            onChange={(v) => setFField("pesoInicial", v)}
-            placeholder="1000"
-            step="1"
-          />
-          <NumberField
-            label="Preço Pago por Rolo (R$)"
-            value={fForm.precoPago}
-            onChange={(v) => setFField("precoPago", v)}
-            placeholder="120,00"
-          />
-
-          <Field label="Data da Compra">
-            <Input
-              type="date"
-              value={fForm.dataCompra}
-              onChange={(e) => setFField("dataCompra", e.target.value)}
-            />
-          </Field>
-          <NumberField
-            label="Quantidade (rolos)"
-            value={fForm.quantidade}
-            onChange={(v) => setFField("quantidade", v)}
-            placeholder="1"
-            step="1"
-          />
-
-          <Field label="Link do Produto (opcional)" className="md:col-span-2 lg:col-span-4">
-            <Input
-              type="url"
-              value={fForm.linkProduto}
-              onChange={(e) => setFField("linkProduto", e.target.value)}
-              placeholder="https://www.amazon.com.br/... ou link do vendedor"
-              maxLength={500}
-            />
-          </Field>
-        </div>
-
-        {/* ─── PAYMENT DETAILS ─── */}
-        <div className="rounded-xl border border-border bg-muted/30 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-muted-foreground" />
-            <h3 className="font-display text-sm font-semibold">Detalhes do Pagamento</h3>
-          </div>
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            <Field label="Forma de Pagamento" className="md:col-span-2">
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={fForm.formaPagamento === "a_vista" ? "default" : "outline"}
-                  className="flex-1 gap-2"
-                  onClick={() => setFField("formaPagamento", "a_vista")}
-                >
-                  <Banknote className="h-4 w-4" /> À vista
-                </Button>
-                <Button
-                  type="button"
-                  variant={fForm.formaPagamento === "parcelado" ? "default" : "outline"}
-                  className="flex-1 gap-2"
-                  onClick={() => setFField("formaPagamento", "parcelado")}
-                >
-                  <CreditCard className="h-4 w-4" /> Parcelado
-                </Button>
-              </div>
-            </Field>
-            {fForm.formaPagamento === "parcelado" ? (
-              <>
-                <NumberField
-                  label="Número de Parcelas"
-                  value={fForm.parcelas}
-                  onChange={(v) => setFField("parcelas", v)}
-                  placeholder="1"
-                  step="1"
-                />
-                <NumberField
-                  label="Custo Total (R$)"
-                  value={fForm.custoTotal}
-                  onChange={(v) => setFField("custoTotal", v)}
-                  placeholder={
-                    fForm.precoPago
-                      ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
-                      : "0,00"
-                  }
-                />
-                <Field label="Primeiro Vencimento" className="md:col-span-2 lg:col-span-4">
-                  <Input
-                    type="date"
-                    value={fForm.primeiraVencimento}
-                    onChange={(e) => setFField("primeiraVencimento", e.target.value)}
-                  />
-                </Field>
-              </>
-            ) : (
-              <NumberField
-                label="Custo Total (R$)"
-                value={fForm.custoTotal}
-                onChange={(v) => setFField("custoTotal", v)}
-                placeholder={
-                  fForm.precoPago
-                    ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
-                    : "0,00"
-                }
-              />
-            )}
-          </div>
-          {(() => {
-            const qty = Math.max(1, Number(fForm.quantidade) || 1);
-            const preco = Number(fForm.precoPago) || 0;
-            const custoTotal = Number(fForm.custoTotal) || preco * qty;
-            const parcelas = Math.max(1, Math.floor(Number(fForm.parcelas) || 1));
-            const perParcel = parcelas > 0 ? custoTotal / parcelas : 0;
-            const juros = custoTotal - preco * qty;
-            if (!preco) return null;
-            return (
-              <p className="mt-3 text-xs text-muted-foreground">
-                {fForm.formaPagamento === "parcelado" ? (
-                  <>
-                    <span className="font-semibold tabular-nums text-foreground">
-                      {parcelas}× de {brl(perParcel)}
-                    </span>
-                    {juros > 0.01 && (
-                      <span className="ml-1">· juros de {brl(juros)} sobre o preço à vista</span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    Pagamento à vista: <span className="font-semibold tabular-nums">{brl(custoTotal)}</span>
-                    {qty > 1 && <span> para {qty} rolos</span>}
-                  </>
-                )}
-              </p>
-            );
-          })()}
-        </div>
-        <div className="flex justify-end">
-          <Button type="submit" size="lg" className="btn-filament gap-2 px-6">
-            <Plus className="h-4 w-4" /> Adicionar Rolo
-          </Button>
-        </div>
-      </form>
+      <div className="flex justify-end">
+        <Button type="button" size="lg" className="btn-filament gap-2 px-6" onClick={() => setCreateFilamentOpen(true)}>
+          <Plus className="h-4 w-4" /> Cadastrar Filamento
+        </Button>
+      </div>
 
       {/* ═══════════ FILAMENT LIST ═══════════ */}
       <div className="filament-top rounded-2xl border border-border bg-card">
@@ -1576,6 +1393,202 @@ function Stock() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════ FILAMENT DETAIL DIALOG ═══════════ */}
+      <Dialog open={createFilamentOpen} onOpenChange={setCreateFilamentOpen}>
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Cadastrar Novo Rolo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={submitFilamento} className="space-y-6">
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <Field label="SKU (Código)" className="md:col-span-1">
+                <Input
+                  value={fForm.sku}
+                  onChange={(e) => setFField("sku", e.target.value.toUpperCase())}
+                  placeholder="FIL-004"
+                  maxLength={50}
+                />
+              </Field>
+              <Field label="Marca">
+                <Input
+                  value={fForm.marca}
+                  onChange={(e) => setFField("marca", e.target.value)}
+                  placeholder="Creality, Bambu Lab..."
+                  maxLength={100}
+                />
+              </Field>
+              <Field label="Cor">
+                <Input
+                  value={fForm.cor}
+                  onChange={(e) => setFField("cor", e.target.value)}
+                  placeholder="Cyan, Magenta, Black..."
+                  maxLength={100}
+                />
+              </Field>
+              <Field label="Material">
+                <Select
+                  value={fForm.material}
+                  onValueChange={(v) => setFField("material", v as Material)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MATERIALS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <NumberField
+                label="Peso Inicial (g)"
+                value={fForm.pesoInicial}
+                onChange={(v) => setFField("pesoInicial", v)}
+                placeholder="1000"
+                step="1"
+              />
+              <NumberField
+                label="Preço Pago por Rolo (R$)"
+                value={fForm.precoPago}
+                onChange={(v) => setFField("precoPago", v)}
+                placeholder="120,00"
+              />
+
+              <Field label="Data da Compra">
+                <Input
+                  type="date"
+                  value={fForm.dataCompra}
+                  onChange={(e) => setFField("dataCompra", e.target.value)}
+                />
+              </Field>
+              <NumberField
+                label="Quantidade (rolos)"
+                value={fForm.quantidade}
+                onChange={(v) => setFField("quantidade", v)}
+                placeholder="1"
+                step="1"
+              />
+
+              <Field label="Link do Produto (opcional)" className="md:col-span-2 lg:col-span-4">
+                <Input
+                  type="url"
+                  value={fForm.linkProduto}
+                  onChange={(e) => setFField("linkProduto", e.target.value)}
+                  placeholder="https://www.amazon.com.br/... ou link do vendedor"
+                  maxLength={500}
+                />
+              </Field>
+            </div>
+
+            <div className="rounded-xl border border-border bg-muted/30 p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-muted-foreground" />
+                <h3 className="font-display text-sm font-semibold">Detalhes do Pagamento</h3>
+              </div>
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                <Field label="Forma de Pagamento" className="md:col-span-2">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={fForm.formaPagamento === "a_vista" ? "default" : "outline"}
+                      className="flex-1 gap-2"
+                      onClick={() => setFField("formaPagamento", "a_vista")}
+                    >
+                      <Banknote className="h-4 w-4" /> À vista
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={fForm.formaPagamento === "parcelado" ? "default" : "outline"}
+                      className="flex-1 gap-2"
+                      onClick={() => setFField("formaPagamento", "parcelado")}
+                    >
+                      <CreditCard className="h-4 w-4" /> Parcelado
+                    </Button>
+                  </div>
+                </Field>
+                {fForm.formaPagamento === "parcelado" ? (
+                  <>
+                    <NumberField
+                      label="Número de Parcelas"
+                      value={fForm.parcelas}
+                      onChange={(v) => setFField("parcelas", v)}
+                      placeholder="1"
+                      step="1"
+                    />
+                    <NumberField
+                      label="Custo Total (R$)"
+                      value={fForm.custoTotal}
+                      onChange={(v) => setFField("custoTotal", v)}
+                      placeholder={
+                        fForm.precoPago
+                          ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
+                          : "0,00"
+                      }
+                    />
+                    <Field label="Primeiro Vencimento" className="md:col-span-2 lg:col-span-4">
+                      <Input
+                        type="date"
+                        value={fForm.primeiraVencimento}
+                        onChange={(e) => setFField("primeiraVencimento", e.target.value)}
+                      />
+                    </Field>
+                  </>
+                ) : (
+                  <NumberField
+                    label="Custo Total (R$)"
+                    value={fForm.custoTotal}
+                    onChange={(v) => setFField("custoTotal", v)}
+                    placeholder={
+                      fForm.precoPago
+                        ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
+                        : "0,00"
+                    }
+                  />
+                )}
+              </div>
+              {(() => {
+                const qty = Math.max(1, Number(fForm.quantidade) || 1);
+                const preco = Number(fForm.precoPago) || 0;
+                const custoTotal = Number(fForm.custoTotal) || preco * qty;
+                const parcelas = Math.max(1, Math.floor(Number(fForm.parcelas) || 1));
+                const perParcel = parcelas > 0 ? custoTotal / parcelas : 0;
+                const juros = custoTotal - preco * qty;
+                if (!preco) return null;
+                return (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {fForm.formaPagamento === "parcelado" ? (
+                      <>
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {parcelas}× de {brl(perParcel)}
+                        </span>
+                        {juros > 0.01 && (
+                          <span className="ml-1">· juros de {brl(juros)} sobre o preço à vista</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        Pagamento à vista: <span className="font-semibold tabular-nums">{brl(custoTotal)}</span>
+                        {qty > 1 && <span> para {qty} rolos</span>}
+                      </>
+                    )}
+                  </p>
+                );
+              })()}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateFilamentOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" size="lg" className="btn-filament gap-2 px-6">
+                <Plus className="h-4 w-4" /> Adicionar Rolo
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

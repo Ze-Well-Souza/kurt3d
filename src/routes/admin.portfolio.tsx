@@ -161,6 +161,7 @@ function formatTime(min: number) {
 function CalcPedidos() {
   const qc = useQueryClient();
   const snap = useSnapshot();
+  const handleUpdateError = useToastErrorHandler({ fallbackMessage: "Erro ao atualizar." });
   const orders = snap.data?.orders ?? [];
   const filamentos = snap.data?.filamentos ?? [];
   const projects = snap.data?.portfolio ?? [];
@@ -209,7 +210,6 @@ function CalcPedidos() {
   const [editProject, setEditProject] = useState<PortfolioProject | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
-  const handleUpdateError = useToastErrorHandler({ fallbackMessage: "Erro ao atualizar." });
 
   /* ── drag state ── */
   const [activeId, setActiveId] = useState<string | null>(null);
