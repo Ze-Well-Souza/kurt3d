@@ -28,7 +28,7 @@ async function getSession() {
     maxAge: 60 * 60 * 24 * 30,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "strict",
       path: "/",
       secure: request ? isSecureRequest(request) : false,
     },

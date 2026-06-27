@@ -3,7 +3,13 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { logger } from "./lib/server/logger.server";
-import { applySecurityHeaders, createHttpsRedirect, shouldRedirectToHttps } from "./lib/server/request-security.server";
+import {
+  applySecurityHeaders,
+  createCorsPreflightResponse,
+  createHttpsRedirect,
+  isCorsPreflightRequest,
+  shouldRedirectToHttps,
+} from "./lib/server/request-security.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -45,6 +51,10 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     if (shouldRedirectToHttps(request)) {
       return createHttpsRedirect(request);
+    }
+
+    if (isCorsPreflightRequest(request)) {
+      return createCorsPreflightResponse(request);
     }
 
     try {
