@@ -13,7 +13,7 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
       formaPagamento: z.enum(["a_vista", "parcelado"]),
       custoTotal: z.number().min(0.01).max(10_000_000),
       parcelas: z.number().int().min(1).max(48),
-      primeiraVencimento: z.string().min(1).max(30),
+      dataParaPagamento: z.string().min(1).max(30),
     }),
   )
   .handler(async ({ data }) => {
@@ -26,6 +26,7 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
       formaPagamento: data.formaPagamento,
       custoTotal: data.custoTotal,
       parcelas: data.parcelas,
+      dataParaPagamento: data.dataParaPagamento,
       createdAt: nowIso(),
     };
     await paymentsRepo.insert(payment);
@@ -40,7 +41,7 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
         paymentId,
         numero: i + 1,
         valor,
-        vencimento: addCalendarMonthsIso(data.primeiraVencimento, i),
+        vencimento: addCalendarMonthsIso(data.dataParaPagamento, i),
         pago: false,
         dataPagamento: null,
         valorPago: null,
@@ -59,7 +60,7 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
       formaPagamento: z.enum(["a_vista", "parcelado"]),
       custoTotal: z.number().min(0.01).max(10_000_000),
       parcelas: z.number().int().min(1).max(48),
-      primeiraVencimento: z.string().min(1).max(30),
+      dataParaPagamento: z.string().min(1).max(30),
     }),
   )
   .handler(async ({ data }) => {
@@ -73,6 +74,7 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
       formaPagamento: data.formaPagamento,
       custoTotal: data.custoTotal,
       parcelas: data.parcelas,
+      dataParaPagamento: data.dataParaPagamento,
     };
     await paymentsRepo.update(updated);
 
@@ -95,7 +97,7 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
         paymentId: data.paymentId,
         numero,
         valor,
-        vencimento: addCalendarMonthsIso(data.primeiraVencimento, i),
+        vencimento: addCalendarMonthsIso(data.dataParaPagamento, i),
         pago: false,
         dataPagamento: null,
         valorPago: null,

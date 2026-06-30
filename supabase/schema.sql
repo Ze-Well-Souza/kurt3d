@@ -32,6 +32,7 @@ create table if not exists public.filamentos (
   peso_atual double precision not null,
   preco_pago double precision not null,
   data_compra text not null,
+  data_entrega text null,
   data_fim text null,
   qualidade public.filamento_qualidade null,
   observacao text null,
@@ -50,6 +51,7 @@ create table if not exists public.filamentos_history (
   peso_atual double precision not null,
   preco_pago double precision not null,
   data_compra text not null,
+  data_entrega text null,
   data_fim text null,
   qualidade public.filamento_qualidade null,
   observacao text null,
@@ -217,6 +219,7 @@ create table if not exists public.filamento_payments (
   forma_pagamento text not null,
   custo_total double precision not null,
   parcelas integer not null default 1,
+  data_para_pagamento date null,
   created_at timestamptz not null default now()
 );
 

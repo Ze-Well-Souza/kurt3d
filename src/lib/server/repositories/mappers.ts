@@ -85,6 +85,7 @@ export function fromFilamentoRow(row: any): Filamento {
     pesoAtual: row.peso_atual,
     precoPago: row.preco_pago,
     dataCompra: row.data_compra,
+    dataEntrega: row.data_entrega ?? null,
     dataFim: row.data_fim ?? null,
     qualidade: normalizeFilamentoQualidade(row.qualidade),
     observacao: row.observacao ?? row.comentario ?? null,
@@ -107,6 +108,7 @@ export function toFilamentoRow(row: Filamento) {
     peso_atual: row.pesoAtual,
     preco_pago: row.precoPago,
     data_compra: row.dataCompra,
+    data_entrega: row.dataEntrega ?? null,
     data_fim: row.dataFim ?? null,
     qualidade: row.qualidade ?? null,
     comentario: observacao,
@@ -128,11 +130,14 @@ export function fromFilamentoHistoryRow(row: any): FilamentoHistory {
     pesoAtual: row.peso_atual,
     precoPago: row.preco_pago,
     dataCompra: row.data_compra,
+    dataEntrega: row.data_entrega ?? null,
     dataFim: row.data_fim ?? null,
     qualidade: normalizeFilamentoQualidade(row.qualidade),
     observacao: row.observacao ?? row.comentario ?? null,
     comentario: row.comentario ?? row.observacao ?? null,
     linkProduto: row.link_produto ?? null,
+    batchId: row.batch_id ?? null,
+    paymentId: row.payment_id ?? null,
     arquivadoAt: row.arquivado_at,
   };
 }
@@ -149,11 +154,14 @@ export function toFilamentoHistoryRow(row: FilamentoHistory) {
     peso_atual: row.pesoAtual,
     preco_pago: row.precoPago,
     data_compra: row.dataCompra,
+    data_entrega: row.dataEntrega ?? null,
     data_fim: row.dataFim ?? null,
     qualidade: row.qualidade ?? null,
     comentario: observacao,
     observacao,
     link_produto: row.linkProduto ?? null,
+    batch_id: row.batchId ?? null,
+    payment_id: row.paymentId ?? null,
     arquivado_at: row.arquivadoAt,
   };
 }
@@ -355,6 +363,7 @@ export function fromPaymentRow(row: any): FilamentoPayment {
     formaPagamento: row.forma_pagamento as FormaPagamento,
     custoTotal: row.custo_total,
     parcelas: row.parcelas,
+    dataParaPagamento: row.data_para_pagamento ?? null,
     createdAt: row.created_at,
   };
 }
@@ -366,6 +375,7 @@ export function toPaymentRow(row: FilamentoPayment) {
     forma_pagamento: row.formaPagamento,
     custo_total: row.custoTotal,
     parcelas: row.parcelas,
+    data_para_pagamento: row.dataParaPagamento ?? null,
     created_at: row.createdAt,
   };
 }

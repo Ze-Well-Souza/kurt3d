@@ -162,6 +162,7 @@ export type Database = {
           batch_id: string
           created_at: string
           custo_total: number
+          data_para_pagamento: string | null
           forma_pagamento: string
           id: string
           parcelas: number
@@ -170,6 +171,7 @@ export type Database = {
           batch_id: string
           created_at?: string
           custo_total: number
+          data_para_pagamento?: string | null
           forma_pagamento: string
           id: string
           parcelas?: number
@@ -178,6 +180,7 @@ export type Database = {
           batch_id?: string
           created_at?: string
           custo_total?: number
+          data_para_pagamento?: string | null
           forma_pagamento?: string
           id?: string
           parcelas?: number
@@ -191,6 +194,7 @@ export type Database = {
           cor: string
           created_at: string
           data_compra: string
+          data_entrega: string | null
           data_fim: string | null
           id: string
           link_produto: string | null
@@ -210,6 +214,7 @@ export type Database = {
           cor: string
           created_at?: string
           data_compra: string
+          data_entrega?: string | null
           data_fim?: string | null
           id: string
           link_produto?: string | null
@@ -229,6 +234,7 @@ export type Database = {
           cor?: string
           created_at?: string
           data_compra?: string
+          data_entrega?: string | null
           data_fim?: string | null
           id?: string
           link_produto?: string | null
@@ -251,6 +257,7 @@ export type Database = {
           comentario: string | null
           cor: string
           data_compra: string
+          data_entrega: string | null
           data_fim: string | null
           id: string
           link_produto: string | null
@@ -270,6 +277,7 @@ export type Database = {
           comentario?: string | null
           cor: string
           data_compra: string
+          data_entrega?: string | null
           data_fim?: string | null
           id: string
           link_produto?: string | null
@@ -289,6 +297,7 @@ export type Database = {
           comentario?: string | null
           cor?: string
           data_compra?: string
+          data_entrega?: string | null
           data_fim?: string | null
           id?: string
           link_produto?: string | null

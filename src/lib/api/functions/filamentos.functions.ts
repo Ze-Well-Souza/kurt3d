@@ -18,7 +18,10 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       pesoAtual: z.number().min(0).max(100000).optional(),
       precoPago: z.number().min(0.01).max(100000),
       dataCompra: z.string().min(1).max(30),
-      linkProduto: z.string().url().max(500).optional(),
+      dataEntrega: z.string().min(1).max(30).nullable().optional(),
+      qualidade: filamentoQualidadeSchema.nullable().optional(),
+      observacao: z.string().max(500).nullable().optional(),
+      linkProduto: z.string().url().max(500).nullable().optional(),
       batchId: z.string().min(1).optional(),
       paymentId: z.string().min(1).optional(),
     }),
@@ -56,11 +59,12 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       pesoAtual: nextPesoAtual,
       precoPago: data.precoPago,
       dataCompra: data.dataCompra,
+      dataEntrega: data.dataEntrega !== undefined ? data.dataEntrega : existing?.dataEntrega ?? null,
       dataFim: existing?.dataFim ?? null,
-      qualidade: existing?.qualidade ?? null,
-      observacao: existing?.observacao ?? existing?.comentario ?? null,
-      comentario: existing?.comentario ?? null,
-      linkProduto: data.linkProduto ?? existing?.linkProduto ?? null,
+      qualidade: data.qualidade !== undefined ? data.qualidade : existing?.qualidade ?? null,
+      observacao: data.observacao !== undefined ? data.observacao : existing?.observacao ?? existing?.comentario ?? null,
+      comentario: data.observacao !== undefined ? data.observacao : existing?.comentario ?? null,
+      linkProduto: data.linkProduto !== undefined ? data.linkProduto : existing?.linkProduto ?? null,
       batchId: data.batchId ?? existing?.batchId ?? null,
       paymentId: data.paymentId ?? existing?.paymentId ?? null,
     };
@@ -83,6 +87,7 @@ export const archiveFilamento = createServerFn({ method: "POST" })
       id: z.string().min(1),
       qualidade: filamentoQualidadeSchema.optional(),
       observacao: z.string().max(500).optional(),
+      dataFim: z.string().min(1).max(30).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -95,7 +100,7 @@ export const archiveFilamento = createServerFn({ method: "POST" })
       qualidade: (data.qualidade as FilamentoQualidade) ?? filamento.qualidade,
       observacao: data.observacao ?? filamento.observacao ?? filamento.comentario,
       comentario: data.observacao ?? filamento.observacao ?? filamento.comentario,
-      dataFim: new Date().toISOString().slice(0, 10),
+      dataFim: data.dataFim ?? new Date().toISOString().slice(0, 10),
     };
 
     const historyRepo = await filamentosHistoryRepo();

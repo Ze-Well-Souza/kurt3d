@@ -67,6 +67,7 @@ export type FilamentoPayment = {
   formaPagamento: FormaPagamento;
   custoTotal: number;
   parcelas: number;
+  dataParaPagamento: string | null;
   createdAt: string;
 };
 
@@ -92,6 +93,7 @@ export type Filamento = {
   pesoAtual: number;
   precoPago: number;
   dataCompra: string;
+  dataEntrega?: string | null;
   dataFim?: string | null;
   qualidade?: FilamentoQualidade | null;
   observacao?: string | null;

@@ -63,6 +63,7 @@ export const Route = createFileRoute("/admin/stock")({
 
 const MATERIALS = ["PLA", "PETG", "ABS", "TPU"] as const;
 type Material = (typeof MATERIALS)[number];
+type FilamentoQualidadeInput = FilamentoQualidade | "";
 
 const filamentoSchema = z.object({
   sku: z.string().trim().min(1, "SKU obrigatório").max(50),
@@ -72,6 +73,10 @@ const filamentoSchema = z.object({
   pesoInicial: z.number().min(1, "Peso inicial inválido").max(100000),
   precoPago: z.number().min(0.01, "Preço pago inválido").max(100000),
   dataCompra: z.string().min(1, "Data da compra obrigatória"),
+  dataEntrega: z.string().min(1).max(30).nullable().optional(),
+  qualidade: z.enum(["Ótimo", "bom", "médio", "ruim"]).nullable().optional(),
+  observacao: z.string().max(500).nullable().optional(),
+  linkProduto: z.string().url("Informe um link válido começando com http:// ou https://").max(500).nullable().optional(),
 });
 
 type FilamentoForm = {
@@ -82,12 +87,15 @@ type FilamentoForm = {
   pesoInicial: string;
   precoPago: string;
   dataCompra: string;
+  dataEntrega: string;
+  qualidade: FilamentoQualidadeInput;
+  observacao: string;
   linkProduto: string;
   quantidade: string;
   formaPagamento: FormaPagamento;
   custoTotal: string;
   parcelas: string;
-  primeiraVencimento: string;
+  dataParaPagamento: string;
 };
 
 type EditFilamentoForm = FilamentoForm & {
@@ -103,12 +111,15 @@ const initialFilamentoForm: FilamentoForm = {
   pesoInicial: "1000",
   precoPago: "",
   dataCompra: "",
+  dataEntrega: "",
+  qualidade: "",
+  observacao: "",
   linkProduto: "",
   quantidade: "1",
   formaPagamento: "a_vista",
   custoTotal: "",
   parcelas: "1",
-  primeiraVencimento: "",
+  dataParaPagamento: "",
 };
 
 
@@ -187,7 +198,7 @@ function Stock() {
   });
 
   const mutateArchive = useMutation({
-    mutationFn: (input: { id: string; qualidade?: FilamentoQualidade; observacao?: string }) =>
+    mutationFn: (input: { id: string; qualidade?: FilamentoQualidade; observacao?: string; dataFim?: string }) =>
       archiveFilamento({ data: input }),
     onSuccess: () => {
       invalidate();
@@ -211,13 +222,13 @@ function Stock() {
   });
 
   const mutateCreatePayment = useMutation({
-    mutationFn: (input: { batchId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; primeiraVencimento: string }) =>
+    mutationFn: (input: { batchId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; dataParaPagamento: string }) =>
       createFilamentoPayment({ data: input }),
     onSuccess: invalidate,
   });
 
   const mutateUpdatePayment = useMutation({
-    mutationFn: (input: { paymentId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; primeiraVencimento: string }) =>
+    mutationFn: (input: { paymentId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; dataParaPagamento: string }) =>
       updateFilamentoPayment({ data: input }),
     onSuccess: invalidate,
   });
@@ -259,13 +270,17 @@ function Stock() {
     ...initialFilamentoForm,
     sku: generateSku(allUsedSkus),
     dataCompra: todayIso(),
-    primeiraVencimento: addCalendarMonthsIso(todayIso(), 1),
+    dataParaPagamento: addCalendarMonthsIso(todayIso(), 1),
   }));
   const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
   const [editInsumo, setEditInsumo] = useState<(InsumoForm & { id: string }) | null>(null);
   const [createFilamentOpen, setCreateFilamentOpen] = useState(false);
 
   const [filSearch, setFilSearch] = useState("");
+  const [filMarcaFilter, setFilMarcaFilter] = useState("all");
+  const [filCorFilter, setFilCorFilter] = useState("all");
+  const [filMaterialFilter, setFilMaterialFilter] = useState("all");
+  const [filDataCompraFilter, setFilDataCompraFilter] = useState("");
   const [insSearch, setInsSearch] = useState("");
   const [stockView, setStockView] = useState<"cards" | "table">(
     () => (localStorage.getItem("stock-view-preference") as "cards" | "table") ?? "cards"
@@ -287,12 +302,15 @@ function Stock() {
       pesoAtual: String(f.pesoAtual),
       precoPago: String(f.precoPago),
       dataCompra: f.dataCompra,
+      dataEntrega: f.dataEntrega ?? "",
+      qualidade: f.qualidade ?? "",
+      observacao: f.observacao ?? f.comentario ?? "",
       linkProduto: f.linkProduto ?? "",
       quantidade: "1",
       formaPagamento: payment?.formaPagamento ?? "a_vista",
       custoTotal: payment ? String(payment.custoTotal) : String(f.precoPago),
       parcelas: payment ? String(payment.parcelas) : "1",
-      primeiraVencimento: first?.vencimento ?? (f.dataCompra || new Date().toISOString().slice(0, 10)),
+      dataParaPagamento: payment?.dataParaPagamento ?? first?.vencimento ?? (f.dataCompra || new Date().toISOString().slice(0, 10)),
     });
   };
 
@@ -311,7 +329,10 @@ function Stock() {
       pesoAtual: Number(editForm.pesoAtual),
       precoPago: Number(editForm.precoPago),
       dataCompra: editForm.dataCompra,
-      linkProduto: editForm.linkProduto || undefined,
+      dataEntrega: editForm.dataEntrega || null,
+      qualidade: editForm.qualidade || null,
+      observacao: editForm.observacao || null,
+      linkProduto: editForm.linkProduto || null,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
@@ -321,7 +342,7 @@ function Stock() {
     const formaPagamento: FormaPagamento = editForm.formaPagamento === "parcelado" ? "parcelado" : "a_vista";
     const custoTotalNum = Number(editForm.custoTotal) || Number(editForm.precoPago) || 0;
     const parcelas = formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(editForm.parcelas) || 1)) : 1;
-    const primeiraVencimento = editForm.primeiraVencimento || editForm.dataCompra || new Date().toISOString().slice(0, 10);
+    const dataParaPagamento = editForm.dataParaPagamento || editForm.dataCompra || new Date().toISOString().slice(0, 10);
 
     const existingFilamento = filamentos.find((x) => x.id === editForm.id);
     const existingPaymentId = existingFilamento?.paymentId ?? null;
@@ -335,7 +356,7 @@ function Stock() {
           formaPagamento,
           custoTotal: custoTotalNum,
           parcelas,
-          primeiraVencimento,
+          dataParaPagamento,
         });
         await mutateFilamento.mutateAsync({
           ...parsed.data,
@@ -350,7 +371,7 @@ function Stock() {
           formaPagamento,
           custoTotal: custoTotalNum,
           parcelas,
-          primeiraVencimento,
+          dataParaPagamento,
         });
         const paymentId = (created as { ok?: boolean; paymentId?: string })?.paymentId ?? batchId;
         await mutateFilamento.mutateAsync({
@@ -402,7 +423,10 @@ function Stock() {
       pesoInicial: Number(fForm.pesoInicial),
       precoPago: Number(fForm.precoPago),
       dataCompra: fForm.dataCompra,
-      linkProduto: fForm.linkProduto || undefined,
+      dataEntrega: fForm.dataEntrega || null,
+      qualidade: fForm.qualidade || null,
+      observacao: fForm.observacao || null,
+      linkProduto: fForm.linkProduto || null,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
@@ -416,9 +440,9 @@ function Stock() {
         ? Number(fForm.custoTotal)
         : parsed.data.precoPago * qty;
     const parcelas = formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(fForm.parcelas) || 1)) : 1;
-    const primeiraVencimento = fForm.primeiraVencimento || parsed.data.dataCompra;
-    if (formaPagamento === "parcelado" && !fForm.primeiraVencimento) {
-      toast.error("Informe a data do primeiro vencimento.");
+    const dataParaPagamento = fForm.dataParaPagamento || parsed.data.dataCompra;
+    if (!dataParaPagamento) {
+      toast.error("Informe a data para pagamento.");
       return;
     }
 
@@ -449,7 +473,7 @@ function Stock() {
         formaPagamento,
         custoTotal: custoTotalNum,
         parcelas,
-        primeiraVencimento,
+        dataParaPagamento,
       });
       toast.success(
         qty === 1
@@ -460,7 +484,7 @@ function Stock() {
         ...initialFilamentoForm,
         sku: generateSku([...usedLower]),
         dataCompra: todayIso(),
-        primeiraVencimento: addCalendarMonthsIso(todayIso(), 1),
+        dataParaPagamento: addCalendarMonthsIso(todayIso(), 1),
       });
       setCreateFilamentOpen(false);
     } catch (err) {
@@ -475,6 +499,7 @@ function Stock() {
       id: archiveDialog.filamentId,
       qualidade: archiveDialog.qualidade,
       observacao: archiveDialog.observacao || undefined,
+      dataFim: archiveDialog.dataFim || undefined,
     });
     setArchiveDialog({ open: false, filamentId: "", qualidade: "bom", observacao: "", dataFim: new Date().toISOString().slice(0, 10) });
   };
@@ -534,10 +559,30 @@ function Stock() {
 
   // ── Filtered lists ──
   const filteredFilamentos = useMemo(() => {
-    if (!filSearch.trim()) return filamentos;
     const s = normalizeText(filSearch);
-    return filamentos.filter((f) => normalizeText(f.sku).includes(s) || normalizeText(f.marca).includes(s) || normalizeText(f.cor).includes(s) || normalizeText(f.material).includes(s));
-  }, [filamentos, filSearch]);
+    return filamentos.filter((f) => {
+      const matchesSearch =
+        !s ||
+        normalizeText(f.sku).includes(s) ||
+        normalizeText(f.marca).includes(s) ||
+        normalizeText(f.cor).includes(s) ||
+        normalizeText(f.material).includes(s);
+      const matchesMarca = filMarcaFilter === "all" || normalizeText(f.marca) === normalizeText(filMarcaFilter);
+      const matchesCor = filCorFilter === "all" || normalizeText(f.cor) === normalizeText(filCorFilter);
+      const matchesMaterial = filMaterialFilter === "all" || f.material === filMaterialFilter;
+      const matchesDataCompra = !filDataCompraFilter || f.dataCompra === filDataCompraFilter;
+      return matchesSearch && matchesMarca && matchesCor && matchesMaterial && matchesDataCompra;
+    });
+  }, [filDataCompraFilter, filMarcaFilter, filCorFilter, filMaterialFilter, filamentos, filSearch]);
+
+  const marcaOptions = useMemo(
+    () => Array.from(new Set(filamentos.map((f) => f.marca.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [filamentos],
+  );
+  const corOptions = useMemo(
+    () => Array.from(new Set(filamentos.map((f) => f.cor.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [filamentos],
+  );
 
   const filteredInsumos = useMemo(() => {
     if (!insSearch.trim()) return insumos;
@@ -603,7 +648,6 @@ function Stock() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
             <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
               <Button
                 size="sm"
@@ -625,6 +669,51 @@ function Stock() {
               </Button>
             </div>
           </div>
+        </div>
+        <div className="grid gap-3 border-b border-border px-6 py-4 md:grid-cols-2 xl:grid-cols-5">
+          <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
+          <Select value={filMarcaFilter} onValueChange={setFilMarcaFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por marca" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as marcas</SelectItem>
+              {marcaOptions.map((marca) => (
+                <SelectItem key={marca} value={marca}>
+                  {marca}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filCorFilter} onValueChange={setFilCorFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por cor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as cores</SelectItem>
+              {corOptions.map((cor) => (
+                <SelectItem key={cor} value={cor}>
+                  {cor}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filMaterialFilter} onValueChange={setFilMaterialFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filtrar por material" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os materiais</SelectItem>
+              {MATERIALS.map((material) => (
+                <SelectItem key={material} value={material}>
+                  {material}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Field label="Data da Compra" className="space-y-1">
+            <Input type="date" value={filDataCompraFilter} onChange={(e) => setFilDataCompraFilter(e.target.value)} />
+          </Field>
         </div>
         {lowFilamentosCount > 0 && (
           <div className="flex items-center gap-2 border-b border-red-500/20 bg-red-500/5 px-6 py-3 text-sm text-red-700">
@@ -652,6 +741,9 @@ function Stock() {
                   <TableHead className="text-right">Custo/g</TableHead>
                   <TableHead className="text-right">Investido</TableHead>
                   <TableHead>Data Compra</TableHead>
+                  <TableHead>Entrega</TableHead>
+                  <TableHead>Data p/ Pagto</TableHead>
+                  <TableHead>Qualidade</TableHead>
                   <TableHead>Link</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -673,6 +765,9 @@ function Stock() {
                   const insts = payment ? filamentoInstallments.filter((i) => i.paymentId === payment.id) : [];
                   const paidCount = insts.filter((i) => i.pago).length;
                   const totalInsts = insts.length;
+                  const firstInstallment = [...insts].sort((a, b) => a.numero - b.numero)[0];
+                  const dataParaPagamento = payment?.dataParaPagamento ?? firstInstallment?.vencimento ?? null;
+                  const qCfg = f.qualidade ? QUALIDADE_CONFIG[f.qualidade] : null;
                   return (
                     <TableRow key={f.id}>
                       <TableCell className="font-mono text-xs">{f.sku}</TableCell>
@@ -742,6 +837,21 @@ function Stock() {
                       <TableCell className="tabular-nums text-muted-foreground">
                         {new Date(f.dataCompra).toLocaleDateString("pt-BR")}
                       </TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {f.dataEntrega ? new Date(f.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {qCfg ? (
+                          <Badge variant="outline" className="gap-1 text-[10px]" style={{ borderColor: qCfg.color, color: qCfg.color }}>
+                            {qCfg.label}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {f.linkProduto ? (
                           <a
@@ -787,8 +897,8 @@ function Stock() {
                               setArchiveDialog({
                                 open: true,
                                 filamentId: f.id,
-                                qualidade: "bom",
-                                observacao: "",
+                                qualidade: f.qualidade ?? "bom",
+                                observacao: f.observacao ?? f.comentario ?? "",
                                 dataFim: new Date().toISOString().slice(0, 10),
                               })
                             }
@@ -828,6 +938,10 @@ function Stock() {
               const alertLevel = getFilamentoAlertLevel(f);
               const isLow = alertLevel === "low";
               const isMedium = alertLevel === "medium";
+              const payment = f.paymentId ? filamentoPayments.find((p) => p.id === f.paymentId) : null;
+              const insts = payment ? filamentoInstallments.filter((i) => i.paymentId === payment.id) : [];
+              const paidCount = insts.filter((i) => i.pago).length;
+              const dataParaPagamento = payment?.dataParaPagamento ?? [...insts].sort((a, b) => a.numero - b.numero)[0]?.vencimento ?? null;
 
               return (
                 <div
@@ -873,10 +987,7 @@ function Stock() {
                           {f.material}
                         </Badge>
                         {(() => {
-                          const payment = f.paymentId ? filamentoPayments.find((p) => p.id === f.paymentId) : null;
                           if (!payment) return null;
-                          const insts = filamentoInstallments.filter((i) => i.paymentId === payment.id);
-                          const paidCount = insts.filter((i) => i.pago).length;
                           return payment.formaPagamento === "a_vista" ? (
                             <Badge variant="outline" className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]">
                               <Banknote className="h-3 w-3" /> À vista
@@ -929,6 +1040,11 @@ function Stock() {
                       </Badge>
                     </div>
                   )}
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                    <span>Compra: {new Date(f.dataCompra).toLocaleDateString("pt-BR")}</span>
+                    <span>Entrega: {f.dataEntrega ? new Date(f.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}</span>
+                    <span>Pagto: {dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}</span>
+                  </div>
 
                   {/* Link (if set) */}
                   {f.linkProduto && (
@@ -987,8 +1103,8 @@ function Stock() {
                           setArchiveDialog({
                             open: true,
                             filamentId: f.id,
-                            qualidade: "bom",
-                            observacao: "",
+                            qualidade: f.qualidade ?? "bom",
+                            observacao: f.observacao ?? f.comentario ?? "",
                             dataFim: new Date().toISOString().slice(0, 10),
                           })
                         }
@@ -1106,6 +1222,8 @@ function Stock() {
                 <TableHead>Marca / Cor</TableHead>
                 <TableHead>Material</TableHead>
                 <TableHead>Compra</TableHead>
+                <TableHead>Entrega</TableHead>
+                <TableHead>Data p/ Pagto</TableHead>
                 <TableHead>Término</TableHead>
                 <TableHead>Qualidade</TableHead>
                 <TableHead>Observação</TableHead>
@@ -1116,6 +1234,9 @@ function Stock() {
             <TableBody>
               {filamentosHistory.map((h) => {
                 const qCfg = h.qualidade ? QUALIDADE_CONFIG[h.qualidade] : null;
+                const payment = h.paymentId ? filamentoPayments.find((p) => p.id === h.paymentId) : null;
+                const insts = payment ? filamentoInstallments.filter((i) => i.paymentId === payment.id) : [];
+                const dataParaPagamento = payment?.dataParaPagamento ?? [...insts].sort((a, b) => a.numero - b.numero)[0]?.vencimento ?? null;
                 return (
                   <TableRow key={h.id}>
                     <TableCell className="font-mono text-xs">{h.sku}</TableCell>
@@ -1123,6 +1244,12 @@ function Stock() {
                     <TableCell>{h.material}</TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
                       {new Date(h.dataCompra).toLocaleDateString("pt-BR")}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {h.dataEntrega ? new Date(h.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}
                     </TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
                       {h.dataFim ? new Date(h.dataFim).toLocaleDateString("pt-BR") : "—"}
@@ -1467,6 +1594,13 @@ function Stock() {
                   onChange={(e) => setFField("dataCompra", e.target.value)}
                 />
               </Field>
+              <Field label="Data da Entrega">
+                <Input
+                  type="date"
+                  value={fForm.dataEntrega}
+                  onChange={(e) => setFField("dataEntrega", e.target.value)}
+                />
+              </Field>
               <NumberField
                 label="Quantidade (rolos)"
                 value={fForm.quantidade}
@@ -1475,13 +1609,37 @@ function Stock() {
                 step="1"
               />
 
-              <Field label="Link do Produto (opcional)" className="md:col-span-2 lg:col-span-4">
+              <Field label="Qualidade">
+                <Select value={fForm.qualidade || "none"} onValueChange={(v) => setFField("qualidade", v === "none" ? "" : (v as FilamentoQualidadeInput))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar qualidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem avaliação</SelectItem>
+                    <SelectItem value="Ótimo">Ótimo</SelectItem>
+                    <SelectItem value="bom">Bom</SelectItem>
+                    <SelectItem value="médio">Médio</SelectItem>
+                    <SelectItem value="ruim">Ruim</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="Link do Produto (opcional)" className="md:col-span-2">
                 <Input
                   type="url"
                   value={fForm.linkProduto}
                   onChange={(e) => setFField("linkProduto", e.target.value)}
                   placeholder="https://www.amazon.com.br/... ou link do vendedor"
                   maxLength={500}
+                />
+              </Field>
+              <Field label="Observação" className="md:col-span-2 lg:col-span-4">
+                <Textarea
+                  rows={3}
+                  maxLength={500}
+                  value={fForm.observacao}
+                  onChange={(e) => setFField("observacao", e.target.value)}
+                  placeholder="Observações sobre entrega, qualidade, fornecedor ou devolução"
                 />
               </Field>
             </div>
@@ -1512,45 +1670,32 @@ function Stock() {
                     </Button>
                   </div>
                 </Field>
-                {fForm.formaPagamento === "parcelado" ? (
-                  <>
-                    <NumberField
-                      label="Número de Parcelas"
-                      value={fForm.parcelas}
-                      onChange={(v) => setFField("parcelas", v)}
-                      placeholder="1"
-                      step="1"
-                    />
-                    <NumberField
-                      label="Custo Total (R$)"
-                      value={fForm.custoTotal}
-                      onChange={(v) => setFField("custoTotal", v)}
-                      placeholder={
-                        fForm.precoPago
-                          ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
-                          : "0,00"
-                      }
-                    />
-                    <Field label="Primeiro Vencimento" className="md:col-span-2 lg:col-span-4">
-                      <Input
-                        type="date"
-                        value={fForm.primeiraVencimento}
-                        onChange={(e) => setFField("primeiraVencimento", e.target.value)}
-                      />
-                    </Field>
-                  </>
-                ) : (
+                {fForm.formaPagamento === "parcelado" && (
                   <NumberField
-                    label="Custo Total (R$)"
-                    value={fForm.custoTotal}
-                    onChange={(v) => setFField("custoTotal", v)}
-                    placeholder={
-                      fForm.precoPago
-                        ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
-                        : "0,00"
-                    }
+                    label="Número de Parcelas"
+                    value={fForm.parcelas}
+                    onChange={(v) => setFField("parcelas", v)}
+                    placeholder="1"
+                    step="1"
                   />
                 )}
+                <NumberField
+                  label="Custo Total (R$)"
+                  value={fForm.custoTotal}
+                  onChange={(v) => setFField("custoTotal", v)}
+                  placeholder={
+                    fForm.precoPago
+                      ? String((Number(fForm.precoPago) * Math.max(1, Number(fForm.quantidade) || 1)).toFixed(2))
+                      : "0,00"
+                  }
+                />
+                <Field label="Data para Pagto" className="md:col-span-2">
+                  <Input
+                    type="date"
+                    value={fForm.dataParaPagamento}
+                    onChange={(e) => setFField("dataParaPagamento", e.target.value)}
+                  />
+                </Field>
               </div>
               {(() => {
                 const qty = Math.max(1, Number(fForm.quantidade) || 1);
@@ -1604,6 +1749,13 @@ function Stock() {
           </DialogHeader>
           {detailFilament && (
             <div className="space-y-4 py-2">
+              {(() => {
+                const payment = detailFilament?.paymentId
+                  ? filamentoPayments.find((p) => p.id === detailFilament.paymentId)
+                  : null;
+                const insts = payment ? filamentoInstallments.filter((i) => i.paymentId === payment.id) : [];
+                const dataParaPagamento = payment?.dataParaPagamento ?? [...insts].sort((a, b) => a.numero - b.numero)[0]?.vencimento ?? null;
+                return (
               <div className="grid grid-cols-2 gap-4">
                 <DetailRow label="SKU" value={detailFilament.sku} mono />
                 <DetailRow label="Material" value={detailFilament.material} />
@@ -1616,6 +1768,14 @@ function Stock() {
                   value={new Date(detailFilament.dataCompra).toLocaleDateString("pt-BR")}
                 />
                 <DetailRow
+                  label="Data da entrega"
+                  value={detailFilament.dataEntrega ? new Date(detailFilament.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}
+                />
+                <DetailRow
+                  label="Data para pagto"
+                  value={dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}
+                />
+                <DetailRow
                   label="Custo por grama"
                   value={brl(
                     detailFilament.pesoInicial > 0
@@ -1624,6 +1784,8 @@ function Stock() {
                   )}
                 />
               </div>
+                );
+              })()}
 
               <div className="space-y-1 border-t border-border pt-3">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -1817,17 +1979,49 @@ function Stock() {
                     onChange={(e) => setEditField("dataCompra", e.target.value)}
                   />
                 </Field>
+                <Field label="Data da Entrega">
+                  <Input
+                    type="date"
+                    value={editForm.dataEntrega}
+                    onChange={(e) => setEditField("dataEntrega", e.target.value)}
+                  />
+                </Field>
               </div>
 
-              <Field label="Link do Produto (opcional)">
-                <Input
-                  type="url"
-                  value={editForm.linkProduto}
-                  onChange={(e) => setEditField("linkProduto", e.target.value)}
-                  placeholder="https://www.amazon.com.br/... ou link do vendedor"
-                  maxLength={500}
-                />
-              </Field>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Qualidade">
+                  <Select value={editForm.qualidade || "none"} onValueChange={(v) => setEditField("qualidade", v === "none" ? "" : (v as FilamentoQualidadeInput))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar qualidade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem avaliação</SelectItem>
+                      <SelectItem value="Ótimo">Ótimo</SelectItem>
+                      <SelectItem value="bom">Bom</SelectItem>
+                      <SelectItem value="médio">Médio</SelectItem>
+                      <SelectItem value="ruim">Ruim</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Link do Produto (opcional)">
+                  <Input
+                    type="url"
+                    value={editForm.linkProduto}
+                    onChange={(e) => setEditField("linkProduto", e.target.value)}
+                    placeholder="https://www.amazon.com.br/... ou link do vendedor"
+                    maxLength={500}
+                  />
+                </Field>
+                <Field label="Observação" className="md:col-span-2">
+                  <Textarea
+                    rows={3}
+                    maxLength={500}
+                    value={editForm.observacao}
+                    onChange={(e) => setEditField("observacao", e.target.value)}
+                    placeholder="Observações sobre entrega, qualidade, fornecedor ou devolução"
+                  />
+                </Field>
+              </div>
 
               {/* ─── PAYMENT DETAILS (EDIT) ─── */}
               <div className="rounded-xl border border-border bg-muted/30 p-5">
@@ -1856,41 +2050,30 @@ function Stock() {
                       </Button>
                     </div>
                   </Field>
-                  {editForm.formaPagamento === "parcelado" ? (
-                    <>
-                      <NumberField
-                        label="Número de Parcelas"
-                        value={editForm.parcelas}
-                        onChange={(v) => setEditField("parcelas", v)}
-                        placeholder="1"
-                        step="1"
-                      />
-                      <NumberField
-                        label="Custo Total (R$)"
-                        value={editForm.custoTotal}
-                        onChange={(v) => setEditField("custoTotal", v)}
-                        placeholder={
-                          editForm.precoPago ? String(Number(editForm.precoPago).toFixed(2)) : "0,00"
-                        }
-                      />
-                      <Field label="Primeiro Vencimento" className="md:col-span-2 lg:col-span-4">
-                        <Input
-                          type="date"
-                          value={editForm.primeiraVencimento}
-                          onChange={(e) => setEditField("primeiraVencimento", e.target.value)}
-                        />
-                      </Field>
-                    </>
-                  ) : (
+                  {editForm.formaPagamento === "parcelado" && (
                     <NumberField
-                      label="Custo Total (R$)"
-                      value={editForm.custoTotal}
-                      onChange={(v) => setEditField("custoTotal", v)}
-                      placeholder={
-                        editForm.precoPago ? String(Number(editForm.precoPago).toFixed(2)) : "0,00"
-                      }
+                      label="Número de Parcelas"
+                      value={editForm.parcelas}
+                      onChange={(v) => setEditField("parcelas", v)}
+                      placeholder="1"
+                      step="1"
                     />
                   )}
+                  <NumberField
+                    label="Custo Total (R$)"
+                    value={editForm.custoTotal}
+                    onChange={(v) => setEditField("custoTotal", v)}
+                    placeholder={
+                      editForm.precoPago ? String(Number(editForm.precoPago).toFixed(2)) : "0,00"
+                    }
+                  />
+                  <Field label="Data para Pagto" className="md:col-span-2">
+                    <Input
+                      type="date"
+                      value={editForm.dataParaPagamento}
+                      onChange={(e) => setEditField("dataParaPagamento", e.target.value)}
+                    />
+                  </Field>
                 </div>
                 {(() => {
                   const preco = Number(editForm.precoPago) || 0;
