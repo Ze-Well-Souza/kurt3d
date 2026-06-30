@@ -15,6 +15,10 @@ import {
   portfolioRepo,
   settingsRepo,
   vendasRepo,
+  productionCalendarRepo,
+  budgetQuotesRepo,
+  portfolioVideosRepo,
+  savedReportsRepo,
 } from "../../server/repositories.server";
 import { buildFilamentoLabel, hydrateOrderClientLinks } from "./shared";
 
@@ -52,6 +56,10 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     clients,
     payments,
     installments,
+    calendarEvents,
+    budgetQuotes,
+    portfolioVideos,
+    savedReports,
   ] = await Promise.all([
     ordersRepo(),
     orderPartsRepo(),
@@ -67,6 +75,10 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     clientsRepo(),
     filamentoPaymentsRepo(),
     filamentoInstallmentsRepo(),
+    productionCalendarRepo(),
+    budgetQuotesRepo(),
+    portfolioVideosRepo(),
+    savedReportsRepo(),
   ]);
 
   const reservedMap = computeReservedByFilament(inv.list);
@@ -101,5 +113,9 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     clients: clients.list,
     filamentoPayments: payments.list,
     filamentoInstallments: installments.list,
+    calendarEvents: calendarEvents.list,
+    budgetQuotes: budgetQuotes.list,
+    portfolioVideos: portfolioVideos.list,
+    savedReports: savedReports.list,
   };
 });
