@@ -599,8 +599,8 @@ function Stock() {
       <Toaster />
 
       {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div className="min-w-0">
           <h1 className="font-display text-3xl font-bold tracking-tight">
             Estoque & Insumos
           </h1>
@@ -608,7 +608,7 @@ function Stock() {
             Gestão completa de filamentos, ferramentas e materiais de apoio.
           </p>
         </div>
-        <div className="flex gap-6 text-sm">
+        <div className="flex flex-wrap gap-4 text-sm sm:gap-6 xl:justify-end">
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
               Rolos ativos
@@ -630,12 +630,16 @@ function Stock() {
             <div className="font-display text-xl font-bold">{brl(totalInvestido)}</div>
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-end">
-        <Button type="button" size="lg" className="btn-filament gap-2 px-6" onClick={() => setCreateFilamentOpen(true)}>
-          <Plus className="h-4 w-4" /> Cadastrar Filamento
-        </Button>
+        <div className="flex w-full xl:w-auto xl:justify-end">
+          <Button
+            type="button"
+            size="lg"
+            className="btn-filament w-full gap-2 px-4 sm:w-auto sm:px-6"
+            onClick={() => setCreateFilamentOpen(true)}
+          >
+            <Plus className="h-4 w-4" /> Cadastrar Filamento
+          </Button>
+        </div>
       </div>
 
       {/* ═══════════ FILAMENT LIST ═══════════ */}
@@ -670,7 +674,7 @@ function Stock() {
             </div>
           </div>
         </div>
-        <div className="grid gap-3 border-b border-border px-6 py-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 xl:grid-cols-5">
           <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
           <Select value={filMarcaFilter} onValueChange={setFilMarcaFilter}>
             <SelectTrigger>
