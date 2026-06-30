@@ -15,6 +15,10 @@ export { leadsRepo } from "./repositories/leads.repo";
 export { clientsRepo } from "./repositories/clients.repo";
 export { settingsRepo } from "./repositories/settings.repo";
 export { siteContentRepo } from "./repositories/site-content.repo";
+export { productionCalendarRepo } from "./repositories/extended-repos";
+export { budgetQuotesRepo } from "./repositories/extended-repos";
+export { portfolioVideosRepo } from "./repositories/extended-repos";
+export { savedReportsRepo } from "./repositories/extended-repos";
 
 export async function computeReservedMap() {
   const inv = await inventoryRepo();

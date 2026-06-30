@@ -209,3 +209,75 @@ alter table public.filamentos add column if not exists batch_id text null;
 alter table public.filamentos add column if not exists payment_id text null;
 alter table public.filamentos_history add column if not exists batch_id text null;
 alter table public.filamentos_history add column if not exists payment_id text null;
+
+-- ═══════════ Production Calendar ═══════════
+create table if not exists public.production_calendar (
+  id text primary key,
+  order_id text not null references public.orders(id) on delete cascade,
+  title text not null,
+  start_date timestamptz not null,
+  end_date timestamptz not null,
+  printer_name text not null default 'Bambu Lab A1',
+  status text not null default 'scheduled',
+  notes text null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_production_calendar_dates on public.production_calendar(start_date, end_date);
+create index if not exists idx_production_calendar_order on public.production_calendar(order_id);
+
+-- ═══════════ Portfolio Videos/Reels ═══════════
+create table if not exists public.portfolio_videos (
+  id text primary key,
+  project_id text null references public.portfolio_projects(id) on delete set null,
+  title text not null,
+  description text null,
+  video_url text not null,
+  thumbnail_url text null,
+  platform text not null default 'youtube',
+  duration_seconds integer null,
+  views_count integer null default 0,
+  featured boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_portfolio_videos_project on public.portfolio_videos(project_id);
+create index if not exists idx_portfolio_videos_featured on public.portfolio_videos(featured) where featured = true;
+
+-- ═══════════ Report Templates & Saved Reports ═══════════
+create table if not exists public.saved_reports (
+  id text primary key,
+  name text not null,
+  type text not null,
+  config jsonb not null default '{}',
+  filters jsonb null,
+  created_by text null references public.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_saved_reports_type on public.saved_reports(type);
+
+-- ═══════════ Budget Quotes (Orçamentos) ═══════════
+create table if not exists public.budget_quotes (
+  id text primary key,
+  client_name text not null,
+  client_contact text null,
+  client_email text null,
+  items jsonb not null default '[]',
+  subtotal double precision not null default 0,
+  discount_percent double precision null default 0,
+  total double precision not null,
+  validity_days integer not null default 7,
+  status text not null default 'draft',
+  notes text null,
+  pdf_url text null,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz null,
+  converted_to_order_id text null references public.orders(id) on delete set null
+);
+
+create index if not exists idx_budget_quotes_status on public.budget_quotes(status);
+create index if not exists idx_budget_quotes_expires on public.budget_quotes(expires_at);

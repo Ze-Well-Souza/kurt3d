@@ -255,3 +255,78 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   whatsappNumero: "5511999999999",
 };
 
+// ═══════════ Extended Types for New Features ═══════════
+
+export type ProductionCalendarEvent = {
+  id: string;
+  orderId: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  printerName: string;
+  status: "scheduled" | "in_progress" | "completed" | "cancelled";
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BudgetQuoteItem = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  timeMinutes: number;
+  materialGrams: number;
+  subtotal: number;
+};
+
+export type BudgetQuoteStatus = "draft" | "sent" | "approved" | "rejected" | "expired" | "converted";
+
+export type BudgetQuote = {
+  id: string;
+  clientName: string;
+  clientContact?: string | null;
+  clientEmail?: string | null;
+  items: BudgetQuoteItem[];
+  subtotal: number;
+  discountPercent?: number | null;
+  total: number;
+  validityDays: number;
+  status: BudgetQuoteStatus;
+  notes?: string | null;
+  pdfUrl?: string | null;
+  createdAt: string;
+  expiresAt?: string | null;
+  convertedToOrderId?: string | null;
+};
+
+export type PortfolioVideoPlatform = "youtube" | "vimeo" | "instagram" | "tiktok";
+
+export type PortfolioVideo = {
+  id: string;
+  projectId?: string | null;
+  title: string;
+  description?: string | null;
+  videoUrl: string;
+  thumbnailUrl?: string | null;
+  platform: PortfolioVideoPlatform;
+  durationSeconds?: number | null;
+  viewsCount?: number | null;
+  featured: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SavedReportType = "revenue" | "performance" | "inventory" | "orders" | "custom";
+
+export type SavedReport = {
+  id: string;
+  name: string;
+  type: SavedReportType;
+  config: Record<string, unknown>;
+  filters?: Record<string, unknown> | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
