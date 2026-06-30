@@ -4,6 +4,8 @@ import { z } from "zod";
 import type { Filamento, FilamentoQualidade } from "../../domain/types";
 import { filamentosHistoryRepo, filamentosRepo } from "../../server/repositories.server";
 
+const filamentoQualidadeSchema = z.enum(["Ótimo", "bom", "médio", "ruim"]);
+
 export const upsertFilamento = createServerFn({ method: "POST" })
   .validator(
     z.object({
@@ -56,6 +58,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       dataCompra: data.dataCompra,
       dataFim: existing?.dataFim ?? null,
       qualidade: existing?.qualidade ?? null,
+      observacao: existing?.observacao ?? existing?.comentario ?? null,
       comentario: existing?.comentario ?? null,
       linkProduto: data.linkProduto ?? existing?.linkProduto ?? null,
       batchId: data.batchId ?? existing?.batchId ?? null,
@@ -78,8 +81,8 @@ export const archiveFilamento = createServerFn({ method: "POST" })
   .validator(
     z.object({
       id: z.string().min(1),
-      qualidade: z.enum(["bom", "medio", "ruim"]).optional(),
-      comentario: z.string().max(500).optional(),
+      qualidade: filamentoQualidadeSchema.optional(),
+      observacao: z.string().max(500).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -90,7 +93,8 @@ export const archiveFilamento = createServerFn({ method: "POST" })
     const updatedFilamento: Filamento = {
       ...filamento,
       qualidade: (data.qualidade as FilamentoQualidade) ?? filamento.qualidade,
-      comentario: data.comentario ?? filamento.comentario,
+      observacao: data.observacao ?? filamento.observacao ?? filamento.comentario,
+      comentario: data.observacao ?? filamento.observacao ?? filamento.comentario,
       dataFim: new Date().toISOString().slice(0, 10),
     };
 
@@ -103,8 +107,8 @@ export const updateFilamentoQualidade = createServerFn({ method: "POST" })
   .validator(
     z.object({
       id: z.string().min(1),
-      qualidade: z.enum(["bom", "medio", "ruim"]).optional(),
-      comentario: z.string().max(500).optional(),
+      qualidade: filamentoQualidadeSchema.optional(),
+      observacao: z.string().max(500).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -115,7 +119,8 @@ export const updateFilamentoQualidade = createServerFn({ method: "POST" })
     const updated: Filamento = {
       ...filamento,
       qualidade: data.qualidade !== undefined ? (data.qualidade as FilamentoQualidade) : filamento.qualidade,
-      comentario: data.comentario !== undefined ? data.comentario : filamento.comentario,
+      observacao: data.observacao !== undefined ? data.observacao : filamento.observacao ?? filamento.comentario,
+      comentario: data.observacao !== undefined ? data.observacao : filamento.observacao ?? filamento.comentario,
     };
 
     await repo.save(repo.list.map((item) => (item.id === data.id ? updated : item)));

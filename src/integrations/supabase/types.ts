@@ -196,6 +196,7 @@ export type Database = {
           link_produto: string | null
           marca: string
           material: string
+          observacao: string | null
           payment_id: string | null
           peso_atual: number
           peso_inicial: number
@@ -214,6 +215,7 @@ export type Database = {
           link_produto?: string | null
           marca: string
           material: string
+          observacao?: string | null
           payment_id?: string | null
           peso_atual: number
           peso_inicial: number
@@ -232,6 +234,7 @@ export type Database = {
           link_produto?: string | null
           marca?: string
           material?: string
+          observacao?: string | null
           payment_id?: string | null
           peso_atual?: number
           peso_inicial?: number
@@ -253,6 +256,7 @@ export type Database = {
           link_produto: string | null
           marca: string
           material: string
+          observacao: string | null
           payment_id: string | null
           peso_atual: number
           peso_inicial: number
@@ -271,6 +275,7 @@ export type Database = {
           link_produto?: string | null
           marca: string
           material: string
+          observacao?: string | null
           payment_id?: string | null
           peso_atual: number
           peso_inicial: number
@@ -289,6 +294,7 @@ export type Database = {
           link_produto?: string | null
           marca?: string
           material?: string
+          observacao?: string | null
           payment_id?: string | null
           peso_atual?: number
           peso_inicial?: number

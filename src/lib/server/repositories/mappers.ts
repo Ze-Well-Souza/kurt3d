@@ -43,6 +43,24 @@ export function fromUserRow(row: any): User {
   };
 }
 
+function normalizeFilamentoQualidade(value: unknown): Filamento["qualidade"] {
+  if (typeof value !== "string") return null;
+  switch (value.trim().toLowerCase()) {
+    case "otimo":
+    case "ótimo":
+      return "Ótimo";
+    case "bom":
+      return "bom";
+    case "medio":
+    case "médio":
+      return "médio";
+    case "ruim":
+      return "ruim";
+    default:
+      return null;
+  }
+}
+
 export function toUserRow(user: User) {
   return {
     id: user.id,
@@ -68,8 +86,9 @@ export function fromFilamentoRow(row: any): Filamento {
     precoPago: row.preco_pago,
     dataCompra: row.data_compra,
     dataFim: row.data_fim ?? null,
-    qualidade: row.qualidade ?? null,
-    comentario: row.comentario ?? null,
+    qualidade: normalizeFilamentoQualidade(row.qualidade),
+    observacao: row.observacao ?? row.comentario ?? null,
+    comentario: row.comentario ?? row.observacao ?? null,
     linkProduto: row.link_produto ?? null,
     batchId: row.batch_id ?? null,
     paymentId: row.payment_id ?? null,
@@ -77,6 +96,7 @@ export function fromFilamentoRow(row: any): Filamento {
 }
 
 export function toFilamentoRow(row: Filamento) {
+  const observacao = row.observacao ?? row.comentario ?? null;
   return {
     id: row.id,
     sku: row.sku,
@@ -89,7 +109,8 @@ export function toFilamentoRow(row: Filamento) {
     data_compra: row.dataCompra,
     data_fim: row.dataFim ?? null,
     qualidade: row.qualidade ?? null,
-    comentario: row.comentario ?? null,
+    comentario: observacao,
+    observacao,
     link_produto: row.linkProduto ?? null,
     batch_id: row.batchId ?? null,
     payment_id: row.paymentId ?? null,
@@ -108,14 +129,16 @@ export function fromFilamentoHistoryRow(row: any): FilamentoHistory {
     precoPago: row.preco_pago,
     dataCompra: row.data_compra,
     dataFim: row.data_fim ?? null,
-    qualidade: row.qualidade ?? null,
-    comentario: row.comentario ?? null,
+    qualidade: normalizeFilamentoQualidade(row.qualidade),
+    observacao: row.observacao ?? row.comentario ?? null,
+    comentario: row.comentario ?? row.observacao ?? null,
     linkProduto: row.link_produto ?? null,
     arquivadoAt: row.arquivado_at,
   };
 }
 
 export function toFilamentoHistoryRow(row: FilamentoHistory) {
+  const observacao = row.observacao ?? row.comentario ?? null;
   return {
     id: row.id,
     sku: row.sku,
@@ -128,7 +151,8 @@ export function toFilamentoHistoryRow(row: FilamentoHistory) {
     data_compra: row.dataCompra,
     data_fim: row.dataFim ?? null,
     qualidade: row.qualidade ?? null,
-    comentario: row.comentario ?? null,
+    comentario: observacao,
+    observacao,
     link_produto: row.linkProduto ?? null,
     arquivado_at: row.arquivadoAt,
   };

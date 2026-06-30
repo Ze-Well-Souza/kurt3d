@@ -57,7 +57,7 @@ export type Venda = {
   data: string;
 };
 
-export type FilamentoQualidade = "bom" | "medio" | "ruim";
+export type FilamentoQualidade = "Ótimo" | "bom" | "médio" | "ruim";
 
 export type FormaPagamento = "a_vista" | "parcelado";
 
@@ -94,6 +94,7 @@ export type Filamento = {
   dataCompra: string;
   dataFim?: string | null;
   qualidade?: FilamentoQualidade | null;
+  observacao?: string | null;
   comentario?: string | null;
   linkProduto?: string | null;
   batchId?: string | null;

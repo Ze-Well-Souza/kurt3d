@@ -139,8 +139,9 @@ const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const QUALIDADE_CONFIG: Record<FilamentoQualidade, { label: string; color: string; icon: typeof ThumbsUp }> = {
+  "Ótimo": { label: "Ótimo", color: "var(--filament-cyan)", icon: ThumbsUp },
   bom: { label: "Bom", color: "var(--filament-green)", icon: ThumbsUp },
-  medio: { label: "Médio", color: "var(--filament-yellow)", icon: Minus },
+  "médio": { label: "Médio", color: "var(--filament-yellow)", icon: Minus },
   ruim: { label: "Ruim", color: "var(--filament-magenta)", icon: ThumbsDown },
 };
 
@@ -186,7 +187,7 @@ function Stock() {
   });
 
   const mutateArchive = useMutation({
-    mutationFn: (input: { id: string; qualidade?: FilamentoQualidade; comentario?: string }) =>
+    mutationFn: (input: { id: string; qualidade?: FilamentoQualidade; observacao?: string }) =>
       archiveFilamento({ data: input }),
     onSuccess: () => {
       invalidate();
@@ -370,13 +371,13 @@ function Stock() {
     open: boolean;
     filamentId: string;
     qualidade: FilamentoQualidade;
-    comentario: string;
+    observacao: string;
     dataFim: string;
   }>({
     open: false,
     filamentId: "",
     qualidade: "bom",
-    comentario: "",
+    observacao: "",
     dataFim: new Date().toISOString().slice(0, 10),
   });
 
@@ -473,9 +474,9 @@ function Stock() {
     mutateArchive.mutate({
       id: archiveDialog.filamentId,
       qualidade: archiveDialog.qualidade,
-      comentario: archiveDialog.comentario || undefined,
+      observacao: archiveDialog.observacao || undefined,
     });
-    setArchiveDialog({ open: false, filamentId: "", qualidade: "bom", comentario: "", dataFim: new Date().toISOString().slice(0, 10) });
+    setArchiveDialog({ open: false, filamentId: "", qualidade: "bom", observacao: "", dataFim: new Date().toISOString().slice(0, 10) });
   };
 
   // ── Insumo submit ──
@@ -787,7 +788,7 @@ function Stock() {
                                 open: true,
                                 filamentId: f.id,
                                 qualidade: "bom",
-                                comentario: "",
+                                observacao: "",
                                 dataFim: new Date().toISOString().slice(0, 10),
                               })
                             }
@@ -943,9 +944,9 @@ function Stock() {
                   )}
 
                   {/* Comment (if set) */}
-                  {f.comentario && (
+                  {(f.observacao ?? f.comentario) && (
                     <p className="mt-2 text-xs italic text-muted-foreground line-clamp-2">
-                      "{f.comentario}"
+                      "{f.observacao ?? f.comentario}"
                     </p>
                   )}
 
@@ -987,7 +988,7 @@ function Stock() {
                             open: true,
                             filamentId: f.id,
                             qualidade: "bom",
-                            comentario: "",
+                            observacao: "",
                             dataFim: new Date().toISOString().slice(0, 10),
                           })
                         }
@@ -1038,8 +1039,8 @@ function Stock() {
             </div>
             <div className="space-y-2">
               <Label>Qualidade do Filamento</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["bom", "medio", "ruim"] as FilamentoQualidade[]).map((q) => {
+              <div className="grid grid-cols-2 gap-2">
+                {(["Ótimo", "bom", "médio", "ruim"] as FilamentoQualidade[]).map((q) => {
                   const cfg = QUALIDADE_CONFIG[q];
                   const Icon = cfg.icon;
                   const selected = archiveDialog.qualidade === q;
@@ -1060,13 +1061,13 @@ function Stock() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Comentário (opcional)</Label>
+              <Label>Observação (opcional)</Label>
               <Textarea
                 rows={3}
                 maxLength={500}
                 placeholder="Ex: Cor ficou apagada, quebrou fácil, excelente acabamento..."
-                value={archiveDialog.comentario}
-                onChange={(e) => setArchiveDialog((s) => ({ ...s, comentario: e.target.value }))}
+                value={archiveDialog.observacao}
+                onChange={(e) => setArchiveDialog((s) => ({ ...s, observacao: e.target.value }))}
               />
             </div>
           </div>
@@ -1107,7 +1108,7 @@ function Stock() {
                 <TableHead>Compra</TableHead>
                 <TableHead>Término</TableHead>
                 <TableHead>Qualidade</TableHead>
-                <TableHead>Comentário</TableHead>
+                <TableHead>Observação</TableHead>
                 <TableHead>Link</TableHead>
                 <TableHead className="text-right">Preço</TableHead>
               </TableRow>
@@ -1140,8 +1141,8 @@ function Stock() {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground" title={h.comentario ?? ""}>
-                      {h.comentario || "—"}
+                    <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground" title={h.observacao ?? h.comentario ?? ""}>
+                      {h.observacao ?? h.comentario ?? "—"}
                     </TableCell>
                     <TableCell>
                       {h.linkProduto ? (
@@ -1643,13 +1644,13 @@ function Stock() {
                 )}
               </div>
 
-              {detailFilament.comentario && (
+              {(detailFilament.observacao ?? detailFilament.comentario) && (
                 <div className="space-y-1 border-t border-border pt-3">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    Comentário
+                    Observação
                   </div>
                   <p className="text-sm italic text-muted-foreground">
-                    "{detailFilament.comentario}"
+                    "{detailFilament.observacao ?? detailFilament.comentario}"
                   </p>
                 </div>
               )}

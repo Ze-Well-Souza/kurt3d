@@ -9,6 +9,19 @@ create table if not exists public.users (
   updated_at timestamptz not null
 );
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_type
+    where typnamespace = 'public'::regnamespace
+      and typname = 'filamento_qualidade'
+  ) then
+    create type public.filamento_qualidade as enum ('Ótimo', 'bom', 'médio', 'ruim');
+  end if;
+end
+$$;
+
 create table if not exists public.filamentos (
   id text primary key,
   sku text not null unique,
@@ -20,7 +33,8 @@ create table if not exists public.filamentos (
   preco_pago double precision not null,
   data_compra text not null,
   data_fim text null,
-  qualidade text null,
+  qualidade public.filamento_qualidade null,
+  observacao text null,
   comentario text null,
   link_produto text null,
   created_at timestamptz not null default now()
@@ -37,7 +51,8 @@ create table if not exists public.filamentos_history (
   preco_pago double precision not null,
   data_compra text not null,
   data_fim text null,
-  qualidade text null,
+  qualidade public.filamento_qualidade null,
+  observacao text null,
   comentario text null,
   link_produto text null,
   arquivado_at timestamptz not null default now()
