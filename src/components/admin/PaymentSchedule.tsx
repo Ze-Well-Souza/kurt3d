@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatIsoDatePtBr, todayIso } from "@/lib/domain/installments";
 import type { Filamento, FilamentoPayment, FilamentoPaymentInstallment } from "@/lib/domain/types";
 
 type PaymentScheduleProps = {
@@ -41,7 +42,7 @@ export function PaymentSchedule({
     open: boolean;
     totalPago: string;
     dataPagamento: string;
-  }>({ open: false, totalPago: "", dataPagamento: new Date().toISOString().slice(0, 10) });
+  }>({ open: false, totalPago: "", dataPagamento: todayIso() });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVencimento, setEditVencimento] = useState("");
   const [editObservacao, setEditObservacao] = useState("");
@@ -52,7 +53,7 @@ export function PaymentSchedule({
   const totalPago = paid.reduce((s, i) => s + (i.valorPago ?? i.valor), 0);
   const totalPendente = pending.reduce((s, i) => s + i.valor, 0);
   const percent = payment.parcelas > 0 ? (paid.length / payment.parcelas) * 100 : 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIso();
 
   return (
     <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
@@ -124,7 +125,7 @@ export function PaymentSchedule({
                       />
                     ) : (
                       <span className={`text-xs tabular-nums ${overdue ? "font-semibold text-destructive" : ""}`}>
-                        {new Date(i.vencimento).toLocaleDateString("pt-BR")}
+                        {formatIsoDatePtBr(i.vencimento)}
                       </span>
                     )}
                   </TableCell>
@@ -141,7 +142,7 @@ export function PaymentSchedule({
                     )}
                   </TableCell>
                   <TableCell className="tabular-nums text-xs text-muted-foreground">
-                    {i.dataPagamento ? new Date(i.dataPagamento).toLocaleDateString("pt-BR") : "—"}
+                    {i.dataPagamento ? formatIsoDatePtBr(i.dataPagamento) : "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">

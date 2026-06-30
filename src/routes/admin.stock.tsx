@@ -48,7 +48,7 @@ import {
   updateInstallment,
   upsertFilamento,
 } from "@/lib/api/data.functions";
-import { addCalendarMonthsIso, todayIso } from "@/lib/domain/installments";
+import { addCalendarMonthsIso, formatIsoDatePtBr, todayIso } from "@/lib/domain/installments";
 import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
@@ -839,13 +839,13 @@ function Stock() {
                         {brl(f.precoPago)}
                       </TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
-                        {new Date(f.dataCompra).toLocaleDateString("pt-BR")}
+                        {formatIsoDatePtBr(f.dataCompra)}
                       </TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
-                        {f.dataEntrega ? new Date(f.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}
+                        {f.dataEntrega ? formatIsoDatePtBr(f.dataEntrega) : "Pendente"}
                       </TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
-                        {dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}
+                        {dataParaPagamento ? formatIsoDatePtBr(dataParaPagamento) : "—"}
                       </TableCell>
                       <TableCell>
                         {qCfg ? (
@@ -1045,9 +1045,9 @@ function Stock() {
                     </div>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                    <span>Compra: {new Date(f.dataCompra).toLocaleDateString("pt-BR")}</span>
-                    <span>Entrega: {f.dataEntrega ? new Date(f.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}</span>
-                    <span>Pagto: {dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}</span>
+                    <span>Compra: {formatIsoDatePtBr(f.dataCompra)}</span>
+                    <span>Entrega: {f.dataEntrega ? formatIsoDatePtBr(f.dataEntrega) : "Pendente"}</span>
+                    <span>Pagto: {dataParaPagamento ? formatIsoDatePtBr(dataParaPagamento) : "—"}</span>
                   </div>
 
                   {/* Link (if set) */}
@@ -1075,7 +1075,7 @@ function Stock() {
                     <div className="text-xs text-muted-foreground">
                       {brl(f.precoPago)} ·{" "}
                       <span className="tabular-nums">
-                        {new Date(f.dataCompra).toLocaleDateString("pt-BR")}
+                        {formatIsoDatePtBr(f.dataCompra)}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1">
@@ -1247,16 +1247,16 @@ function Stock() {
                     <TableCell className="font-medium">{h.marca} — {h.cor}</TableCell>
                     <TableCell>{h.material}</TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
-                      {new Date(h.dataCompra).toLocaleDateString("pt-BR")}
+                      {formatIsoDatePtBr(h.dataCompra)}
                     </TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
-                      {h.dataEntrega ? new Date(h.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}
+                      {h.dataEntrega ? formatIsoDatePtBr(h.dataEntrega) : "Pendente"}
                     </TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
-                      {dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}
+                      {dataParaPagamento ? formatIsoDatePtBr(dataParaPagamento) : "—"}
                     </TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
-                      {h.dataFim ? new Date(h.dataFim).toLocaleDateString("pt-BR") : "—"}
+                      {h.dataFim ? formatIsoDatePtBr(h.dataFim) : "—"}
                     </TableCell>
                     <TableCell>
                       {qCfg ? (
@@ -1417,7 +1417,7 @@ function Stock() {
                     )}
                   </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
-                    {new Date(i.dataCompra).toLocaleDateString("pt-BR")}
+                    {formatIsoDatePtBr(i.dataCompra)}
                   </TableCell>
                   <TableCell>
                     {i.linkProduto ? (
@@ -1769,15 +1769,15 @@ function Stock() {
                 <DetailRow label="Preço pago" value={brl(detailFilament.precoPago)} />
                 <DetailRow
                   label="Data da compra"
-                  value={new Date(detailFilament.dataCompra).toLocaleDateString("pt-BR")}
+                  value={formatIsoDatePtBr(detailFilament.dataCompra)}
                 />
                 <DetailRow
                   label="Data da entrega"
-                  value={detailFilament.dataEntrega ? new Date(detailFilament.dataEntrega).toLocaleDateString("pt-BR") : "Pendente"}
+                  value={detailFilament.dataEntrega ? formatIsoDatePtBr(detailFilament.dataEntrega) : "Pendente"}
                 />
                 <DetailRow
                   label="Data para pagto"
-                  value={dataParaPagamento ? new Date(dataParaPagamento).toLocaleDateString("pt-BR") : "—"}
+                  value={dataParaPagamento ? formatIsoDatePtBr(dataParaPagamento) : "—"}
                 />
                 <DetailRow
                   label="Custo por grama"

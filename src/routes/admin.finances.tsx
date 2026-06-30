@@ -19,6 +19,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { SearchInput } from "@/components/SearchInput";
 import { addManualExpense, removeExpense, payInstallment, settlePayment } from "@/lib/api/data.functions";
+import { formatIsoDatePtBr, parseIsoDateLocal, todayIso } from "@/lib/domain/installments";
 import type { FilamentoPayment, FilamentoPaymentInstallment } from "@/lib/domain/types";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { normalizeText } from "@/lib/utils/normalization";
@@ -170,7 +171,7 @@ function Finances() {
 
   // Installment (parcelas) KPIs
   const installmentKpis = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIso();
     const yearMonth = today.slice(0, 7);
     let pendente = 0;
     let pagoNoMes = 0;
@@ -180,7 +181,7 @@ function Finances() {
       if (!inst.pago) {
         pendente += inst.valor;
         if (inst.vencimento <= today) atrasadas++;
-        const diffDays = (new Date(inst.vencimento).getTime() - new Date(today).getTime()) / 86400000;
+        const diffDays = (parseIsoDateLocal(inst.vencimento).getTime() - parseIsoDateLocal(today).getTime()) / 86400000;
         if (diffDays >= 0 && diffDays <= 30) vencendoEm30 += inst.valor;
       } else if (inst.dataPagamento && inst.dataPagamento.slice(0, 7) === yearMonth) {
         pagoNoMes += inst.valorPago ?? inst.valor;
@@ -190,7 +191,7 @@ function Finances() {
   }, [filteredInstallments]);
 
   const upcomingInstallments = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayIso();
     return filteredInstallments
       .filter((i) => !i.pago)
       .map((i) => {
@@ -819,7 +820,7 @@ function Finances() {
                       <span
                         className={`text-xs tabular-nums ${overdue ? "font-semibold text-destructive" : ""}`}
                       >
-                        {new Date(inst.vencimento).toLocaleDateString("pt-BR")}
+                        {formatIsoDatePtBr(inst.vencimento)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{brl(inst.valor)}</TableCell>

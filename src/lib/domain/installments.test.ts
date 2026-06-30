@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addCalendarMonthsIso, todayIso } from "./installments";
+import { addCalendarMonthsIso, formatIsoDatePtBr, todayIso } from "./installments";
 
 describe("installments", () => {
   it("avanca por meses reais preservando o dia quando possivel", () => {
@@ -15,5 +15,9 @@ describe("installments", () => {
 
   it("gera a data ISO de hoje", () => {
     expect(todayIso(new Date("2026-06-26T15:30:00.000Z"))).toBe("2026-06-26");
+  });
+
+  it("formata datas ISO sem deslocar o dia por timezone", () => {
+    expect(formatIsoDatePtBr("2026-06-24")).toBe("24/06/2026");
   });
 });
