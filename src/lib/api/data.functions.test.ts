@@ -34,6 +34,22 @@ type InsumoRepoMock = {
   save: ReturnType<typeof vi.fn>;
 };
 
+type InsumoPaymentRepoMock = {
+  list: any[];
+  insert: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+  remove: ReturnType<typeof vi.fn>;
+  attachToInsumo: ReturnType<typeof vi.fn>;
+  detachFromInsumo: ReturnType<typeof vi.fn>;
+};
+
+type InsumoInstallmentRepoMock = {
+  list: any[];
+  insertMany: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+  deleteByPayment: ReturnType<typeof vi.fn>;
+};
+
 type LeadRepoMock = {
   list: any[];
   save: ReturnType<typeof vi.fn>;
@@ -47,6 +63,8 @@ let clientsRepoMock: ClientRepoMock;
 let orderPartsRepoMock: OrderPartRepoMock;
 let expensesRepoMock: ExpenseRepoMock;
 let insumosRepoMock: InsumoRepoMock;
+let insumoPaymentsRepoMock: InsumoPaymentRepoMock;
+let insumoInstallmentsRepoMock: InsumoInstallmentRepoMock;
 let leadsRepoMock: LeadRepoMock;
 
 vi.mock("@tanstack/react-start", () => ({
@@ -71,12 +89,18 @@ vi.mock("../server/repositories.server", () => ({
   filamentoPaymentsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
   filamentosHistoryRepo: vi.fn(async () => ({ list: [], save: vi.fn(), archive: vi.fn() })),
   filamentosRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
+  insumoInstallmentsRepo: vi.fn(async () => insumoInstallmentsRepoMock),
+  insumoPaymentsRepo: vi.fn(async () => insumoPaymentsRepoMock),
   insumosRepo: vi.fn(async () => insumosRepoMock),
   inventoryRepo: vi.fn(async () => inventoryRepoMock),
   leadsRepo: vi.fn(async () => leadsRepoMock),
   orderPartsRepo: vi.fn(async () => orderPartsRepoMock),
   ordersRepo: vi.fn(async () => ordersRepoMock),
   portfolioRepo: vi.fn(async () => portfolioRepoMock),
+  productionCalendarRepo: vi.fn(async () => ({ list: [] })),
+  budgetQuotesRepo: vi.fn(async () => ({ list: [] })),
+  portfolioVideosRepo: vi.fn(async () => ({ list: [] })),
+  savedReportsRepo: vi.fn(async () => ({ list: [] })),
   settingsRepo: vi.fn(async () => ({ settings: {}, save: vi.fn() })),
   vendasRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
 }));
@@ -193,6 +217,20 @@ describe("client linking", () => {
     insumosRepoMock = {
       list: [],
       save: vi.fn(async () => undefined),
+    };
+    insumoPaymentsRepoMock = {
+      list: [],
+      insert: vi.fn(async () => undefined),
+      update: vi.fn(async () => undefined),
+      remove: vi.fn(async () => undefined),
+      attachToInsumo: vi.fn(async () => undefined),
+      detachFromInsumo: vi.fn(async () => undefined),
+    };
+    insumoInstallmentsRepoMock = {
+      list: [],
+      insertMany: vi.fn(async () => undefined),
+      update: vi.fn(async () => undefined),
+      deleteByPayment: vi.fn(async () => undefined),
     };
     leadsRepoMock = {
       list: [],
@@ -561,6 +599,60 @@ describe("insumos e leads", () => {
       data: "2026-06-10",
       descricao: "Compra de insumo: Bico 0.6",
     });
+  });
+
+  it("cria plano parcelado para insumo sem perder a despesa espelhada", async () => {
+    const { addInsumo } = await import("./data.functions");
+
+    await addInsumo({
+      data: {
+        nome: "Impressora Bambu Lab A1",
+        dataCompra: "2026-07-01",
+        quantidade: "1",
+        precoTotal: 5299,
+        linkProduto: "https://example.com/impressora",
+        formaPagamento: "parcelado",
+        parcelas: 12,
+        dataParaPagamento: "2026-07-01",
+      },
+    });
+
+    expect(insumosRepoMock.save).toHaveBeenCalledTimes(1);
+    expect(expensesRepoMock.save).toHaveBeenCalledTimes(1);
+    expect(insumoPaymentsRepoMock.insert).toHaveBeenCalledTimes(1);
+    expect(insumoInstallmentsRepoMock.insertMany).toHaveBeenCalledTimes(1);
+    const savedInsumo = insumosRepoMock.save.mock.calls[0][0][0];
+    expect(savedInsumo).toMatchObject({
+      nome: "Impressora Bambu Lab A1",
+      paymentId: expect.any(String),
+    });
+    const createdInstallments = insumoInstallmentsRepoMock.insertMany.mock.calls[0][0];
+    expect(createdInstallments).toHaveLength(12);
+    expect(createdInstallments[0]).toMatchObject({ numero: 1, vencimento: "2026-07-01" });
+    expect(createdInstallments[1]).toMatchObject({ numero: 2, vencimento: "2026-08-01" });
+  });
+
+  it("remove o insumo e exclui o plano parcelado vinculado", async () => {
+    insumosRepoMock.list = [
+      {
+        id: "ins-1",
+        nome: "Impressora",
+        dataCompra: "2026-07-01",
+        quantidade: "1",
+        precoTotal: 5299,
+        linkProduto: null,
+        paymentId: "pay-1",
+      },
+    ];
+
+    const { removeInsumo } = await import("./data.functions");
+
+    await removeInsumo({ data: { id: "ins-1" } });
+
+    expect(insumosRepoMock.save).toHaveBeenCalledWith([]);
+    expect(insumoInstallmentsRepoMock.deleteByPayment).toHaveBeenCalledWith("pay-1");
+    expect(insumoPaymentsRepoMock.detachFromInsumo).toHaveBeenCalledWith("pay-1");
+    expect(insumoPaymentsRepoMock.remove).toHaveBeenCalledWith("pay-1");
   });
 
   it("converte lead em cliente sem apagar o lead e sem duplicar cliente existente", async () => {

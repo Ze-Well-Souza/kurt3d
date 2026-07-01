@@ -9,6 +9,8 @@ import type {
   FilamentoPaymentInstallment,
   FormaPagamento,
   Insumo,
+  InsumoPayment,
+  InsumoPaymentInstallment,
   InventoryTxn,
   Lead,
   Order,
@@ -294,6 +296,7 @@ export function fromInsumoRow(row: any): Insumo {
     quantidade: row.quantidade,
     precoTotal: row.preco_total,
     linkProduto: row.link_produto ?? null,
+    paymentId: row.payment_id ?? null,
   };
 }
 
@@ -305,6 +308,7 @@ export function toInsumoRow(row: Insumo) {
     quantidade: row.quantidade,
     preco_total: row.precoTotal,
     link_produto: row.linkProduto ?? null,
+    payment_id: row.paymentId ?? null,
   };
 }
 
@@ -380,6 +384,30 @@ export function toPaymentRow(row: FilamentoPayment) {
   };
 }
 
+export function fromInsumoPaymentRow(row: any): InsumoPayment {
+  return {
+    id: row.id,
+    insumoId: row.insumo_id,
+    formaPagamento: row.forma_pagamento as FormaPagamento,
+    custoTotal: row.custo_total,
+    parcelas: row.parcelas,
+    dataParaPagamento: row.data_para_pagamento ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+export function toInsumoPaymentRow(row: InsumoPayment) {
+  return {
+    id: row.id,
+    insumo_id: row.insumoId,
+    forma_pagamento: row.formaPagamento,
+    custo_total: row.custoTotal,
+    parcelas: row.parcelas,
+    data_para_pagamento: row.dataParaPagamento ?? null,
+    created_at: row.createdAt,
+  };
+}
+
 export function fromInstallmentRow(row: any): FilamentoPaymentInstallment {
   return {
     id: row.id,
@@ -395,6 +423,34 @@ export function fromInstallmentRow(row: any): FilamentoPaymentInstallment {
 }
 
 export function toInstallmentRow(row: FilamentoPaymentInstallment) {
+  return {
+    id: row.id,
+    payment_id: row.paymentId,
+    numero: row.numero,
+    valor: row.valor,
+    vencimento: row.vencimento,
+    pago: row.pago,
+    data_pagamento: row.dataPagamento ?? null,
+    valor_pago: row.valorPago ?? null,
+    observacao: row.observacao ?? null,
+  };
+}
+
+export function fromInsumoInstallmentRow(row: any): InsumoPaymentInstallment {
+  return {
+    id: row.id,
+    paymentId: row.payment_id,
+    numero: row.numero,
+    valor: row.valor,
+    vencimento: row.vencimento,
+    pago: !!row.pago,
+    dataPagamento: row.data_pagamento ?? null,
+    valorPago: row.valor_pago ?? null,
+    observacao: row.observacao ?? null,
+  };
+}
+
+export function toInsumoInstallmentRow(row: InsumoPaymentInstallment) {
   return {
     id: row.id,
     payment_id: row.paymentId,

@@ -83,6 +83,28 @@ export type FilamentoPaymentInstallment = {
   observacao: string | null;
 };
 
+export type InsumoPayment = {
+  id: string;
+  insumoId: string;
+  formaPagamento: FormaPagamento;
+  custoTotal: number;
+  parcelas: number;
+  dataParaPagamento: string | null;
+  createdAt: string;
+};
+
+export type InsumoPaymentInstallment = {
+  id: string;
+  paymentId: string;
+  numero: number;
+  valor: number;
+  vencimento: string;
+  pago: boolean;
+  dataPagamento: string | null;
+  valorPago: number | null;
+  observacao: string | null;
+};
+
 export type Filamento = {
   id: string;
   sku: string;
@@ -114,6 +136,7 @@ export type Insumo = {
   quantidade: string;
   precoTotal: number;
   linkProduto?: string | null;
+  paymentId?: string | null;
 };
 
 export type PortfolioProject = {

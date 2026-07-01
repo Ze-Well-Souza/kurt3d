@@ -187,6 +187,88 @@ export type Database = {
         }
         Relationships: []
       }
+      insumo_payment_installments: {
+        Row: {
+          data_pagamento: string | null
+          id: string
+          numero: number
+          observacao: string | null
+          pago: boolean
+          payment_id: string
+          valor: number
+          valor_pago: number | null
+          vencimento: string
+        }
+        Insert: {
+          data_pagamento?: string | null
+          id: string
+          numero: number
+          observacao?: string | null
+          pago?: boolean
+          payment_id: string
+          valor: number
+          valor_pago?: number | null
+          vencimento: string
+        }
+        Update: {
+          data_pagamento?: string | null
+          id?: string
+          numero?: number
+          observacao?: string | null
+          pago?: boolean
+          payment_id?: string
+          valor?: number
+          valor_pago?: number | null
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insumo_payment_installments_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "insumo_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insumo_payments: {
+        Row: {
+          created_at: string
+          custo_total: number
+          data_para_pagamento: string | null
+          forma_pagamento: string
+          id: string
+          insumo_id: string
+          parcelas: number
+        }
+        Insert: {
+          created_at?: string
+          custo_total: number
+          data_para_pagamento?: string | null
+          forma_pagamento: string
+          id: string
+          insumo_id: string
+          parcelas?: number
+        }
+        Update: {
+          created_at?: string
+          custo_total?: number
+          data_para_pagamento?: string | null
+          forma_pagamento?: string
+          id?: string
+          insumo_id?: string
+          parcelas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insumo_payments_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "insumos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       filamentos: {
         Row: {
           batch_id: string | null
@@ -319,6 +401,7 @@ export type Database = {
           id: string
           link_produto: string | null
           nome: string
+          payment_id: string | null
           preco_total: number
           quantidade: string
         }
@@ -327,6 +410,7 @@ export type Database = {
           id: string
           link_produto?: string | null
           nome: string
+          payment_id?: string | null
           preco_total: number
           quantidade: string
         }
@@ -335,6 +419,7 @@ export type Database = {
           id?: string
           link_produto?: string | null
           nome?: string
+          payment_id?: string | null
           preco_total?: number
           quantidade?: string
         }

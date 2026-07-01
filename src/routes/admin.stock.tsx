@@ -39,17 +39,21 @@ import {
   createFilamentoPayment,
   deleteFilamentoPayment,
   payInstallment,
+  payInsumoInstallment,
   removeFilamento,
   removeInsumo,
   revertInstallment,
+  revertInsumoInstallment,
   settlePayment,
+  settleInsumoPayment,
   updateInsumo,
   updateFilamentoPayment,
   updateInstallment,
+  updateInsumoInstallment,
   upsertFilamento,
 } from "@/lib/api/data.functions";
 import { addCalendarMonthsIso, formatIsoDatePtBr, todayIso } from "@/lib/domain/installments";
-import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo } from "@/lib/domain/types";
+import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { normalizeText } from "@/lib/utils/normalization";
@@ -128,6 +132,10 @@ const insumoSchema = z.object({
   dataCompra: z.string().min(1, "Data da compra obrigatória"),
   quantidade: z.string().trim().min(1, "Informe a quantidade").max(100),
   precoTotal: z.number().min(0.01, "Preço total inválido").max(1000000),
+  linkProduto: z.string().url("Informe um link válido começando com http:// ou https://").max(500).nullable().optional(),
+  formaPagamento: z.enum(["a_vista", "parcelado"]),
+  parcelas: z.number().int().min(1).max(48),
+  dataParaPagamento: z.string().min(1, "Data para pagamento obrigatória").max(30),
 });
 
 type InsumoForm = {
@@ -136,6 +144,9 @@ type InsumoForm = {
   quantidade: string;
   precoTotal: string;
   linkProduto: string;
+  formaPagamento: FormaPagamento;
+  parcelas: string;
+  dataParaPagamento: string;
 };
 
 const initialInsumoForm: InsumoForm = {
@@ -144,6 +155,9 @@ const initialInsumoForm: InsumoForm = {
   quantidade: "",
   precoTotal: "",
   linkProduto: "",
+  formaPagamento: "a_vista",
+  parcelas: "1",
+  dataParaPagamento: "",
 };
 
 const brl = (n: number) =>
@@ -184,6 +198,8 @@ function Stock() {
   const insumos = (snap.data?.insumos ?? []) as Insumo[];
   const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
   const filamentoInstallments = (snap.data?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
+  const insumoPayments = (snap.data?.insumoPayments ?? []) as InsumoPayment[];
+  const insumoInstallments = (snap.data?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["snapshot"] });
 
@@ -272,7 +288,11 @@ function Stock() {
     dataCompra: todayIso(),
     dataParaPagamento: addCalendarMonthsIso(todayIso(), 1),
   }));
-  const [iForm, setIForm] = useState<InsumoForm>(initialInsumoForm);
+  const [iForm, setIForm] = useState<InsumoForm>({
+    ...initialInsumoForm,
+    dataCompra: todayIso(),
+    dataParaPagamento: todayIso(),
+  });
   const [editInsumo, setEditInsumo] = useState<(InsumoForm & { id: string }) | null>(null);
   const [createFilamentOpen, setCreateFilamentOpen] = useState(false);
 
@@ -310,7 +330,7 @@ function Stock() {
       formaPagamento: payment?.formaPagamento ?? "a_vista",
       custoTotal: payment ? String(payment.custoTotal) : String(f.precoPago),
       parcelas: payment ? String(payment.parcelas) : "1",
-      dataParaPagamento: payment?.dataParaPagamento ?? first?.vencimento ?? (f.dataCompra || new Date().toISOString().slice(0, 10)),
+      dataParaPagamento: payment?.dataParaPagamento ?? first?.vencimento ?? (f.dataCompra || todayIso()),
     });
   };
 
@@ -342,7 +362,7 @@ function Stock() {
     const formaPagamento: FormaPagamento = editForm.formaPagamento === "parcelado" ? "parcelado" : "a_vista";
     const custoTotalNum = Number(editForm.custoTotal) || Number(editForm.precoPago) || 0;
     const parcelas = formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(editForm.parcelas) || 1)) : 1;
-    const dataParaPagamento = editForm.dataParaPagamento || editForm.dataCompra || new Date().toISOString().slice(0, 10);
+    const dataParaPagamento = editForm.dataParaPagamento || editForm.dataCompra || todayIso();
 
     const existingFilamento = filamentos.find((x) => x.id === editForm.id);
     const existingPaymentId = existingFilamento?.paymentId ?? null;
@@ -501,7 +521,7 @@ function Stock() {
       observacao: archiveDialog.observacao || undefined,
       dataFim: archiveDialog.dataFim || undefined,
     });
-    setArchiveDialog({ open: false, filamentId: "", qualidade: "bom", observacao: "", dataFim: new Date().toISOString().slice(0, 10) });
+    setArchiveDialog({ open: false, filamentId: "", qualidade: "bom", observacao: "", dataFim: todayIso() });
   };
 
   // ── Insumo submit ──
@@ -512,14 +532,21 @@ function Stock() {
       dataCompra: iForm.dataCompra,
       quantidade: iForm.quantidade,
       precoTotal: Number(iForm.precoTotal),
-      linkProduto: iForm.linkProduto || undefined,
+      linkProduto: iForm.linkProduto || null,
+      formaPagamento: iForm.formaPagamento,
+      parcelas: iForm.formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(iForm.parcelas) || 1)) : 1,
+      dataParaPagamento: iForm.dataParaPagamento || iForm.dataCompra,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
     }
     mutateInsumo.mutate(parsed.data);
-    setIForm(initialInsumoForm);
+    setIForm({
+      ...initialInsumoForm,
+      dataCompra: todayIso(),
+      dataParaPagamento: todayIso(),
+    });
     toast.success(`Insumo "${parsed.data.nome}" cadastrado.`);
   };
 
@@ -532,7 +559,10 @@ function Stock() {
       dataCompra: editInsumo.dataCompra,
       quantidade: editInsumo.quantidade,
       precoTotal: Number(editInsumo.precoTotal),
-      linkProduto: editInsumo.linkProduto || undefined,
+      linkProduto: editInsumo.linkProduto || null,
+      formaPagamento: editInsumo.formaPagamento,
+      parcelas: editInsumo.formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(editInsumo.parcelas) || 1)) : 1,
+      dataParaPagamento: editInsumo.dataParaPagamento || editInsumo.dataCompra,
     });
 
     if (!parsed.success) {
@@ -593,6 +623,19 @@ function Stock() {
   const lowFilamentosCount = filteredFilamentos.filter((f) => getFilamentoAlertLevel(f) === "low").length;
   const lowInsumosCount = filteredInsumos.filter((i) => getInsumoAlertLevel(i) === "low").length;
   const unknownInsumosCount = filteredInsumos.filter((i) => getInsumoAlertLevel(i) === "unknown").length;
+
+  const getInsumoPaymentMeta = (insumo: Insumo) => {
+    const payment = insumo.paymentId ? insumoPayments.find((p) => p.id === insumo.paymentId) : null;
+    const installments = payment ? insumoInstallments.filter((item) => item.paymentId === payment.id) : [];
+    const firstInstallment = [...installments].sort((a, b) => a.numero - b.numero)[0];
+    const paidCount = installments.filter((item) => item.pago).length;
+    return {
+      payment,
+      installments,
+      paidCount,
+      dataParaPagamento: payment?.dataParaPagamento ?? firstInstallment?.vencimento ?? null,
+    };
+  };
 
   return (
     <div className="space-y-8">
@@ -1344,7 +1387,31 @@ function Stock() {
             />
           </Field>
         </div>
-          <div className="flex justify-end">
+        <div className="rounded-xl border border-border p-4">
+          <div className="mb-4 flex items-center gap-2">
+            <CalendarClock className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-medium">Detalhes do Pagamento</h3>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Field label="Forma de Pagamento" className="md:col-span-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant={iForm.formaPagamento === "a_vista" ? "default" : "outline"} className="justify-center" onClick={() => setIField("formaPagamento", "a_vista")}>
+                  <Banknote className="mr-2 h-4 w-4" /> À vista
+                </Button>
+                <Button type="button" variant={iForm.formaPagamento === "parcelado" ? "default" : "outline"} className="justify-center" onClick={() => setIField("formaPagamento", "parcelado")}>
+                  <CreditCard className="mr-2 h-4 w-4" /> Parcelado
+                </Button>
+              </div>
+            </Field>
+            {iForm.formaPagamento === "parcelado" && (
+              <NumberField label="Número de Parcelas" value={iForm.parcelas} onChange={(v) => setIField("parcelas", v)} placeholder="12" step="1" />
+            )}
+            <Field label="Data para Pagto" className={iForm.formaPagamento === "parcelado" ? "" : "lg:col-span-2"}>
+              <Input type="date" value={iForm.dataParaPagamento} onChange={(e) => setIField("dataParaPagamento", e.target.value)} />
+            </Field>
+          </div>
+        </div>
+        <div className="flex justify-end">
           <Button type="submit" size="lg" className="btn-filament gap-2 px-6">
             <Plus className="h-4 w-4" /> Adicionar Insumo
           </Button>
@@ -1389,6 +1456,8 @@ function Stock() {
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Alerta</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead>Pagamento</TableHead>
+                <TableHead>Data p/ Pagto</TableHead>
                 <TableHead>Link</TableHead>
                 <TableHead className="text-right">Preço Total</TableHead>
                 <TableHead className="w-24 text-right">Ações</TableHead>
@@ -1398,6 +1467,7 @@ function Stock() {
               {filteredInsumos.map((i) => {
                 const alertLevel = getInsumoAlertLevel(i);
                 const quantityNumber = extractQuantityNumber(i.quantidade);
+                const { payment, installments, paidCount, dataParaPagamento } = getInsumoPaymentMeta(i);
                 return (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.nome}</TableCell>
@@ -1418,6 +1488,23 @@ function Stock() {
                   </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
                     {formatIsoDatePtBr(i.dataCompra)}
+                  </TableCell>
+                  <TableCell>
+                    {!payment ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : payment.formaPagamento === "a_vista" ? (
+                      <Badge variant="outline" className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]">
+                        <Banknote className="h-3 w-3" /> À vista
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="gap-1 border-blue-500/30 bg-blue-50 text-blue-700 text-[10px]">
+                        <CreditCard className="h-3 w-3" />
+                        {paidCount}/{installments.length}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="tabular-nums text-muted-foreground">
+                    {dataParaPagamento ? formatIsoDatePtBr(dataParaPagamento) : "—"}
                   </TableCell>
                   <TableCell>
                     {i.linkProduto ? (
@@ -1445,6 +1532,9 @@ function Stock() {
                             quantidade: i.quantidade,
                             precoTotal: String(i.precoTotal),
                             linkProduto: i.linkProduto ?? "",
+                            formaPagamento: payment?.formaPagamento ?? "a_vista",
+                            parcelas: String(payment?.parcelas ?? 1),
+                            dataParaPagamento: dataParaPagamento ?? i.dataCompra,
                           })
                         }
                         aria-label="Editar insumo"
@@ -1514,6 +1604,34 @@ function Stock() {
                     maxLength={500}
                   />
                 </Field>
+              </div>
+              <div className="rounded-xl border border-border p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-medium">Detalhes do Pagamento</h3>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Forma de Pagamento" className="md:col-span-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button type="button" variant={editInsumo.formaPagamento === "a_vista" ? "default" : "outline"} className="justify-center" onClick={() => setEditInsumoField("formaPagamento", "a_vista")}>
+                        <Banknote className="mr-2 h-4 w-4" /> À vista
+                      </Button>
+                      <Button type="button" variant={editInsumo.formaPagamento === "parcelado" ? "default" : "outline"} className="justify-center" onClick={() => setEditInsumoField("formaPagamento", "parcelado")}>
+                        <CreditCard className="mr-2 h-4 w-4" /> Parcelado
+                      </Button>
+                    </div>
+                  </Field>
+                  {editInsumo.formaPagamento === "parcelado" && (
+                    <NumberField label="Número de Parcelas" value={editInsumo.parcelas} onChange={(value) => setEditInsumoField("parcelas", value)} placeholder="12" step="1" />
+                  )}
+                  <Field label="Data para Pagto" className={editInsumo.formaPagamento === "parcelado" ? "" : "lg:col-span-2"}>
+                    <Input
+                      type="date"
+                      value={editInsumo.dataParaPagamento}
+                      onChange={(e) => setEditInsumoField("dataParaPagamento", e.target.value)}
+                    />
+                  </Field>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditInsumo(null)}>

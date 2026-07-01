@@ -18,9 +18,9 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { SearchInput } from "@/components/SearchInput";
-import { addManualExpense, removeExpense, payInstallment, settlePayment } from "@/lib/api/data.functions";
+import { addManualExpense, removeExpense, payInstallment, payInsumoInstallment, settleInsumoPayment, settlePayment } from "@/lib/api/data.functions";
 import { formatIsoDatePtBr, parseIsoDateLocal, todayIso } from "@/lib/domain/installments";
-import type { FilamentoPayment, FilamentoPaymentInstallment } from "@/lib/domain/types";
+import type { FilamentoPayment, FilamentoPaymentInstallment, Insumo, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { normalizeText } from "@/lib/utils/normalization";
 
@@ -47,9 +47,12 @@ function Finances() {
   const vendas = snap.data?.vendas ?? [];
   const orders = snap.data?.orders ?? [];
   const filamentos = snap.data?.filamentos ?? [];
+  const insumos = (snap.data?.insumos ?? []) as Insumo[];
   const expenses = snap.data?.expenses ?? [];
   const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
   const filamentoInstallments = (snap.data?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
+  const insumoPayments = (snap.data?.insumoPayments ?? []) as InsumoPayment[];
+  const insumoInstallments = (snap.data?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
 
   const [search, setSearch] = useState("");
   const [showExpense, setShowExpense] = useState(false);
@@ -70,6 +73,16 @@ function Finances() {
     mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
       settlePayment({ data: input }),
     onSuccess: () => { invalidate(); toast.success("Todas as parcelas quitadas."); },
+  });
+  const mutatePayInsumoInstallment = useMutation({
+    mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number }) =>
+      payInsumoInstallment({ data: input }),
+    onSuccess: () => { invalidate(); toast.success("Parcela do insumo marcada como paga."); },
+  });
+  const mutateSettleInsumoPayment = useMutation({
+    mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
+      settleInsumoPayment({ data: input }),
+    onSuccess: () => { invalidate(); toast.success("Todas as parcelas do insumo foram quitadas."); },
   });
 
   const periodLabel = useMemo(() => {
@@ -105,12 +118,23 @@ function Finances() {
     [expenses, periodAnchor, periodPreset],
   );
 
-  const filteredInstallments = useMemo(
+  const filteredFilamentoInstallments = useMemo(
     () =>
       filamentoInstallments.filter((installment) =>
         isDateInSelectedPeriod(installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento),
       ),
     [filamentoInstallments, periodAnchor, periodPreset],
+  );
+  const filteredInsumoInstallments = useMemo(
+    () =>
+      insumoInstallments.filter((installment) =>
+        isDateInSelectedPeriod(installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento),
+      ),
+    [insumoInstallments, periodAnchor, periodPreset],
+  );
+  const filteredInstallments = useMemo(
+    () => [...filteredFilamentoInstallments, ...filteredInsumoInstallments],
+    [filteredFilamentoInstallments, filteredInsumoInstallments],
   );
 
   const totals = useMemo(() => {
@@ -192,17 +216,24 @@ function Finances() {
 
   const upcomingInstallments = useMemo(() => {
     const today = todayIso();
-    return filteredInstallments
+    const filamentEntries = filteredFilamentoInstallments
       .filter((i) => !i.pago)
       .map((i) => {
-        const payment = filamentoPayments.find((p) => p.id === i.paymentId);
-        const batchSkus = payment
-          ? filamentos.filter((f) => f.batchId === payment.batchId).map((f) => f.sku)
-          : [];
-        return { inst: i, payment, batchSkus, overdue: i.vencimento <= today };
-      })
-      .sort((a, b) => a.inst.vencimento.localeCompare(b.inst.vencimento));
-  }, [filteredInstallments, filamentoPayments, filamentos]);
+        const payment = filamentoPayments.find((p) => p.id === i.paymentId) ?? null;
+        const label = payment
+          ? filamentos.filter((f) => f.batchId === payment.batchId).map((f) => f.sku).join(", ")
+          : "";
+        return { kind: "filamento" as const, inst: i, payment, label, overdue: i.vencimento <= today };
+      });
+    const insumoEntries = filteredInsumoInstallments
+      .filter((i) => !i.pago)
+      .map((i) => {
+        const payment = insumoPayments.find((p) => p.id === i.paymentId) ?? null;
+        const insumo = payment ? insumos.find((item) => item.id === payment.insumoId) : null;
+        return { kind: "insumo" as const, inst: i, payment, label: insumo?.nome ?? "", overdue: i.vencimento <= today };
+      });
+    return [...filamentEntries, ...insumoEntries].sort((a, b) => a.inst.vencimento.localeCompare(b.inst.vencimento));
+  }, [filteredFilamentoInstallments, filteredInsumoInstallments, filamentoPayments, filamentos, insumoPayments, insumos]);
 
   const filteredVendas = useMemo(() => {
     if (!search.trim()) return periodFilteredVendas;
@@ -241,7 +272,7 @@ function Finances() {
       tipo: "Parcela",
       data: installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento,
       descricao: `Parcela ${installment.numero}`,
-      categoria: "Filamento",
+      categoria: filamentoInstallments.some((item) => item.id === installment.id) ? "Filamento" : "Insumo",
       cliente: "",
       valor: installment.pago ? installment.valorPago ?? installment.valor : installment.valor,
       custo: "",
@@ -251,7 +282,7 @@ function Finances() {
     }));
 
     return [...vendaRows, ...expenseRows, ...installmentRows].sort((a, b) => a.data.localeCompare(b.data));
-  }, [filteredExpenses, filteredInstallments, periodFilteredVendas]);
+  }, [filteredExpenses, filteredInstallments, filamentoInstallments, periodFilteredVendas]);
 
   const exportCsv = () => {
     const headers = ["tipo", "data", "descricao", "categoria", "cliente", "valor", "custo", "depreciacao", "status", "observacao"];
@@ -797,7 +828,7 @@ function Finances() {
               <TableHeader>
                 <TableRow>
                   <TableHead>#</TableHead>
-                  <TableHead>Lote</TableHead>
+                  <TableHead>Referência</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-center">Status</TableHead>
@@ -806,12 +837,12 @@ function Finances() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {upcomingInstallments.map(({ inst, payment, batchSkus, overdue }) => (
+                {upcomingInstallments.map(({ kind, inst, payment, label, overdue }) => (
                   <TableRow key={inst.id}>
                     <TableCell className="font-mono text-xs">{inst.numero}</TableCell>
                     <TableCell className="text-xs">
-                      {batchSkus.length > 0 ? (
-                        <span className="font-mono">{batchSkus.join(", ")}</span>
+                      {label ? (
+                        <span className={kind === "filamento" ? "font-mono" : "font-medium"}>{label}</span>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
@@ -849,12 +880,17 @@ function Finances() {
                           size="sm"
                           variant="outline"
                           className="h-7 gap-1 text-xs"
-                          disabled={mutatePayInstallment.isPending || mutateSettlePayment.isPending}
+                          disabled={mutatePayInstallment.isPending || mutateSettlePayment.isPending || mutatePayInsumoInstallment.isPending || mutateSettleInsumoPayment.isPending}
                           onClick={() =>
-                            mutatePayInstallment.mutate({
-                              installmentId: inst.id,
-                              dataPagamento: new Date().toISOString().slice(0, 10),
-                            })
+                            kind === "filamento"
+                              ? mutatePayInstallment.mutate({
+                                  installmentId: inst.id,
+                                  dataPagamento: todayIso(),
+                                })
+                              : mutatePayInsumoInstallment.mutate({
+                                  installmentId: inst.id,
+                                  dataPagamento: todayIso(),
+                                })
                           }
                         >
                           <Check className="h-3 w-3" /> Pagar
@@ -864,15 +900,20 @@ function Finances() {
                             size="sm"
                             variant="ghost"
                             className="h-7 gap-1 text-xs"
-                            disabled={mutateSettlePayment.isPending}
+                            disabled={mutateSettlePayment.isPending || mutateSettleInsumoPayment.isPending}
                             onClick={() =>
-                              mutateSettlePayment.mutate({
-                                paymentId: payment.id,
-                                dataPagamento: new Date().toISOString().slice(0, 10),
-                              })
+                              kind === "filamento"
+                                ? mutateSettlePayment.mutate({
+                                    paymentId: payment.id,
+                                    dataPagamento: todayIso(),
+                                  })
+                                : mutateSettleInsumoPayment.mutate({
+                                    paymentId: payment.id,
+                                    dataPagamento: todayIso(),
+                                  })
                             }
                           >
-                            Quitar lote
+                            {kind === "filamento" ? "Quitar lote" : "Quitar compra"}
                           </Button>
                         )}
                       </div>
@@ -916,7 +957,7 @@ function Finances() {
                     <TableCell className="font-medium">{e.descricao}</TableCell>
                     <TableCell>{e.categoria ? <Badge variant="secondary">{e.categoria}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                     <TableCell><Badge variant="outline" style={{ borderColor: src.color, color: src.color }}>{src.label}</Badge></TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">{new Date(e.data).toLocaleDateString("pt-BR")}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{formatIsoDatePtBr(e.data)}</TableCell>
                     <TableCell className="text-right tabular-nums font-semibold">{brl(e.valor)}</TableCell>
                     <TableCell>
                       {e.source !== "insumo" && (
