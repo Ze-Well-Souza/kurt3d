@@ -237,6 +237,8 @@ function CalcPedidos() {
   const results = useMemo(() => calcPortfolioPricing({ ...numeric, settings }), [numeric, settings]);
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const isSlicerMode = form.entryMode === "slicer";
+  const effectiveUnitPrice = numeric.precoVenda > 0 ? numeric.precoVenda : results.precoSugerido;
+  const effectiveLotProfit = effectiveUnitPrice * numeric.quantidade - results.custoLote;
 
   const totals = useMemo(() => projects.reduce((acc, p) => {
     const r = calcPortfolioPricing({
@@ -1236,7 +1238,17 @@ function CalcPedidos() {
                 <Wand2 className="h-3 w-3" /> Aplicar
               </Button>
             </div>
-            <ResultCard label="Lucro Líquido do Lote" value={brl(results.lucroLiquido)} accent={results.lucroLiquido >= 0 ? "green" : "magenta"} emphasize tip="Receita total do pedido menos custo total do lote." />
+            <ResultCard
+              label="Lucro Líquido do Lote"
+              value={brl(effectiveLotProfit)}
+              accent={effectiveLotProfit >= 0 ? "green" : "magenta"}
+              emphasize
+              tip={
+                numeric.precoVenda > 0
+                  ? "Lucro do lote usando o Preco de Venda informado."
+                  : "Lucro estimado do lote usando o Preco Sugerido, ja que ainda nao ha um Preco de Venda informado."
+              }
+            />
           </div>
 
           <div className="flex justify-end">
