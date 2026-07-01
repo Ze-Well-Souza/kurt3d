@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check, Download, FileText, Tags } from "lucide-react";
+import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check, Download, FileText, Tags, ChevronLeft, ChevronRight } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,12 @@ const isPartialInstallment = (installment: { pago: boolean; valor: number; valor
 const getEventSignedAmount = (event: { tipo: "pagamento" | "estorno"; valor: number }) =>
   event.tipo === "estorno" ? -event.valor : event.valor;
 
+const formatMonthYearLabel = (monthIso: string) => {
+  const [year, month] = monthIso.split("-").map(Number);
+  if (!year || !month) return monthIso;
+  return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+};
+
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   insumo: { label: "Insumo", color: "var(--filament-yellow)" },
   manual: { label: "Manual", color: "var(--filament-cyan)" },
@@ -96,6 +102,7 @@ function Finances() {
     dataPagamento: string;
     valorPago: string;
   } | null>(null);
+  const [installmentKpiMonthAnchor, setInstallmentKpiMonthAnchor] = useState(() => todayIso().slice(0, 7));
   const [paymentHistorySourceFilter, setPaymentHistorySourceFilter] = useState<PaymentHistorySourceFilter>("all");
   const [paymentHistoryTypeFilter, setPaymentHistoryTypeFilter] = useState<PaymentHistoryTypeFilter>("all");
   const [expForm, setExpForm] = useState({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" });
@@ -264,23 +271,52 @@ function Finances() {
       ),
     [insumoInstallments, periodAnchor, periodPreset],
   );
+  const allInstallments = useMemo(
+    () => [...filamentoInstallments, ...insumoInstallments],
+    [filamentoInstallments, insumoInstallments],
+  );
+
   const filteredInstallments = useMemo(
     () => [...filteredFilamentoInstallments, ...filteredInsumoInstallments],
     [filteredFilamentoInstallments, filteredInsumoInstallments],
   );
 
-  const filteredPaymentEvents = useMemo(
+  const referenceMonthFilamentoInstallments = useMemo(
+    () => filamentoInstallments.filter((installment) => installment.vencimento.slice(0, 7) === installmentKpiMonthAnchor),
+    [filamentoInstallments, installmentKpiMonthAnchor],
+  );
+
+  const referenceMonthInsumoInstallments = useMemo(
+    () => insumoInstallments.filter((installment) => installment.vencimento.slice(0, 7) === installmentKpiMonthAnchor),
+    [insumoInstallments, installmentKpiMonthAnchor],
+  );
+
+  const referenceMonthInstallments = useMemo(
+    () => [...referenceMonthFilamentoInstallments, ...referenceMonthInsumoInstallments],
+    [referenceMonthFilamentoInstallments, referenceMonthInsumoInstallments],
+  );
+
+  const allPaymentEvents = useMemo(
     () =>
       [
         ...filamentoPaymentEvents.map((event) => ({ ...event, kind: "filamento" as const })),
         ...insumoPaymentEvents.map((event) => ({ ...event, kind: "insumo" as const })),
-      ]
+      ].sort((a, b) => {
+        const byDate = b.dataPagamento.localeCompare(a.dataPagamento);
+        return byDate !== 0 ? byDate : b.createdAt.localeCompare(a.createdAt);
+      }),
+    [filamentoPaymentEvents, insumoPaymentEvents],
+  );
+
+  const filteredPaymentEvents = useMemo(
+    () =>
+      allPaymentEvents
         .filter((event) => isDateInSelectedPeriod(event.dataPagamento))
         .sort((a, b) => {
           const byDate = b.dataPagamento.localeCompare(a.dataPagamento);
           return byDate !== 0 ? byDate : b.createdAt.localeCompare(a.createdAt);
         }),
-    [filamentoPaymentEvents, insumoPaymentEvents, periodAnchor, periodPreset],
+    [allPaymentEvents, periodAnchor, periodPreset],
   );
 
 
@@ -350,42 +386,64 @@ function Finances() {
   // Installment (parcelas) KPIs
   const installmentKpis = useMemo(() => {
     const today = todayIso();
-    const yearMonth = today.slice(0, 7);
     let pendente = 0;
-    let vencendoEm30 = 0;
+    let vencendoNoMes = 0;
     let atrasadas = 0;
-    for (const inst of filteredInstallments) {
+    for (const inst of referenceMonthInstallments) {
       if (!inst.pago) {
-        pendente += getInstallmentRemainingAmount(inst);
-        if (inst.vencimento <= today) atrasadas++;
-        const diffDays = (parseIsoDateLocal(inst.vencimento).getTime() - parseIsoDateLocal(today).getTime()) / 86400000;
-        if (diffDays >= 0 && diffDays <= 30) vencendoEm30 += getInstallmentRemainingAmount(inst);
+        const remainingAmount = getInstallmentRemainingAmount(inst);
+        pendente += remainingAmount;
+        if (inst.vencimento < today) {
+          atrasadas++;
+        } else {
+          vencendoNoMes += remainingAmount;
+        }
       }
     }
     const installmentIdsWithEventThisMonth = new Set(
-      filteredPaymentEvents
-        .filter((event) => event.dataPagamento.slice(0, 7) === yearMonth)
+      allPaymentEvents
+        .filter((event) => event.dataPagamento.slice(0, 7) === installmentKpiMonthAnchor)
         .map((event) => event.installmentId),
     );
-    const paidFallbackNoMes = filteredInstallments
+    const paidFallbackNoMes = allInstallments
       .filter(
         (inst) =>
           !!inst.dataPagamento &&
-          inst.dataPagamento.slice(0, 7) === yearMonth &&
+          inst.dataPagamento.slice(0, 7) === installmentKpiMonthAnchor &&
           getInstallmentPaidAmount(inst) > 0 &&
           !installmentIdsWithEventThisMonth.has(inst.id),
       )
       .reduce((sum, inst) => sum + getInstallmentPaidAmount(inst), 0);
-    const paidFromEventsNoMes = filteredPaymentEvents
-      .filter((event) => event.dataPagamento.slice(0, 7) === yearMonth)
+    const paidFromEventsNoMes = allPaymentEvents
+      .filter((event) => event.dataPagamento.slice(0, 7) === installmentKpiMonthAnchor)
       .reduce((sum, event) => sum + getEventSignedAmount(event), 0);
     const pagoNoMes = paidFromEventsNoMes + paidFallbackNoMes;
-    return { pendente, pagoNoMes, vencendoEm30, atrasadas };
-  }, [filteredInstallments, filteredPaymentEvents]);
+    return { pendente, pagoNoMes, vencendoNoMes, atrasadas };
+  }, [referenceMonthInstallments, allPaymentEvents, allInstallments, installmentKpiMonthAnchor]);
+
+  const installmentKpiAvailableMonths = useMemo(() => {
+    const months = new Set<string>();
+    months.add(todayIso().slice(0, 7));
+    for (const installment of allInstallments) {
+      months.add(installment.vencimento.slice(0, 7));
+      if (installment.dataPagamento) months.add(installment.dataPagamento.slice(0, 7));
+    }
+    for (const event of allPaymentEvents) {
+      months.add(event.dataPagamento.slice(0, 7));
+    }
+    return Array.from(months).sort((a, b) => a.localeCompare(b));
+  }, [allInstallments, allPaymentEvents]);
+
+  const installmentKpiMonthIndex = installmentKpiAvailableMonths.indexOf(installmentKpiMonthAnchor);
+  const previousInstallmentKpiMonth = installmentKpiMonthIndex > 0 ? installmentKpiAvailableMonths[installmentKpiMonthIndex - 1] : null;
+  const nextInstallmentKpiMonth =
+    installmentKpiMonthIndex >= 0 && installmentKpiMonthIndex < installmentKpiAvailableMonths.length - 1
+      ? installmentKpiAvailableMonths[installmentKpiMonthIndex + 1]
+      : null;
 
   const filamentoPaymentProgress = useMemo(() => {
     const grouped = new Map<string, { totalInstallments: number; paidInstallments: number; totalAmount: number; paidAmount: number }>();
-    for (const installment of filteredFilamentoInstallments) {
+    for (const installment of filamentoInstallments) {
       const current = grouped.get(installment.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
       current.totalInstallments += 1;
       current.totalAmount += installment.valor;
@@ -394,11 +452,11 @@ function Finances() {
       grouped.set(installment.paymentId, current);
     }
     return grouped;
-  }, [filteredFilamentoInstallments]);
+  }, [filamentoInstallments]);
 
   const insumoPaymentProgress = useMemo(() => {
     const grouped = new Map<string, { totalInstallments: number; paidInstallments: number; totalAmount: number; paidAmount: number }>();
-    for (const installment of filteredInsumoInstallments) {
+    for (const installment of insumoInstallments) {
       const current = grouped.get(installment.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
       current.totalInstallments += 1;
       current.totalAmount += installment.valor;
@@ -407,11 +465,11 @@ function Finances() {
       grouped.set(installment.paymentId, current);
     }
     return grouped;
-  }, [filteredInsumoInstallments]);
+  }, [insumoInstallments]);
 
   const scheduleEntries = useMemo(() => {
     const today = todayIso();
-    const filamentEntries = filteredFilamentoInstallments
+    const filamentEntries = referenceMonthFilamentoInstallments
       .map((i) => {
         const payment = filamentoPayments.find((p) => p.id === i.paymentId) ?? null;
         const label = payment
@@ -420,7 +478,7 @@ function Finances() {
         const progress = filamentoPaymentProgress.get(i.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
         return { kind: "filamento" as const, inst: i, payment, label, overdue: !i.pago && i.vencimento <= today, progress };
       });
-    const insumoEntries = filteredInsumoInstallments
+    const insumoEntries = referenceMonthInsumoInstallments
       .map((i) => {
         const payment = insumoPayments.find((p) => p.id === i.paymentId) ?? null;
         const insumo = payment ? insumos.find((item) => item.id === payment.insumoId) : null;
@@ -445,8 +503,8 @@ function Finances() {
       return aDate.localeCompare(bDate);
     });
   }, [
-    filteredFilamentoInstallments,
-    filteredInsumoInstallments,
+    referenceMonthFilamentoInstallments,
+    referenceMonthInsumoInstallments,
     filamentoPayments,
     filamentos,
     insumoPayments,
@@ -458,27 +516,27 @@ function Finances() {
 
   const scheduleCounts = useMemo(
     () => ({
-      pending: filteredInstallments.filter((item) => !item.pago).length,
-      paid: filteredInstallments.filter((item) => item.pago).length,
-      partial: filteredInstallments.filter((item) => isPartialInstallment(item)).length,
-      total: filteredInstallments.length,
+      pending: referenceMonthInstallments.filter((item) => !item.pago).length,
+      paid: referenceMonthInstallments.filter((item) => item.pago).length,
+      partial: referenceMonthInstallments.filter((item) => isPartialInstallment(item)).length,
+      total: referenceMonthInstallments.length,
     }),
-    [filteredInstallments],
+    [referenceMonthInstallments],
   );
 
   const selectedFinanceInstallment = useMemo(() => {
     if (!payDialog) return null;
-    const list = payDialog.kind === "filamento" ? filteredFilamentoInstallments : filteredInsumoInstallments;
+    const list = payDialog.kind === "filamento" ? filamentoInstallments : insumoInstallments;
     return list.find((item) => item.id === payDialog.installmentId) ?? null;
-  }, [filteredFilamentoInstallments, filteredInsumoInstallments, payDialog]);
+  }, [filamentoInstallments, insumoInstallments, payDialog]);
 
   const financeHistoryRows = useMemo(() => {
     const filamentoPaymentsById = new Map(filamentoPayments.map((payment) => [payment.id, payment]));
     const insumoPaymentsById = new Map(insumoPayments.map((payment) => [payment.id, payment]));
     const filamentoInstallmentsById = new Map(filamentoInstallments.map((installment) => [installment.id, installment]));
     const insumoInstallmentsById = new Map(insumoInstallments.map((installment) => [installment.id, installment]));
-
-    return filteredPaymentEvents.map((event) => {
+    const installmentsWithTrackedEvents = new Set(allPaymentEvents.map((event) => event.installmentId));
+    const eventRows = filteredPaymentEvents.map((event) => {
       if (event.kind === "filamento") {
         const installment = filamentoInstallmentsById.get(event.installmentId) ?? null;
         const payment = filamentoPaymentsById.get(event.paymentId) ?? null;
@@ -502,7 +560,69 @@ function Finances() {
         formaPagamento: payment?.formaPagamento ?? null,
       };
     });
+
+    const legacyFilamentoRows = filamentoInstallments
+      .filter(
+        (installment) =>
+          !!installment.dataPagamento &&
+          isDateInSelectedPeriod(installment.dataPagamento) &&
+          getInstallmentPaidAmount(installment) > 0 &&
+          !installmentsWithTrackedEvents.has(installment.id),
+      )
+      .map((installment) => {
+        const payment = filamentoPaymentsById.get(installment.paymentId) ?? null;
+        const reference = payment
+          ? filamentos.filter((item) => item.batchId === payment.batchId).map((item) => item.sku).join(", ")
+          : "—";
+        return {
+          id: `legacy-filamento-${installment.id}`,
+          installmentId: installment.id,
+          paymentId: installment.paymentId,
+          kind: "filamento" as const,
+          tipo: "pagamento" as const,
+          valor: getInstallmentPaidAmount(installment),
+          dataPagamento: installment.dataPagamento ?? installment.vencimento,
+          observacao: installment.observacao ?? "Pagamento confirmado antes do historico detalhado.",
+          createdAt: installment.dataPagamento ?? installment.vencimento,
+          reference,
+          numero: installment.numero,
+          formaPagamento: payment?.formaPagamento ?? null,
+        };
+      });
+
+    const legacyInsumoRows = insumoInstallments
+      .filter(
+        (installment) =>
+          !!installment.dataPagamento &&
+          isDateInSelectedPeriod(installment.dataPagamento) &&
+          getInstallmentPaidAmount(installment) > 0 &&
+          !installmentsWithTrackedEvents.has(installment.id),
+      )
+      .map((installment) => {
+        const payment = insumoPaymentsById.get(installment.paymentId) ?? null;
+        const insumo = payment ? insumos.find((item) => item.id === payment.insumoId) : null;
+        return {
+          id: `legacy-insumo-${installment.id}`,
+          installmentId: installment.id,
+          paymentId: installment.paymentId,
+          kind: "insumo" as const,
+          tipo: "pagamento" as const,
+          valor: getInstallmentPaidAmount(installment),
+          dataPagamento: installment.dataPagamento ?? installment.vencimento,
+          observacao: installment.observacao ?? "Pagamento confirmado antes do historico detalhado.",
+          createdAt: installment.dataPagamento ?? installment.vencimento,
+          reference: insumo?.nome ?? "—",
+          numero: installment.numero,
+          formaPagamento: payment?.formaPagamento ?? null,
+        };
+      });
+
+    return [...eventRows, ...legacyFilamentoRows, ...legacyInsumoRows].sort((a, b) => {
+      const byDate = b.dataPagamento.localeCompare(a.dataPagamento);
+      return byDate !== 0 ? byDate : b.createdAt.localeCompare(a.createdAt);
+    });
   }, [
+    allPaymentEvents,
     filteredPaymentEvents,
     filamentoPayments,
     insumoPayments,
@@ -510,6 +630,8 @@ function Finances() {
     insumoInstallments,
     filamentos,
     insumos,
+    periodAnchor,
+    periodPreset,
   ]);
 
   const visibleFinanceHistoryRows = useMemo(
@@ -991,6 +1113,40 @@ function Finances() {
       </div>
 
       {/* Installments (Parcelas) KPIs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <div>
+          <div className="text-sm font-semibold text-foreground">Mês de referência das parcelas</div>
+          <div className="text-xs text-muted-foreground">
+            Os cards e o cronograma abaixo acompanham este mês de referência de forma independente do filtro global da tela.
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-8 w-8"
+            disabled={!previousInstallmentKpiMonth}
+            onClick={() => previousInstallmentKpiMonth && setInstallmentKpiMonthAnchor(previousInstallmentKpiMonth)}
+            aria-label="Mês anterior com movimento"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Badge variant="secondary" className="min-w-[140px] justify-center px-3 py-1 text-xs capitalize">
+            {formatMonthYearLabel(installmentKpiMonthAnchor)}
+          </Badge>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-8 w-8"
+            disabled={!nextInstallmentKpiMonth}
+            onClick={() => nextInstallmentKpiMonth && setInstallmentKpiMonthAnchor(nextInstallmentKpiMonth)}
+            aria-label="Próximo mês com movimento"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           icon={<CreditCard className="h-4 w-4" />}
@@ -1000,14 +1156,14 @@ function Finances() {
         />
         <KpiCard
           icon={<Banknote className="h-4 w-4" />}
-          label="Parcelas Pagas (mês)"
+          label="Parcelas Pagas (Ref.)"
           value={brl(installmentKpis.pagoNoMes)}
           color="var(--filament-green)"
         />
         <KpiCard
           icon={<CalendarClock className="h-4 w-4" />}
-          label="Vencendo em 30 dias"
-          value={brl(installmentKpis.vencendoEm30)}
+          label="Vencendo no Mês"
+          value={brl(installmentKpis.vencendoNoMes)}
           color="var(--filament-yellow)"
         />
         <KpiCard
@@ -1279,7 +1435,7 @@ function Finances() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>#</TableHead>
+                  <TableHead>Parcela</TableHead>
                   <TableHead>Referência</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead>Data Pgto</TableHead>
@@ -1290,7 +1446,10 @@ function Finances() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scheduleEntries.map(({ kind, inst, payment, label, overdue, progress }) => (
+                {scheduleEntries.map(({ kind, inst, payment, label, overdue, progress }) => {
+                  const totalInstallments = (payment?.parcelas ?? progress.totalInstallments) || 1;
+                  const totalPlanAmount = payment?.custoTotal ?? progress.totalAmount;
+                  return (
                   <TableRow
                     key={inst.id}
                     className={
@@ -1299,7 +1458,7 @@ function Finances() {
                         : undefined
                     }
                   >
-                    <TableCell className="font-mono text-xs">{inst.numero}</TableCell>
+                    <TableCell className="font-mono text-xs">{`${inst.numero}/${totalInstallments}`}</TableCell>
                     <TableCell className="text-xs">
                       <div className="flex flex-wrap items-center gap-2">
                         {label ? (
@@ -1318,13 +1477,18 @@ function Finances() {
                           }
                         >
                           {progress.totalAmount > 0 && progress.paidAmount >= progress.totalAmount
-                            ? "Quitado"
+                            ? `Quitado ${totalInstallments}/${totalInstallments}`
                             : progress.paidAmount > 0
-                              ? `Parcial ${brl(progress.paidAmount)}`
+                              ? `Pago ${progress.paidInstallments}/${totalInstallments}${isPartialInstallment(inst) ? ` + parcial ${brl(getInstallmentPaidAmount(inst))}` : ""}`
                               : payment?.formaPagamento === "a_vista"
                                 ? "Em aberto"
-                                : `Em aberto 0/${progress.totalInstallments}`}
+                                : `Em aberto 0/${totalInstallments}`}
                         </Badge>
+                      </div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">
+                        {payment?.formaPagamento === "parcelado"
+                          ? `Parcela ${inst.numero}/${totalInstallments} · Total ${brl(totalPlanAmount)}`
+                          : `Pagamento unico · Total ${brl(totalPlanAmount)}`}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1339,6 +1503,9 @@ function Finances() {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       <div>{brl(inst.valor)}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Total {brl(totalPlanAmount)}
+                      </div>
                       {!inst.pago && (
                         <div className="text-[10px] text-muted-foreground">
                           Falta {brl(getInstallmentRemainingAmount(inst))}
@@ -1416,7 +1583,7 @@ function Finances() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           </div>

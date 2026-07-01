@@ -107,7 +107,7 @@ export function PaymentSchedule({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">#</TableHead>
+              <TableHead className="w-16">Parcela</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead className="text-center">Status</TableHead>
@@ -121,7 +121,7 @@ export function PaymentSchedule({
               const overdue = !i.pago && i.vencimento < today;
               return (
                 <TableRow key={i.id}>
-                  <TableCell className="font-mono text-xs">{i.numero}</TableCell>
+                  <TableCell className="font-mono text-xs">{`${i.numero}/${payment.parcelas}`}</TableCell>
                   <TableCell>
                     {isEditing ? (
                       <Input
@@ -138,6 +138,9 @@ export function PaymentSchedule({
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-xs">
                     <div>{brl(i.valor)}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Total {brl(payment.custoTotal)}
+                    </div>
                     {!i.pago && (
                       <div className="text-[10px] text-muted-foreground">
                         Falta {brl(getRemainingAmount(i))}
