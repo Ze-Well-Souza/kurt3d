@@ -61,6 +61,8 @@ export type FilamentoQualidade = "Ótimo" | "bom" | "médio" | "ruim";
 
 export type FormaPagamento = "a_vista" | "parcelado";
 
+export type InsumoClassificacaoFinanceira = "operacional" | "investimento";
+
 export type FilamentoPayment = {
   id: string;
   batchId: string;
@@ -137,6 +139,7 @@ export type Insumo = {
   precoTotal: number;
   linkProduto?: string | null;
   paymentId?: string | null;
+  classificacaoFinanceira: InsumoClassificacaoFinanceira;
 };
 
 export type PortfolioProject = {

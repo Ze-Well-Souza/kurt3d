@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { addCalendarMonthsIso } from "../../domain/installments";
-import type { Expense, FormaPagamento, Insumo, InsumoPayment, InsumoPaymentInstallment } from "../../domain/types";
+import type { Expense, FormaPagamento, Insumo, InsumoClassificacaoFinanceira, InsumoPayment, InsumoPaymentInstallment } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { expensesRepo, insumoInstallmentsRepo, insumoPaymentsRepo, insumosRepo } from "../../server/repositories.server";
 
@@ -11,6 +11,10 @@ const paymentFields = {
   parcelas: z.number().int().min(1).max(48).optional(),
   dataParaPagamento: z.string().min(1).max(30).optional(),
 };
+
+function buildInsumoExpenseCategory(classificacaoFinanceira: InsumoClassificacaoFinanceira): string {
+  return classificacaoFinanceira === "investimento" ? "Investimento / Imobilizado" : "Despesa Operacional";
+}
 
 async function createOrUpdateInsumoPayment(input: {
   insumoId: string;
@@ -115,6 +119,7 @@ export const addInsumo = createServerFn({ method: "POST" })
       quantidade: z.string().trim().min(1).max(100),
       precoTotal: z.number().min(0.01).max(1000000),
       linkProduto: z.string().url().max(500).nullable().optional(),
+      classificacaoFinanceira: z.enum(["operacional", "investimento"]).default("operacional"),
       ...paymentFields,
     }),
   )
@@ -129,6 +134,7 @@ export const addInsumo = createServerFn({ method: "POST" })
       precoTotal: data.precoTotal,
       linkProduto: data.linkProduto ?? null,
       paymentId: provisionalPaymentId,
+      classificacaoFinanceira: data.classificacaoFinanceira,
     };
     await repo.save([insumo, ...repo.list]);
 
@@ -175,7 +181,7 @@ export const addInsumo = createServerFn({ method: "POST" })
       valor: insumo.precoTotal,
       data: insumo.dataCompra,
       descricao: `Compra de insumo: ${insumo.nome}`,
-      categoria: null,
+      categoria: buildInsumoExpenseCategory(insumo.classificacaoFinanceira),
     };
     await expRepo.save([expense, ...expRepo.list]);
     return { ok: true };
@@ -207,6 +213,7 @@ export const updateInsumo = createServerFn({ method: "POST" })
       quantidade: z.string().trim().min(1).max(100),
       precoTotal: z.number().min(0.01).max(1000000),
       linkProduto: z.string().url().max(500).nullable().optional(),
+      classificacaoFinanceira: z.enum(["operacional", "investimento"]).default("operacional"),
       ...paymentFields,
     }),
   )
@@ -232,6 +239,7 @@ export const updateInsumo = createServerFn({ method: "POST" })
       precoTotal: data.precoTotal,
       linkProduto: data.linkProduto ?? null,
       paymentId: paymentResult.paymentId,
+      classificacaoFinanceira: data.classificacaoFinanceira,
     };
 
     await repo.save(repo.list.map((insumo) => (insumo.id === data.id ? updated : insumo)));
@@ -244,7 +252,7 @@ export const updateInsumo = createServerFn({ method: "POST" })
       valor: updated.precoTotal,
       data: updated.dataCompra,
       descricao: `Compra de insumo: ${updated.nome}`,
-      categoria: linkedExpense?.categoria ?? null,
+      categoria: buildInsumoExpenseCategory(updated.classificacaoFinanceira),
     };
 
     const nextExpenses = linkedExpense

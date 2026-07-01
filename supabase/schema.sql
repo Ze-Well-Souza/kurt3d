@@ -121,7 +121,8 @@ create table if not exists public.insumos (
   quantidade text not null,
   preco_total double precision not null,
   link_produto text null,
-  payment_id text null
+  payment_id text null,
+  classificacao_financeira text not null default 'operacional'
 );
 
 create table if not exists public.vendas (

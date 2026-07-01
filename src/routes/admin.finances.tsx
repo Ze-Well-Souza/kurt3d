@@ -40,6 +40,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 type FinancePeriodPreset = "all" | "month" | "quarter";
+type InstallmentViewFilter = "pending" | "paid" | "all";
 
 function Finances() {
   const qc = useQueryClient();
@@ -58,8 +59,11 @@ function Finances() {
   const [search, setSearch] = useState("");
   const [showExpense, setShowExpense] = useState(false);
   const [stockView, setStockView] = useState<"list" | "table">("table");
+  const [installmentViewFilter, setInstallmentViewFilter] = useState<InstallmentViewFilter>("pending");
   const [purchaseBrandFilter, setPurchaseBrandFilter] = useState("all");
   const [purchaseMaterialFilter, setPurchaseMaterialFilter] = useState("all");
+  const [highlightedInstallmentId, setHighlightedInstallmentId] = useState<string | null>(null);
+  const [highlightedPaymentId, setHighlightedPaymentId] = useState<string | null>(null);
   const [expForm, setExpForm] = useState({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" });
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
   const [periodAnchor, setPeriodAnchor] = useState(new Date().toISOString().slice(0, 7));
@@ -70,22 +74,46 @@ function Finances() {
   const mutatePayInstallment = useMutation({
     mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number }) =>
       payInstallment({ data: input }),
-    onSuccess: () => { invalidate(); toast.success("Parcela marcada como paga."); },
+    onSuccess: (_data, variables) => {
+      invalidate();
+      setInstallmentViewFilter("paid");
+      setHighlightedInstallmentId(variables.installmentId);
+      setHighlightedPaymentId(null);
+      toast.success("Parcela marcada como paga. Confira em Pagas.");
+    },
   });
   const mutateSettlePayment = useMutation({
     mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
       settlePayment({ data: input }),
-    onSuccess: () => { invalidate(); toast.success("Todas as parcelas quitadas."); },
+    onSuccess: (_data, variables) => {
+      invalidate();
+      setInstallmentViewFilter("paid");
+      setHighlightedInstallmentId(null);
+      setHighlightedPaymentId(variables.paymentId);
+      toast.success("Lote quitado. Confira em Pagas.");
+    },
   });
   const mutatePayInsumoInstallment = useMutation({
     mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number }) =>
       payInsumoInstallment({ data: input }),
-    onSuccess: () => { invalidate(); toast.success("Parcela do insumo marcada como paga."); },
+    onSuccess: (_data, variables) => {
+      invalidate();
+      setInstallmentViewFilter("paid");
+      setHighlightedInstallmentId(variables.installmentId);
+      setHighlightedPaymentId(null);
+      toast.success("Parcela do insumo marcada como paga. Confira em Pagas.");
+    },
   });
   const mutateSettleInsumoPayment = useMutation({
     mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
       settleInsumoPayment({ data: input }),
-    onSuccess: () => { invalidate(); toast.success("Todas as parcelas do insumo foram quitadas."); },
+    onSuccess: (_data, variables) => {
+      invalidate();
+      setInstallmentViewFilter("paid");
+      setHighlightedInstallmentId(null);
+      setHighlightedPaymentId(variables.paymentId);
+      toast.success("Compra quitada. Confira em Pagas.");
+    },
   });
 
   const periodLabel = useMemo(() => {
@@ -119,6 +147,25 @@ function Finances() {
   const filteredExpenses = useMemo(
     () => expenses.filter((expense) => isDateInSelectedPeriod(expense.data)),
     [expenses, periodAnchor, periodPreset],
+  );
+
+  const insumoById = useMemo(
+    () => new Map(insumos.map((item) => [item.id, item])),
+    [insumos],
+  );
+
+  const classifiedExpenses = useMemo(
+    () =>
+      filteredExpenses.map((expense) => {
+        const linkedInsumo = expense.source === "insumo" ? insumoById.get(expense.refId) : null;
+        const financialClass =
+          linkedInsumo?.classificacaoFinanceira === "investimento" ||
+          expense.categoria === "Investimento / Imobilizado"
+            ? "investimento"
+            : "operacional";
+        return { ...expense, financialClass };
+      }),
+    [filteredExpenses, insumoById],
   );
 
   const allFilamentPurchases = useMemo(
@@ -183,11 +230,16 @@ function Finances() {
   const totals = useMemo(() => {
     const receita = periodFilteredVendas.reduce((s, v) => s + v.valor, 0);
     const custo = periodFilteredVendas.reduce((s, v) => s + v.custo, 0);
-    const despesas = filteredExpenses.reduce((s, e) => s + e.valor, 0);
-    const lucro = receita - custo - despesas;
+    const despesasOperacionais = classifiedExpenses
+      .filter((expense) => expense.financialClass === "operacional")
+      .reduce((s, e) => s + e.valor, 0);
+    const investimentos = classifiedExpenses
+      .filter((expense) => expense.financialClass === "investimento")
+      .reduce((s, e) => s + e.valor, 0);
+    const lucro = receita - custo - despesasOperacionais;
     const depreciacaoAcumulada = periodFilteredVendas.reduce((s, v) => s + v.depreciacao, 0);
-    return { receita, custo, lucro, depreciacaoAcumulada, despesas };
-  }, [periodFilteredVendas, filteredExpenses]);
+    return { receita, custo, lucro, depreciacaoAcumulada, despesasOperacionais, investimentos };
+  }, [classifiedExpenses, periodFilteredVendas]);
 
   // Stock summary with full cost accounting per filament
   const stockSummary = useMemo(() => {
@@ -232,9 +284,11 @@ function Finances() {
     );
   }, [stockSummary]);
 
-  const despesasManuais = filteredExpenses.filter((e) => e.source === "manual").reduce((s, e) => s + e.valor, 0);
-  const despesasFalha = filteredExpenses.filter((e) => e.source === "falha").reduce((s, e) => s + e.valor, 0);
-  const despesasInsumos = filteredExpenses.filter((e) => e.source === "insumo").reduce((s, e) => s + e.valor, 0);
+  const despesasManuais = classifiedExpenses.filter((e) => e.source === "manual").reduce((s, e) => s + e.valor, 0);
+  const despesasFalha = classifiedExpenses.filter((e) => e.source === "falha").reduce((s, e) => s + e.valor, 0);
+  const despesasInsumosOperacionais = classifiedExpenses
+    .filter((e) => e.source === "insumo" && e.financialClass === "operacional")
+    .reduce((s, e) => s + e.valor, 0);
 
   // Installment (parcelas) KPIs
   const installmentKpis = useMemo(() => {
@@ -257,26 +311,83 @@ function Finances() {
     return { pendente, pagoNoMes, vencendoEm30, atrasadas };
   }, [filteredInstallments]);
 
-  const upcomingInstallments = useMemo(() => {
+  const filamentoPaymentProgress = useMemo(() => {
+    const grouped = new Map<string, { total: number; paid: number }>();
+    for (const installment of filteredFilamentoInstallments) {
+      const current = grouped.get(installment.paymentId) ?? { total: 0, paid: 0 };
+      current.total += 1;
+      if (installment.pago) current.paid += 1;
+      grouped.set(installment.paymentId, current);
+    }
+    return grouped;
+  }, [filteredFilamentoInstallments]);
+
+  const insumoPaymentProgress = useMemo(() => {
+    const grouped = new Map<string, { total: number; paid: number }>();
+    for (const installment of filteredInsumoInstallments) {
+      const current = grouped.get(installment.paymentId) ?? { total: 0, paid: 0 };
+      current.total += 1;
+      if (installment.pago) current.paid += 1;
+      grouped.set(installment.paymentId, current);
+    }
+    return grouped;
+  }, [filteredInsumoInstallments]);
+
+  const scheduleEntries = useMemo(() => {
     const today = todayIso();
     const filamentEntries = filteredFilamentoInstallments
-      .filter((i) => !i.pago)
       .map((i) => {
         const payment = filamentoPayments.find((p) => p.id === i.paymentId) ?? null;
         const label = payment
           ? filamentos.filter((f) => f.batchId === payment.batchId).map((f) => f.sku).join(", ")
           : "";
-        return { kind: "filamento" as const, inst: i, payment, label, overdue: i.vencimento <= today };
+        const progress = filamentoPaymentProgress.get(i.paymentId) ?? { total: 0, paid: 0 };
+        return { kind: "filamento" as const, inst: i, payment, label, overdue: !i.pago && i.vencimento <= today, progress };
       });
     const insumoEntries = filteredInsumoInstallments
-      .filter((i) => !i.pago)
       .map((i) => {
         const payment = insumoPayments.find((p) => p.id === i.paymentId) ?? null;
         const insumo = payment ? insumos.find((item) => item.id === payment.insumoId) : null;
-        return { kind: "insumo" as const, inst: i, payment, label: insumo?.nome ?? "", overdue: i.vencimento <= today };
+        const progress = insumoPaymentProgress.get(i.paymentId) ?? { total: 0, paid: 0 };
+        return { kind: "insumo" as const, inst: i, payment, label: insumo?.nome ?? "", overdue: !i.pago && i.vencimento <= today, progress };
       });
-    return [...filamentEntries, ...insumoEntries].sort((a, b) => a.inst.vencimento.localeCompare(b.inst.vencimento));
-  }, [filteredFilamentoInstallments, filteredInsumoInstallments, filamentoPayments, filamentos, insumoPayments, insumos]);
+    const allEntries = [...filamentEntries, ...insumoEntries];
+    const visibleEntries = allEntries.filter(({ inst }) => {
+      if (installmentViewFilter === "pending") return !inst.pago;
+      if (installmentViewFilter === "paid") return inst.pago;
+      return true;
+    });
+    return visibleEntries.sort((a, b) => {
+      if (installmentViewFilter === "paid") {
+        return (b.inst.dataPagamento ?? b.inst.vencimento).localeCompare(a.inst.dataPagamento ?? a.inst.vencimento);
+      }
+      if (installmentViewFilter === "all" && a.inst.pago !== b.inst.pago) {
+        return a.inst.pago ? 1 : -1;
+      }
+      const aDate = a.inst.pago ? a.inst.dataPagamento ?? a.inst.vencimento : a.inst.vencimento;
+      const bDate = b.inst.pago ? b.inst.dataPagamento ?? b.inst.vencimento : b.inst.vencimento;
+      return aDate.localeCompare(bDate);
+    });
+  }, [
+    filteredFilamentoInstallments,
+    filteredInsumoInstallments,
+    filamentoPayments,
+    filamentos,
+    insumoPayments,
+    insumos,
+    filamentoPaymentProgress,
+    insumoPaymentProgress,
+    installmentViewFilter,
+  ]);
+
+  const scheduleCounts = useMemo(
+    () => ({
+      pending: filteredInstallments.filter((item) => !item.pago).length,
+      paid: filteredInstallments.filter((item) => item.pago).length,
+      total: filteredInstallments.length,
+    }),
+    [filteredInstallments],
+  );
 
   const filteredVendas = useMemo(() => {
     if (!search.trim()) return periodFilteredVendas;
@@ -298,11 +409,13 @@ function Finances() {
       observacao: "",
     }));
 
-    const expenseRows = filteredExpenses.map((expense) => ({
+    const expenseRows = classifiedExpenses.map((expense) => ({
       tipo: "Despesa",
       data: expense.data,
       descricao: expense.descricao,
-      categoria: expense.categoria ?? SOURCE_LABELS[expense.source]?.label ?? expense.source,
+      categoria:
+        expense.categoria ??
+        (expense.financialClass === "investimento" ? "Investimento / Imobilizado" : SOURCE_LABELS[expense.source]?.label ?? expense.source),
       cliente: "",
       valor: expense.valor,
       custo: "",
@@ -325,7 +438,7 @@ function Finances() {
     }));
 
     return [...vendaRows, ...expenseRows, ...installmentRows].sort((a, b) => a.data.localeCompare(b.data));
-  }, [filteredExpenses, filteredInstallments, filamentoInstallments, periodFilteredVendas]);
+  }, [classifiedExpenses, filteredInstallments, filamentoInstallments, periodFilteredVendas]);
 
   const exportCsv = () => {
     const headers = ["tipo", "data", "descricao", "categoria", "cliente", "valor", "custo", "depreciacao", "status", "observacao"];
@@ -360,7 +473,8 @@ function Finances() {
     const summaryCards = [
       ["Período", periodLabel],
       ["Receita", brl(totals.receita)],
-      ["Despesas", brl(totals.despesas)],
+      ["Despesas Operacionais", brl(totals.despesasOperacionais)],
+      ["Investimentos", brl(totals.investimentos)],
       ["Lucro", brl(totals.lucro)],
       ["Parcelas pendentes", brl(installmentKpis.pendente)],
       ["Parcelas pagas", brl(installmentKpis.pagoNoMes)],
@@ -488,7 +602,7 @@ function Finances() {
             <div className="space-y-5 leading-relaxed">
               <p>
                 Este módulo calcula o seu <strong className="text-foreground">lucro real</strong> a partir de três entradas:
-                vendas finalizadas, despesas registradas e o custo de produção de cada peça.
+                vendas finalizadas, despesas operacionais registradas e o custo de produção de cada peça.
               </p>
 
               <div>
@@ -508,7 +622,8 @@ function Finances() {
                   2. Despesas (saídas)
                 </h4>
                 <ul className="ml-4 list-disc space-y-1">
-                  <li><strong className="text-foreground">Insumo</strong> — todo item cadastrado em <em>Estoque → Outros Insumos</em> vira despesa automática com o valor pago.</li>
+                  <li><strong className="text-foreground">Insumo operacional</strong> — itens de apoio como álcool, bicos e ferramentas consumíveis entram em <em>Despesas Operacionais</em>.</li>
+                  <li><strong className="text-foreground">Investimento / Imobilizado</strong> — compras como impressoras não derrubam o lucro do mês; ficam separadas em <em>Investimentos</em>.</li>
                   <li><strong className="text-foreground">Manual</strong> — despesas fixas (aluguel, internet, marketing) adicionadas pelo botão "Nova despesa".</li>
                   <li><strong className="text-foreground">Falha</strong> — pedidos finalizados como "Falha de Impressão" geram despesa automática com o custo do filamento desperdiçado.</li>
                 </ul>
@@ -531,29 +646,28 @@ function Finances() {
                   4. Lucro Líquido (resultado)
                 </h4>
                 <p className="rounded-md bg-muted/50 p-3 font-mono text-xs text-foreground">
-                  Lucro = Receita Total − Custo de Produção − Despesas (insumos + manuais + falhas)
+                  Lucro = Receita Total − Custo de Produção − Despesas Operacionais
                 </p>
               </div>
 
               <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <h4 className="mb-2 font-semibold text-foreground">Exemplo prático</h4>
                 <ul className="ml-4 list-disc space-y-1 text-xs">
-                  <li>Você comprou 1 rolo PLA por <strong>R$ 120</strong> e 1 frasco de álcool por <strong>R$ 25</strong>.</li>
-                  <li>→ Despesas automáticas: <strong>R$ 145</strong> (origem Insumo).</li>
+                  <li>Você comprou 1 impressora por <strong>R$ 5.299</strong> e 1 frasco de álcool por <strong>R$ 25</strong>.</li>
+                  <li>→ Investimentos: <strong>R$ 5.299</strong>. Despesas operacionais: <strong>R$ 25</strong>.</li>
                   <li>Vendeu 10 chaveiros por <strong>R$ 150</strong> (Kurtido e Vendido).</li>
                   <li>→ Receita: <strong>R$ 150</strong>. Custo calculado (filamento + energia + depreciação): <strong>R$ 18</strong>.</li>
-                  <li>→ <strong className="filament-text">Lucro Líquido = 150 − 18 − 145 = −R$ 13</strong> (no vermelho até diluir o investimento do rolo nas próximas vendas).</li>
+                  <li>→ <strong className="filament-text">Lucro Líquido = 150 − 18 − 25 = R$ 107</strong>. A impressora continua visível em investimentos, sem distorcer o lucro operacional.</li>
                 </ul>
                 <p className="mt-2 text-xs italic">
-                  Dica: o rolo de filamento é despesa única no mês da compra, mas rende ~166 chaveiros de 6g. A partir da
-                  segunda dúzia de vendas o lucro fica positivo.
+                  Dica: filamentos seguem como estoque/investimento de produção e a impressora entra como imobilizado. Assim o resultado mensal fica mais fiel para análise gerencial.
                 </p>
               </div>
 
               <div>
                 <h4 className="mb-1 font-semibold text-foreground">Checklist diário</h4>
                 <ol className="ml-4 list-decimal space-y-1 text-xs">
-                  <li>Cadastrou compra de filamento ou insumo? → vai direto para Despesas.</li>
+                  <li>Cadastrou um item em Outros Insumos? → escolha se ele e despesa operacional ou investimento / imobilizado.</li>
                   <li>Imprimiu e entregou um pedido? → finalize como "Kurtido e Vendido" com o valor recebido.</li>
                   <li>Print falhou? → finalize como "Falha de Impressão" para contabilizar a perda.</li>
                   <li>Pagou algo fora do estoque (luz, internet)? → "Nova despesa" aqui em Finanças.</li>
@@ -565,7 +679,7 @@ function Finances() {
       </Accordion>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           icon={<DollarSign className="h-4 w-4" />}
           label="Receita Total"
@@ -586,9 +700,15 @@ function Finances() {
         />
         <KpiCard
           icon={<Wrench className="h-4 w-4" />}
-          label="Despesas"
-          value={brl(totals.despesas)}
+          label="Despesas Operacionais"
+          value={brl(totals.despesasOperacionais)}
           color="var(--filament-magenta)"
+        />
+        <KpiCard
+          icon={<Package className="h-4 w-4" />}
+          label="Investimentos"
+          value={brl(totals.investimentos)}
+          color="var(--filament-yellow)"
         />
         <KpiCard
           icon={<AlertCircle className="h-4 w-4" />}
@@ -952,20 +1072,64 @@ function Finances() {
             <CalendarClock className="h-5 w-5 text-muted-foreground" />
             <div>
               <h2 className="font-display text-lg font-semibold">Cronograma de Parcelas</h2>
-              <p className="text-xs text-muted-foreground">
-                {upcomingInstallments.length} parcela(s) pendente(s)
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{scheduleCounts.pending} pendente(s)</span>
+                <span>· {scheduleCounts.paid} paga(s)</span>
+                <span>· {scheduleCounts.total} no período</span>
                 {installmentKpis.atrasadas > 0 && (
-                  <span className="ml-2 font-semibold text-destructive">
+                  <span className="font-semibold text-destructive">
                     · {installmentKpis.atrasadas} atrasada(s)
                   </span>
                 )}
-              </p>
+              </div>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
+              <Button
+                size="sm"
+                variant={installmentViewFilter === "pending" ? "default" : "ghost"}
+                className="h-7 px-3 text-xs"
+                onClick={() => setInstallmentViewFilter("pending")}
+              >
+                Pendentes
+              </Button>
+              <Button
+                size="sm"
+                variant={installmentViewFilter === "paid" ? "default" : "ghost"}
+                className="h-7 px-3 text-xs"
+                onClick={() => setInstallmentViewFilter("paid")}
+              >
+                Pagas
+              </Button>
+              <Button
+                size="sm"
+                variant={installmentViewFilter === "all" ? "default" : "ghost"}
+                className="h-7 px-3 text-xs"
+                onClick={() => setInstallmentViewFilter("all")}
+              >
+                Todas
+              </Button>
+            </div>
+            <Badge variant="secondary">
+              {installmentViewFilter === "pending"
+                ? "Mostrando apenas pendentes"
+                : installmentViewFilter === "paid"
+                  ? "Mostrando pagamentos confirmados"
+                  : "Mostrando pendentes e pagas"}
+            </Badge>
+          </div>
         </div>
-        {upcomingInstallments.length === 0 ? (
+        <div className="border-b border-border px-6 py-3 text-xs text-muted-foreground">
+          Ao clicar em <strong className="text-foreground">Pagar</strong>, a parcela e gravada como paga com data de pagamento e passa a aparecer em <strong className="text-foreground">Pagas</strong> ou <strong className="text-foreground">Todas</strong>.
+        </div>
+        {scheduleEntries.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-muted-foreground">
-            Nenhuma parcela pendente. Todos os pagamentos estão em dia.
+            {installmentViewFilter === "pending"
+              ? "Nenhuma parcela pendente. Todos os pagamentos estão em dia."
+              : installmentViewFilter === "paid"
+                ? "Nenhuma parcela paga encontrada no período selecionado."
+                : "Nenhuma parcela encontrada no período selecionado."}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -975,6 +1139,7 @@ function Finances() {
                   <TableHead>#</TableHead>
                   <TableHead>Referência</TableHead>
                   <TableHead>Vencimento</TableHead>
+                  <TableHead>Data Pgto</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-center">Forma</TableHead>
@@ -982,15 +1147,42 @@ function Finances() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {upcomingInstallments.map(({ kind, inst, payment, label, overdue }) => (
-                  <TableRow key={inst.id}>
+                {scheduleEntries.map(({ kind, inst, payment, label, overdue, progress }) => (
+                  <TableRow
+                    key={inst.id}
+                    className={
+                      highlightedInstallmentId === inst.id || highlightedPaymentId === inst.paymentId
+                        ? "bg-green-50/60"
+                        : undefined
+                    }
+                  >
                     <TableCell className="font-mono text-xs">{inst.numero}</TableCell>
                     <TableCell className="text-xs">
-                      {label ? (
-                        <span className={kind === "filamento" ? "font-mono" : "font-medium"}>{label}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {label ? (
+                          <span className={kind === "filamento" ? "font-mono" : "font-medium"}>{label}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                        <Badge
+                          variant="secondary"
+                          className={
+                            progress.total > 0 && progress.paid === progress.total
+                              ? "border-green-600/20 bg-green-50 text-green-700"
+                              : progress.paid > 0
+                                ? "border-amber-500/20 bg-amber-50 text-amber-700"
+                                : ""
+                          }
+                        >
+                          {progress.total > 0 && progress.paid === progress.total
+                            ? "Quitado"
+                            : progress.paid > 0
+                              ? `Parcial ${progress.paid}/${progress.total}`
+                              : payment?.formaPagamento === "a_vista"
+                                ? "Em aberto"
+                                : `Em aberto 0/${progress.total}`}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <span
@@ -999,9 +1191,16 @@ function Finances() {
                         {formatIsoDatePtBr(inst.vencimento)}
                       </span>
                     </TableCell>
+                    <TableCell className="tabular-nums text-xs text-muted-foreground">
+                      {inst.dataPagamento ? formatIsoDatePtBr(inst.dataPagamento) : "—"}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{brl(inst.valor)}</TableCell>
                     <TableCell className="text-center">
-                      {overdue ? (
+                      {inst.pago ? (
+                        <Badge className="gap-1 bg-green-600 text-[10px]">
+                          <Check className="h-3 w-3" /> Pago
+                        </Badge>
+                      ) : overdue ? (
                         <Badge variant="destructive" className="text-[10px]">Atrasado</Badge>
                       ) : (
                         <Badge variant="outline" className="text-[10px]">Pendente</Badge>
@@ -1026,6 +1225,7 @@ function Finances() {
                           variant="outline"
                           className="h-7 gap-1 text-xs"
                           disabled={mutatePayInstallment.isPending || mutateSettlePayment.isPending || mutatePayInsumoInstallment.isPending || mutateSettleInsumoPayment.isPending}
+                          title={inst.pago ? "Pagamento já confirmado" : "Marcar parcela como paga"}
                           onClick={() =>
                             kind === "filamento"
                               ? mutatePayInstallment.mutate({
@@ -1037,10 +1237,11 @@ function Finances() {
                                   dataPagamento: todayIso(),
                                 })
                           }
+                          style={{ visibility: inst.pago ? "hidden" : "visible" }}
                         >
                           <Check className="h-3 w-3" /> Pagar
                         </Button>
-                        {payment && (
+                        {payment && !inst.pago && (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -1074,14 +1275,22 @@ function Finances() {
       {/* Expenses Section */}
       <div className="filament-top rounded-2xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Wrench className="h-5 w-5 text-muted-foreground" />
-            <h2 className="font-display text-lg font-semibold">Despesas</h2>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-muted-foreground" />
+              <h2 className="font-display text-lg font-semibold">Saídas Financeiras</h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="secondary">Operacionais: {brl(totals.despesasOperacionais)}</Badge>
+              <Badge variant="secondary">Investimentos: {brl(totals.investimentos)}</Badge>
+              <Badge variant="secondary">Insumos operacionais: {brl(despesasInsumosOperacionais)}</Badge>
+              <Badge variant="secondary">Manuais: {brl(despesasManuais)}</Badge>
+            </div>
           </div>
           <Button size="sm" className="btn-filament gap-2" onClick={() => setShowExpense(true)}><Plus className="h-4 w-4" />Nova despesa</Button>
         </div>
-        {filteredExpenses.length === 0 ? (
-          <div className="px-6 py-12 text-center text-sm text-muted-foreground">Nenhuma despesa registrada.</div>
+        {classifiedExpenses.length === 0 ? (
+          <div className="px-6 py-12 text-center text-sm text-muted-foreground">Nenhuma saída registrada.</div>
         ) : (
           <Table>
             <TableHeader>
@@ -1095,12 +1304,14 @@ function Finances() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredExpenses.map((e) => {
+              {classifiedExpenses.map((e) => {
                 const src = SOURCE_LABELS[e.source] ?? { label: e.source, color: "#999" };
+                const categoryLabel =
+                  e.categoria ?? (e.financialClass === "investimento" ? "Investimento / Imobilizado" : "Despesa Operacional");
                 return (
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{e.descricao}</TableCell>
-                    <TableCell>{e.categoria ? <Badge variant="secondary">{e.categoria}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                    <TableCell><Badge variant="secondary">{categoryLabel}</Badge></TableCell>
                     <TableCell><Badge variant="outline" style={{ borderColor: src.color, color: src.color }}>{src.label}</Badge></TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">{formatIsoDatePtBr(e.data)}</TableCell>
                     <TableCell className="text-right tabular-nums font-semibold">{brl(e.valor)}</TableCell>

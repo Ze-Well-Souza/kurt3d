@@ -297,6 +297,7 @@ export function fromInsumoRow(row: any): Insumo {
     precoTotal: row.preco_total,
     linkProduto: row.link_produto ?? null,
     paymentId: row.payment_id ?? null,
+    classificacaoFinanceira: row.classificacao_financeira ?? "operacional",
   };
 }
 
@@ -309,6 +310,7 @@ export function toInsumoRow(row: Insumo) {
     preco_total: row.precoTotal,
     link_produto: row.linkProduto ?? null,
     payment_id: row.paymentId ?? null,
+    classificacao_financeira: row.classificacaoFinanceira,
   };
 }
 

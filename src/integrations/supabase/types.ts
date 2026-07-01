@@ -397,6 +397,7 @@ export type Database = {
       }
       insumos: {
         Row: {
+          classificacao_financeira: string
           data_compra: string
           id: string
           link_produto: string | null
@@ -406,6 +407,7 @@ export type Database = {
           quantidade: string
         }
         Insert: {
+          classificacao_financeira?: string
           data_compra: string
           id: string
           link_produto?: string | null
@@ -415,6 +417,7 @@ export type Database = {
           quantidade: string
         }
         Update: {
+          classificacao_financeira?: string
           data_compra?: string
           id?: string
           link_produto?: string | null

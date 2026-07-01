@@ -53,7 +53,7 @@ import {
   upsertFilamento,
 } from "@/lib/api/data.functions";
 import { addCalendarMonthsIso, formatIsoDatePtBr, todayIso } from "@/lib/domain/installments";
-import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
+import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo, InsumoClassificacaoFinanceira, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { normalizeText } from "@/lib/utils/normalization";
@@ -133,6 +133,7 @@ const insumoSchema = z.object({
   quantidade: z.string().trim().min(1, "Informe a quantidade").max(100),
   precoTotal: z.number().min(0.01, "Preço total inválido").max(1000000),
   linkProduto: z.string().url("Informe um link válido começando com http:// ou https://").max(500).nullable().optional(),
+  classificacaoFinanceira: z.enum(["operacional", "investimento"]),
   formaPagamento: z.enum(["a_vista", "parcelado"]),
   parcelas: z.number().int().min(1).max(48),
   dataParaPagamento: z.string().min(1, "Data para pagamento obrigatória").max(30),
@@ -144,6 +145,7 @@ type InsumoForm = {
   quantidade: string;
   precoTotal: string;
   linkProduto: string;
+  classificacaoFinanceira: InsumoClassificacaoFinanceira;
   formaPagamento: FormaPagamento;
   parcelas: string;
   dataParaPagamento: string;
@@ -155,6 +157,7 @@ const initialInsumoForm: InsumoForm = {
   quantidade: "",
   precoTotal: "",
   linkProduto: "",
+  classificacaoFinanceira: "operacional",
   formaPagamento: "a_vista",
   parcelas: "1",
   dataParaPagamento: "",
@@ -533,6 +536,7 @@ function Stock() {
       quantidade: iForm.quantidade,
       precoTotal: Number(iForm.precoTotal),
       linkProduto: iForm.linkProduto || null,
+      classificacaoFinanceira: iForm.classificacaoFinanceira,
       formaPagamento: iForm.formaPagamento,
       parcelas: iForm.formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(iForm.parcelas) || 1)) : 1,
       dataParaPagamento: iForm.dataParaPagamento || iForm.dataCompra,
@@ -560,6 +564,7 @@ function Stock() {
       quantidade: editInsumo.quantidade,
       precoTotal: Number(editInsumo.precoTotal),
       linkProduto: editInsumo.linkProduto || null,
+      classificacaoFinanceira: editInsumo.classificacaoFinanceira,
       formaPagamento: editInsumo.formaPagamento,
       parcelas: editInsumo.formaPagamento === "parcelado" ? Math.max(1, Math.floor(Number(editInsumo.parcelas) || 1)) : 1,
       dataParaPagamento: editInsumo.dataParaPagamento || editInsumo.dataCompra,
@@ -1377,6 +1382,20 @@ function Stock() {
             onChange={(v) => setIField("precoTotal", v)}
             placeholder="25,00"
           />
+          <Field label="Classificação Financeira">
+            <Select
+              value={iForm.classificacaoFinanceira}
+              onValueChange={(value) => setIField("classificacaoFinanceira", value as InsumoClassificacaoFinanceira)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="operacional">Despesa operacional</SelectItem>
+                <SelectItem value="investimento">Investimento / Imobilizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
           <Field label="Link do Produto (opcional)" className="md:col-span-2 lg:col-span-4">
             <Input
               type="url"
@@ -1456,6 +1475,7 @@ function Stock() {
                 <TableHead>Quantidade</TableHead>
                 <TableHead>Alerta</TableHead>
                 <TableHead>Data</TableHead>
+                <TableHead>Classificação</TableHead>
                 <TableHead>Pagamento</TableHead>
                 <TableHead>Data p/ Pagto</TableHead>
                 <TableHead>Link</TableHead>
@@ -1488,6 +1508,11 @@ function Stock() {
                   </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
                     {formatIsoDatePtBr(i.dataCompra)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {i.classificacaoFinanceira === "investimento" ? "Investimento" : "Operacional"}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {!payment ? (
@@ -1532,6 +1557,7 @@ function Stock() {
                             quantidade: i.quantidade,
                             precoTotal: String(i.precoTotal),
                             linkProduto: i.linkProduto ?? "",
+                            classificacaoFinanceira: i.classificacaoFinanceira,
                             formaPagamento: payment?.formaPagamento ?? "a_vista",
                             parcelas: String(payment?.parcelas ?? 1),
                             dataParaPagamento: dataParaPagamento ?? i.dataCompra,
@@ -1596,6 +1622,20 @@ function Stock() {
                   onChange={(value) => setEditInsumoField("precoTotal", value)}
                   placeholder="25,00"
                 />
+                <Field label="Classificação Financeira">
+                  <Select
+                    value={editInsumo.classificacaoFinanceira}
+                    onValueChange={(value) => setEditInsumoField("classificacaoFinanceira", value as InsumoClassificacaoFinanceira)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="operacional">Despesa operacional</SelectItem>
+                      <SelectItem value="investimento">Investimento / Imobilizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <Field label="Link do Produto (opcional)" className="md:col-span-2">
                   <Input
                     type="url"

@@ -553,6 +553,7 @@ describe("insumos e leads", () => {
         quantidade: "1 un.",
         precoTotal: 19.9,
         linkProduto: null,
+        classificacaoFinanceira: "operacional",
       },
     ];
     expensesRepoMock.list = [
@@ -577,6 +578,7 @@ describe("insumos e leads", () => {
         quantidade: "2 un.",
         precoTotal: 29.9,
         linkProduto: "https://example.com/bico",
+        classificacaoFinanceira: "operacional",
       },
     });
 
@@ -591,6 +593,7 @@ describe("insumos e leads", () => {
       quantidade: "2 un.",
       precoTotal: 29.9,
       linkProduto: "https://example.com/bico",
+      classificacaoFinanceira: "operacional",
     });
     expect(savedExpenses[0]).toMatchObject({
       id: "exp-1",
@@ -598,6 +601,7 @@ describe("insumos e leads", () => {
       valor: 29.9,
       data: "2026-06-10",
       descricao: "Compra de insumo: Bico 0.6",
+      categoria: "Despesa Operacional",
     });
   });
 
@@ -611,6 +615,7 @@ describe("insumos e leads", () => {
         quantidade: "1",
         precoTotal: 5299,
         linkProduto: "https://example.com/impressora",
+        classificacaoFinanceira: "investimento",
         formaPagamento: "parcelado",
         parcelas: 12,
         dataParaPagamento: "2026-07-01",
@@ -625,6 +630,10 @@ describe("insumos e leads", () => {
     expect(savedInsumo).toMatchObject({
       nome: "Impressora Bambu Lab A1",
       paymentId: expect.any(String),
+      classificacaoFinanceira: "investimento",
+    });
+    expect(expensesRepoMock.save.mock.calls[0][0][0]).toMatchObject({
+      categoria: "Investimento / Imobilizado",
     });
     const createdInstallments = insumoInstallmentsRepoMock.insertMany.mock.calls[0][0];
     expect(createdInstallments).toHaveLength(12);
@@ -642,6 +651,7 @@ describe("insumos e leads", () => {
         precoTotal: 5299,
         linkProduto: null,
         paymentId: "pay-1",
+        classificacaoFinanceira: "investimento",
       },
     ];
 
