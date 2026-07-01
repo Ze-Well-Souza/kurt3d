@@ -63,6 +63,8 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
 
 type FinancePeriodPreset = "all" | "month" | "quarter";
 type InstallmentViewFilter = "pending" | "paid" | "all";
+type PaymentHistorySourceFilter = "all" | "filamento" | "insumo";
+type PaymentHistoryTypeFilter = "all" | "pagamento" | "estorno";
 
 function Finances() {
   const qc = useQueryClient();
@@ -94,6 +96,8 @@ function Finances() {
     dataPagamento: string;
     valorPago: string;
   } | null>(null);
+  const [paymentHistorySourceFilter, setPaymentHistorySourceFilter] = useState<PaymentHistorySourceFilter>("all");
+  const [paymentHistoryTypeFilter, setPaymentHistoryTypeFilter] = useState<PaymentHistoryTypeFilter>("all");
   const [expForm, setExpForm] = useState({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" });
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
   const [periodAnchor, setPeriodAnchor] = useState(new Date().toISOString().slice(0, 7));
@@ -493,13 +497,23 @@ function Finances() {
     insumos,
   ]);
 
+  const visibleFinanceHistoryRows = useMemo(
+    () =>
+      financeHistoryRows.filter((row) => {
+        if (paymentHistorySourceFilter !== "all" && row.kind !== paymentHistorySourceFilter) return false;
+        if (paymentHistoryTypeFilter !== "all" && row.tipo !== paymentHistoryTypeFilter) return false;
+        return true;
+      }),
+    [financeHistoryRows, paymentHistorySourceFilter, paymentHistoryTypeFilter],
+  );
+
   const financeHistorySummary = useMemo(
     () => ({
-      pagamentos: financeHistoryRows.filter((row) => row.tipo === "pagamento").length,
-      estornos: financeHistoryRows.filter((row) => row.tipo === "estorno").length,
-      saldo: financeHistoryRows.reduce((sum, row) => sum + getEventSignedAmount(row), 0),
+      pagamentos: visibleFinanceHistoryRows.filter((row) => row.tipo === "pagamento").length,
+      estornos: visibleFinanceHistoryRows.filter((row) => row.tipo === "estorno").length,
+      saldo: visibleFinanceHistoryRows.reduce((sum, row) => sum + getEventSignedAmount(row), 0),
     }),
-    [financeHistoryRows],
+    [visibleFinanceHistoryRows],
   );
 
   const filteredVendas = useMemo(() => {
@@ -537,7 +551,7 @@ function Finances() {
       observacao: expense.source,
     }));
 
-    const paymentEventRows = financeHistoryRows.map((event) => ({
+    const paymentEventRows = visibleFinanceHistoryRows.map((event) => ({
       tipo: "Movimento de Parcela",
       data: event.dataPagamento,
       descricao: `${event.kind === "filamento" ? "Filamento" : "Insumo"} · ${event.reference}${event.numero ? ` · Parcela ${event.numero}` : ""}`,
@@ -551,7 +565,7 @@ function Finances() {
     }));
 
     return [...vendaRows, ...expenseRows, ...paymentEventRows].sort((a, b) => a.data.localeCompare(b.data));
-  }, [classifiedExpenses, financeHistoryRows, periodFilteredVendas]);
+  }, [classifiedExpenses, visibleFinanceHistoryRows, periodFilteredVendas]);
 
   const exportCsv = () => {
     const headers = ["tipo", "data", "descricao", "categoria", "cliente", "valor", "custo", "depreciacao", "status", "observacao"];
@@ -1475,20 +1489,54 @@ function Finances() {
               Cada parcial, quitação e estorno fica registrado como um evento separado para auditoria.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge variant="secondary">{financeHistorySummary.pagamentos} pagamento(s)</Badge>
-            <Badge variant="secondary">{financeHistorySummary.estornos} estorno(s)</Badge>
-            <Badge
-              variant="secondary"
-              className={financeHistorySummary.saldo >= 0 ? "text-green-700" : "text-destructive"}
-            >
-              Saldo movimentado: {brl(financeHistorySummary.saldo)}
-            </Badge>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="grid gap-1">
+              <Label className="text-[11px]">Origem</Label>
+              <Select
+                value={paymentHistorySourceFilter}
+                onValueChange={(value) => setPaymentHistorySourceFilter(value as PaymentHistorySourceFilter)}
+              >
+                <SelectTrigger className="h-8 min-w-[140px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="filamento">Filamentos</SelectItem>
+                  <SelectItem value="insumo">Insumos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1">
+              <Label className="text-[11px]">Evento</Label>
+              <Select
+                value={paymentHistoryTypeFilter}
+                onValueChange={(value) => setPaymentHistoryTypeFilter(value as PaymentHistoryTypeFilter)}
+              >
+                <SelectTrigger className="h-8 min-w-[140px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="pagamento">Pagamentos</SelectItem>
+                  <SelectItem value="estorno">Estornos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="secondary">{financeHistorySummary.pagamentos} pagamento(s)</Badge>
+              <Badge variant="secondary">{financeHistorySummary.estornos} estorno(s)</Badge>
+              <Badge
+                variant="secondary"
+                className={financeHistorySummary.saldo >= 0 ? "text-green-700" : "text-destructive"}
+              >
+                Saldo movimentado: {brl(financeHistorySummary.saldo)}
+              </Badge>
+            </div>
           </div>
         </div>
-        {financeHistoryRows.length === 0 ? (
+        {visibleFinanceHistoryRows.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-muted-foreground">
-            Nenhum pagamento confirmado no período selecionado.
+            Nenhum movimento encontrado para os filtros selecionados.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1505,7 +1553,7 @@ function Finances() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {financeHistoryRows.map((row) => (
+                {visibleFinanceHistoryRows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="tabular-nums text-xs text-muted-foreground">
                       {formatIsoDatePtBr(row.dataPagamento)}
