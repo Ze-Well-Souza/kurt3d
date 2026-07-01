@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check, Download, FileText } from "lucide-react";
+import { Wrench, TrendingUp, DollarSign, Package, Plus, Trash2, AlertCircle, BookOpen, LayoutList, Table as TableIcon, CreditCard, Banknote, CalendarClock, Check, Download, FileText, Tags } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { SearchInput } from "@/components/SearchInput";
 import { addManualExpense, removeExpense, payInstallment, payInsumoInstallment, settleInsumoPayment, settlePayment } from "@/lib/api/data.functions";
 import { formatIsoDatePtBr, parseIsoDateLocal, todayIso } from "@/lib/domain/installments";
-import type { FilamentoPayment, FilamentoPaymentInstallment, Insumo, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
+import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, Insumo, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { normalizeText } from "@/lib/utils/normalization";
 
@@ -46,7 +46,8 @@ function Finances() {
   const snap = useSnapshot();
   const vendas = snap.data?.vendas ?? [];
   const orders = snap.data?.orders ?? [];
-  const filamentos = snap.data?.filamentos ?? [];
+  const filamentos = (snap.data?.filamentos ?? []) as Filamento[];
+  const filamentosHistory = (snap.data?.filamentosHistory ?? []) as FilamentoHistory[];
   const insumos = (snap.data?.insumos ?? []) as Insumo[];
   const expenses = snap.data?.expenses ?? [];
   const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
@@ -57,6 +58,8 @@ function Finances() {
   const [search, setSearch] = useState("");
   const [showExpense, setShowExpense] = useState(false);
   const [stockView, setStockView] = useState<"list" | "table">("table");
+  const [purchaseBrandFilter, setPurchaseBrandFilter] = useState("all");
+  const [purchaseMaterialFilter, setPurchaseMaterialFilter] = useState("all");
   const [expForm, setExpForm] = useState({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" });
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
   const [periodAnchor, setPeriodAnchor] = useState(new Date().toISOString().slice(0, 7));
@@ -117,6 +120,46 @@ function Finances() {
     () => expenses.filter((expense) => isDateInSelectedPeriod(expense.data)),
     [expenses, periodAnchor, periodPreset],
   );
+
+  const allFilamentPurchases = useMemo(
+    () => [...filamentos, ...filamentosHistory],
+    [filamentos, filamentosHistory],
+  );
+
+  const purchaseBrands = useMemo(
+    () => Array.from(new Set(allFilamentPurchases.map((item) => item.marca.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [allFilamentPurchases],
+  );
+
+  const purchaseMaterials = useMemo(
+    () => Array.from(new Set(allFilamentPurchases.map((item) => item.material.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [allFilamentPurchases],
+  );
+
+  const filteredPurchaseAnalysis = useMemo(
+    () =>
+      allFilamentPurchases.filter((item) => {
+        if (!isDateInSelectedPeriod(item.dataCompra)) return false;
+        if (purchaseBrandFilter !== "all" && item.marca !== purchaseBrandFilter) return false;
+        if (purchaseMaterialFilter !== "all" && item.material !== purchaseMaterialFilter) return false;
+        return true;
+      }),
+    [allFilamentPurchases, periodAnchor, periodPreset, purchaseBrandFilter, purchaseMaterialFilter],
+  );
+
+  const purchaseAnalysis = useMemo(() => {
+    const count = filteredPurchaseAnalysis.length;
+    const total = filteredPurchaseAnalysis.reduce((sum, item) => sum + item.precoPago, 0);
+    const average = count > 0 ? total / count : 0;
+    const min = count > 0 ? Math.min(...filteredPurchaseAnalysis.map((item) => item.precoPago)) : 0;
+    const max = count > 0 ? Math.max(...filteredPurchaseAnalysis.map((item) => item.precoPago)) : 0;
+    const target = 100;
+    const delta = average - target;
+    const belowTargetCount = filteredPurchaseAnalysis.filter((item) => item.precoPago < target).length;
+    const aboveTargetCount = filteredPurchaseAnalysis.filter((item) => item.precoPago > target).length;
+    const atTargetCount = filteredPurchaseAnalysis.filter((item) => item.precoPago === target).length;
+    return { count, total, average, min, max, target, delta, belowTargetCount, aboveTargetCount, atTargetCount };
+  }, [filteredPurchaseAnalysis]);
 
   const filteredFilamentoInstallments = useMemo(
     () =>
@@ -581,6 +624,108 @@ function Finances() {
           value={`${filamentTotals.gramasRestantes.toFixed(0)} g`}
           color="var(--filament-pink)"
         />
+      </div>
+
+      <div className="filament-top rounded-2xl border border-border bg-card p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="font-display text-lg font-semibold">Análise de Compra de Filamentos</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Média do preço pago por rolo para comprovar se as compras estão abaixo da meta de R$ 100,00.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Marca</Label>
+              <Select value={purchaseBrandFilter} onValueChange={setPurchaseBrandFilter}>
+                <SelectTrigger className="min-w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as marcas</SelectItem>
+                  {purchaseBrands.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Material</Label>
+              <Select value={purchaseMaterialFilter} onValueChange={setPurchaseMaterialFilter}>
+                <SelectTrigger className="min-w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os materiais</SelectItem>
+                  {purchaseMaterials.map((material) => (
+                    <SelectItem key={material} value={material}>
+                      {material}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          <KpiCard
+            icon={<Tags className="h-4 w-4" />}
+            label="Preço Médio por Rolo"
+            value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.average) : "—"}
+            color={purchaseAnalysis.count === 0 ? "var(--muted-foreground)" : purchaseAnalysis.average <= purchaseAnalysis.target ? "var(--filament-green)" : "var(--filament-magenta)"}
+          />
+          <KpiCard
+            icon={<TrendingUp className="h-4 w-4" />}
+            label="Diferença da Meta"
+            value={
+              purchaseAnalysis.count > 0
+                ? `${purchaseAnalysis.delta <= 0 ? "-" : "+"}${brl(Math.abs(purchaseAnalysis.delta))}`
+                : "—"
+            }
+            color={purchaseAnalysis.count === 0 ? "var(--muted-foreground)" : purchaseAnalysis.delta <= 0 ? "var(--filament-green)" : "var(--filament-magenta)"}
+          />
+          <KpiCard
+            icon={<DollarSign className="h-4 w-4" />}
+            label="Menor Preço"
+            value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.min) : "—"}
+            color="var(--filament-cyan)"
+          />
+          <KpiCard
+            icon={<AlertCircle className="h-4 w-4" />}
+            label="Maior Preço"
+            value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.max) : "—"}
+            color="var(--filament-yellow)"
+          />
+          <KpiCard
+            icon={<Package className="h-4 w-4" />}
+            label="Compras Analisadas"
+            value={String(purchaseAnalysis.count)}
+            color="var(--filament-pink)"
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          <Badge
+            variant="outline"
+            className={purchaseAnalysis.count === 0
+              ? "text-muted-foreground"
+              : purchaseAnalysis.delta <= 0
+                ? "border-green-500/30 bg-green-50 text-green-700"
+                : "border-red-500/30 bg-red-50 text-red-700"}
+          >
+            {purchaseAnalysis.count === 0
+              ? "Nenhuma compra encontrada no filtro atual"
+              : purchaseAnalysis.delta <= 0
+                ? `Média ${brl(Math.abs(purchaseAnalysis.delta))} abaixo da meta de R$ 100,00`
+                : `Média ${brl(Math.abs(purchaseAnalysis.delta))} acima da meta de R$ 100,00`}
+          </Badge>
+          <Badge variant="secondary">{purchaseAnalysis.belowTargetCount} abaixo de R$ 100</Badge>
+          <Badge variant="secondary">{purchaseAnalysis.atTargetCount} exatamente em R$ 100</Badge>
+          <Badge variant="secondary">{purchaseAnalysis.aboveTargetCount} acima de R$ 100</Badge>
+        </div>
       </div>
 
       {/* Installments (Parcelas) KPIs */}
