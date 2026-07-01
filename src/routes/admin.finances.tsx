@@ -20,7 +20,17 @@ import { toast } from "sonner";
 import { SearchInput } from "@/components/SearchInput";
 import { addManualExpense, removeExpense, payInstallment, payInsumoInstallment, settleInsumoPayment, settlePayment } from "@/lib/api/data.functions";
 import { formatIsoDatePtBr, parseIsoDateLocal, todayIso } from "@/lib/domain/installments";
-import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, Insumo, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
+import type {
+  Filamento,
+  FilamentoHistory,
+  FilamentoPayment,
+  FilamentoPaymentEvent,
+  FilamentoPaymentInstallment,
+  Insumo,
+  InsumoPayment,
+  InsumoPaymentEvent,
+  InsumoPaymentInstallment,
+} from "@/lib/domain/types";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { normalizeText } from "@/lib/utils/normalization";
 
@@ -42,6 +52,9 @@ const getInstallmentRemainingAmount = (installment: { valor: number; valorPago: 
 const isPartialInstallment = (installment: { pago: boolean; valor: number; valorPago: number | null }) =>
   !installment.pago && getInstallmentPaidAmount(installment) > 0;
 
+const getEventSignedAmount = (event: { tipo: "pagamento" | "estorno"; valor: number }) =>
+  event.tipo === "estorno" ? -event.valor : event.valor;
+
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   insumo: { label: "Insumo", color: "var(--filament-yellow)" },
   manual: { label: "Manual", color: "var(--filament-cyan)" },
@@ -62,8 +75,10 @@ function Finances() {
   const expenses = snap.data?.expenses ?? [];
   const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
   const filamentoInstallments = (snap.data?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
+  const filamentoPaymentEvents = (snap.data?.filamentoPaymentEvents ?? []) as FilamentoPaymentEvent[];
   const insumoPayments = (snap.data?.insumoPayments ?? []) as InsumoPayment[];
   const insumoInstallments = (snap.data?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
+  const insumoPaymentEvents = (snap.data?.insumoPaymentEvents ?? []) as InsumoPaymentEvent[];
 
   const [search, setSearch] = useState("");
   const [showExpense, setShowExpense] = useState(false);
@@ -250,6 +265,20 @@ function Finances() {
     [filteredFilamentoInstallments, filteredInsumoInstallments],
   );
 
+  const filteredPaymentEvents = useMemo(
+    () =>
+      [
+        ...filamentoPaymentEvents.map((event) => ({ ...event, kind: "filamento" as const })),
+        ...insumoPaymentEvents.map((event) => ({ ...event, kind: "insumo" as const })),
+      ]
+        .filter((event) => isDateInSelectedPeriod(event.dataPagamento))
+        .sort((a, b) => {
+          const byDate = b.dataPagamento.localeCompare(a.dataPagamento);
+          return byDate !== 0 ? byDate : b.createdAt.localeCompare(a.createdAt);
+        }),
+    [filamentoPaymentEvents, insumoPaymentEvents, periodAnchor, periodPreset],
+  );
+
 
   const totals = useMemo(() => {
     const receita = periodFilteredVendas.reduce((s, v) => s + v.valor, 0);
@@ -319,7 +348,6 @@ function Finances() {
     const today = todayIso();
     const yearMonth = today.slice(0, 7);
     let pendente = 0;
-    let pagoNoMes = 0;
     let vencendoEm30 = 0;
     let atrasadas = 0;
     for (const inst of filteredInstallments) {
@@ -329,12 +357,12 @@ function Finances() {
         const diffDays = (parseIsoDateLocal(inst.vencimento).getTime() - parseIsoDateLocal(today).getTime()) / 86400000;
         if (diffDays >= 0 && diffDays <= 30) vencendoEm30 += getInstallmentRemainingAmount(inst);
       }
-      if ((inst.pago || isPartialInstallment(inst)) && inst.dataPagamento && inst.dataPagamento.slice(0, 7) === yearMonth) {
-        pagoNoMes += getInstallmentPaidAmount(inst);
-      }
     }
+    const pagoNoMes = filteredPaymentEvents
+      .filter((event) => event.dataPagamento.slice(0, 7) === yearMonth)
+      .reduce((sum, event) => sum + getEventSignedAmount(event), 0);
     return { pendente, pagoNoMes, vencendoEm30, atrasadas };
-  }, [filteredInstallments]);
+  }, [filteredInstallments, filteredPaymentEvents]);
 
   const filamentoPaymentProgress = useMemo(() => {
     const grouped = new Map<string, { totalInstallments: number; paidInstallments: number; totalAmount: number; paidAmount: number }>();
@@ -425,6 +453,55 @@ function Finances() {
     return list.find((item) => item.id === payDialog.installmentId) ?? null;
   }, [filteredFilamentoInstallments, filteredInsumoInstallments, payDialog]);
 
+  const financeHistoryRows = useMemo(() => {
+    const filamentoPaymentsById = new Map(filamentoPayments.map((payment) => [payment.id, payment]));
+    const insumoPaymentsById = new Map(insumoPayments.map((payment) => [payment.id, payment]));
+    const filamentoInstallmentsById = new Map(filamentoInstallments.map((installment) => [installment.id, installment]));
+    const insumoInstallmentsById = new Map(insumoInstallments.map((installment) => [installment.id, installment]));
+
+    return filteredPaymentEvents.map((event) => {
+      if (event.kind === "filamento") {
+        const installment = filamentoInstallmentsById.get(event.installmentId) ?? null;
+        const payment = filamentoPaymentsById.get(event.paymentId) ?? null;
+        const reference = payment
+          ? filamentos.filter((item) => item.batchId === payment.batchId).map((item) => item.sku).join(", ")
+          : "—";
+        return {
+          ...event,
+          reference,
+          numero: installment?.numero ?? null,
+          formaPagamento: payment?.formaPagamento ?? null,
+        };
+      }
+      const installment = insumoInstallmentsById.get(event.installmentId) ?? null;
+      const payment = insumoPaymentsById.get(event.paymentId) ?? null;
+      const insumo = payment ? insumos.find((item) => item.id === payment.insumoId) : null;
+      return {
+        ...event,
+        reference: insumo?.nome ?? "—",
+        numero: installment?.numero ?? null,
+        formaPagamento: payment?.formaPagamento ?? null,
+      };
+    });
+  }, [
+    filteredPaymentEvents,
+    filamentoPayments,
+    insumoPayments,
+    filamentoInstallments,
+    insumoInstallments,
+    filamentos,
+    insumos,
+  ]);
+
+  const financeHistorySummary = useMemo(
+    () => ({
+      pagamentos: financeHistoryRows.filter((row) => row.tipo === "pagamento").length,
+      estornos: financeHistoryRows.filter((row) => row.tipo === "estorno").length,
+      saldo: financeHistoryRows.reduce((sum, row) => sum + getEventSignedAmount(row), 0),
+    }),
+    [financeHistoryRows],
+  );
+
   const filteredVendas = useMemo(() => {
     if (!search.trim()) return periodFilteredVendas;
     const s = normalizeText(search);
@@ -460,21 +537,21 @@ function Finances() {
       observacao: expense.source,
     }));
 
-    const installmentRows = filteredInstallments.map((installment) => ({
-      tipo: "Parcela",
-      data: installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento,
-      descricao: `Parcela ${installment.numero}`,
-      categoria: filamentoInstallments.some((item) => item.id === installment.id) ? "Filamento" : "Insumo",
+    const paymentEventRows = financeHistoryRows.map((event) => ({
+      tipo: "Movimento de Parcela",
+      data: event.dataPagamento,
+      descricao: `${event.kind === "filamento" ? "Filamento" : "Insumo"} · ${event.reference}${event.numero ? ` · Parcela ${event.numero}` : ""}`,
+      categoria: event.tipo === "pagamento" ? "Pagamento" : "Estorno",
       cliente: "",
-      valor: installment.pago ? installment.valorPago ?? installment.valor : installment.valor,
+      valor: getEventSignedAmount(event),
       custo: "",
       depreciacao: "",
-      status: installment.pago ? "Pago" : "Pendente",
-      observacao: installment.observacao ?? "",
+      status: event.tipo === "pagamento" ? "Confirmado" : "Estornado",
+      observacao: event.observacao ?? "",
     }));
 
-    return [...vendaRows, ...expenseRows, ...installmentRows].sort((a, b) => a.data.localeCompare(b.data));
-  }, [classifiedExpenses, filteredInstallments, filamentoInstallments, periodFilteredVendas]);
+    return [...vendaRows, ...expenseRows, ...paymentEventRows].sort((a, b) => a.data.localeCompare(b.data));
+  }, [classifiedExpenses, financeHistoryRows, periodFilteredVendas]);
 
   const exportCsv = () => {
     const headers = ["tipo", "data", "descricao", "categoria", "cliente", "valor", "custo", "depreciacao", "status", "observacao"];
@@ -1389,6 +1466,101 @@ function Finances() {
           )}
         </DialogContent>
       </Dialog>
+
+      <div className="filament-top rounded-2xl border border-border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
+          <div>
+            <h2 className="font-display text-lg font-semibold">Histórico de Pagamentos</h2>
+            <p className="text-xs text-muted-foreground">
+              Cada parcial, quitação e estorno fica registrado como um evento separado para auditoria.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge variant="secondary">{financeHistorySummary.pagamentos} pagamento(s)</Badge>
+            <Badge variant="secondary">{financeHistorySummary.estornos} estorno(s)</Badge>
+            <Badge
+              variant="secondary"
+              className={financeHistorySummary.saldo >= 0 ? "text-green-700" : "text-destructive"}
+            >
+              Saldo movimentado: {brl(financeHistorySummary.saldo)}
+            </Badge>
+          </div>
+        </div>
+        {financeHistoryRows.length === 0 ? (
+          <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+            Nenhum pagamento confirmado no período selecionado.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Referência</TableHead>
+                  <TableHead>Parcela</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Forma</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Observação</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {financeHistoryRows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="tabular-nums text-xs text-muted-foreground">
+                      {formatIsoDatePtBr(row.dataPagamento)}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <span className={row.kind === "filamento" ? "font-mono" : "font-medium"}>
+                        {row.reference}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {row.numero ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          row.tipo === "pagamento"
+                            ? "border-green-600/30 bg-green-50 text-green-700"
+                            : "border-red-500/30 bg-red-50 text-red-700"
+                        }
+                      >
+                        {row.tipo === "pagamento" ? "Pagamento" : "Estorno"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {row.formaPagamento === "a_vista" ? (
+                        <Badge variant="outline" className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]">
+                          <Banknote className="h-3 w-3" /> À vista
+                        </Badge>
+                      ) : row.formaPagamento === "parcelado" ? (
+                        <Badge variant="outline" className="gap-1 border-blue-500/30 bg-blue-50 text-blue-700 text-[10px]">
+                          <CreditCard className="h-3 w-3" /> Parcelado
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right tabular-nums font-semibold ${
+                        row.tipo === "pagamento" ? "text-green-700" : "text-destructive"
+                      }`}
+                    >
+                      {row.tipo === "pagamento" ? "+" : "-"}
+                      {brl(Math.abs(row.valor))}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {row.observacao?.trim() ? row.observacao : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       {/* Expenses Section */}
       <div className="filament-top rounded-2xl border border-border bg-card">

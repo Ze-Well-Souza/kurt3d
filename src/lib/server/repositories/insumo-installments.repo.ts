@@ -40,5 +40,14 @@ export async function insumoInstallmentsRepo() {
         metadata: { paymentId },
       });
     },
+    async removeMany(ids: string[]) {
+      if (ids.length === 0) return;
+      unwrapResult(await supabase.from("insumo_payment_installments").delete().in("id", ids), {
+        table: "insumo_payment_installments",
+        operation: "removeMany",
+        query: "delete().in(id)",
+        metadata: { count: ids.length },
+      });
+    },
   };
 }

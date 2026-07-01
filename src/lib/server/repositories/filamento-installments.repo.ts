@@ -40,5 +40,14 @@ export async function filamentoInstallmentsRepo() {
         metadata: { paymentId },
       });
     },
+    async removeMany(ids: string[]) {
+      if (ids.length === 0) return;
+      unwrapResult(await supabase.from("filamento_payment_installments").delete().in("id", ids), {
+        table: "filamento_payment_installments",
+        operation: "removeMany",
+        query: "delete().in(id)",
+        metadata: { count: ids.length },
+      });
+    },
   };
 }

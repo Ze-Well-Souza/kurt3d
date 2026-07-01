@@ -60,6 +60,7 @@ export type Venda = {
 export type FilamentoQualidade = "Ótimo" | "bom" | "médio" | "ruim";
 
 export type FormaPagamento = "a_vista" | "parcelado";
+export type PaymentEventTipo = "pagamento" | "estorno";
 
 export type InsumoClassificacaoFinanceira = "operacional" | "investimento";
 
@@ -85,6 +86,17 @@ export type FilamentoPaymentInstallment = {
   observacao: string | null;
 };
 
+export type FilamentoPaymentEvent = {
+  id: string;
+  installmentId: string;
+  paymentId: string;
+  tipo: PaymentEventTipo;
+  valor: number;
+  dataPagamento: string;
+  observacao: string | null;
+  createdAt: string;
+};
+
 export type InsumoPayment = {
   id: string;
   insumoId: string;
@@ -105,6 +117,17 @@ export type InsumoPaymentInstallment = {
   dataPagamento: string | null;
   valorPago: number | null;
   observacao: string | null;
+};
+
+export type InsumoPaymentEvent = {
+  id: string;
+  installmentId: string;
+  paymentId: string;
+  tipo: PaymentEventTipo;
+  valor: number;
+  dataPagamento: string;
+  observacao: string | null;
+  createdAt: string;
 };
 
 export type Filamento = {

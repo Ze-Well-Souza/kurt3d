@@ -2,9 +2,23 @@ import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { addCalendarMonthsIso, todayIso } from "../../domain/installments";
-import type { FilamentoPayment, FilamentoPaymentInstallment, InsumoPayment, InsumoPaymentInstallment } from "../../domain/types";
+import type {
+  FilamentoPayment,
+  FilamentoPaymentEvent,
+  FilamentoPaymentInstallment,
+  InsumoPayment,
+  InsumoPaymentEvent,
+  InsumoPaymentInstallment,
+} from "../../domain/types";
 import { nowIso } from "../../server/db.server";
-import { filamentoInstallmentsRepo, filamentoPaymentsRepo, insumoInstallmentsRepo, insumoPaymentsRepo } from "../../server/repositories.server";
+import {
+  filamentoInstallmentsRepo,
+  filamentoPaymentEventsRepo,
+  filamentoPaymentsRepo,
+  insumoInstallmentsRepo,
+  insumoPaymentEventsRepo,
+  insumoPaymentsRepo,
+} from "../../server/repositories.server";
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
@@ -16,6 +30,16 @@ function getInstallmentPaidAmount(installment: { valor: number; valorPago: numbe
 
 function getInstallmentRemainingAmount(installment: { valor: number; valorPago: number | null }) {
   return Math.max(roundMoney(installment.valor - getInstallmentPaidAmount(installment)), 0);
+}
+
+async function recordFilamentoEvent(event: FilamentoPaymentEvent) {
+  const eventsRepo = await filamentoPaymentEventsRepo();
+  await eventsRepo.insert(event);
+}
+
+async function recordInsumoEvent(event: InsumoPaymentEvent) {
+  const eventsRepo = await insumoPaymentEventsRepo();
+  await eventsRepo.insert(event);
 }
 
 export const createFilamentoPayment = createServerFn({ method: "POST" })
@@ -90,10 +114,10 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
     };
     await paymentsRepo.update(updated);
 
-    const progressed = installmentsRepo.list.filter(
+    const existingInstallments = installmentsRepo.list.filter((installment) => installment.paymentId === data.paymentId);
+    const progressed = existingInstallments.filter(
       (installment) => installment.paymentId === data.paymentId && ((installment.valorPago ?? 0) > 0 || installment.pago),
     );
-    await installmentsRepo.deleteByPayment(data.paymentId);
 
     const perParcel = Math.round((data.custoTotal / data.parcelas) * 100) / 100;
     const lastParcelDiff = +(data.custoTotal - perParcel * data.parcelas).toFixed(2);
@@ -126,7 +150,25 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
         observacao: null,
       });
     }
-    await installmentsRepo.insertMany(newItems);
+    const existingById = new Map(existingInstallments.map((installment) => [installment.id, installment]));
+    const itemsToUpdate = newItems.filter((item) => existingById.has(item.id));
+    const itemsToInsert = newItems.filter((item) => !existingById.has(item.id));
+    const nextIds = new Set(newItems.map((item) => item.id));
+    const progressedToRemove = existingInstallments.filter(
+      (item) => !nextIds.has(item.id) && getInstallmentPaidAmount(item) > 0,
+    );
+    if (progressedToRemove.length > 0) {
+      throw new Error("Nao e possivel reduzir parcelas que ja possuem historico de pagamento.");
+    }
+    const idsToRemove = existingInstallments
+      .filter((item) => !nextIds.has(item.id) && getInstallmentPaidAmount(item) === 0)
+      .map((item) => item.id);
+
+    for (const item of itemsToUpdate) {
+      await installmentsRepo.update(item);
+    }
+    await installmentsRepo.insertMany(itemsToInsert);
+    await installmentsRepo.removeMany(idsToRemove);
     return { ok: true };
   });
 
@@ -171,6 +213,16 @@ export const payInstallment = createServerFn({ method: "POST" })
       observacao: data.observacao ?? installment.observacao,
     };
     await installmentsRepo.update(updated);
+    await recordFilamentoEvent({
+      id: randomUUID(),
+      installmentId: installment.id,
+      paymentId: installment.paymentId,
+      tipo: "pagamento",
+      valor: amountToAdd,
+      dataPagamento: data.dataPagamento,
+      observacao: data.observacao ?? installment.observacao,
+      createdAt: nowIso(),
+    });
     return { ok: true };
   });
 
@@ -180,6 +232,7 @@ export const revertInstallment = createServerFn({ method: "POST" })
     const installmentsRepo = await filamentoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela não encontrada.");
+    const reversedAmount = getInstallmentPaidAmount(installment);
     const updated: FilamentoPaymentInstallment = {
       ...installment,
       pago: false,
@@ -187,6 +240,18 @@ export const revertInstallment = createServerFn({ method: "POST" })
       valorPago: null,
     };
     await installmentsRepo.update(updated);
+    if (reversedAmount > 0) {
+      await recordFilamentoEvent({
+        id: randomUUID(),
+        installmentId: installment.id,
+        paymentId: installment.paymentId,
+        tipo: "estorno",
+        valor: reversedAmount,
+        dataPagamento: todayIso(),
+        observacao: installment.observacao,
+        createdAt: nowIso(),
+      });
+    }
     return { ok: true };
   });
 
@@ -254,6 +319,19 @@ export const settlePayment = createServerFn({ method: "POST" })
     }
     for (const update of updates) {
       await installmentsRepo.update(update);
+      const amountAdded = roundMoney(update.valorPago - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
+      if (amountAdded > 0) {
+        await recordFilamentoEvent({
+          id: randomUUID(),
+          installmentId: update.id,
+          paymentId: update.paymentId,
+          tipo: "pagamento",
+          valor: amountAdded,
+          dataPagamento: today,
+          observacao: update.observacao,
+          createdAt: nowIso(),
+        });
+      }
     }
     return { ok: true };
   });
@@ -288,6 +366,16 @@ export const payInsumoInstallment = createServerFn({ method: "POST" })
       observacao: data.observacao ?? installment.observacao,
     };
     await installmentsRepo.update(updated);
+    await recordInsumoEvent({
+      id: randomUUID(),
+      installmentId: installment.id,
+      paymentId: installment.paymentId,
+      tipo: "pagamento",
+      valor: amountToAdd,
+      dataPagamento: data.dataPagamento,
+      observacao: data.observacao ?? installment.observacao,
+      createdAt: nowIso(),
+    });
     return { ok: true };
   });
 
@@ -297,6 +385,7 @@ export const revertInsumoInstallment = createServerFn({ method: "POST" })
     const installmentsRepo = await insumoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela do insumo não encontrada.");
+    const reversedAmount = getInstallmentPaidAmount(installment);
     const updated: InsumoPaymentInstallment = {
       ...installment,
       pago: false,
@@ -304,6 +393,18 @@ export const revertInsumoInstallment = createServerFn({ method: "POST" })
       valorPago: null,
     };
     await installmentsRepo.update(updated);
+    if (reversedAmount > 0) {
+      await recordInsumoEvent({
+        id: randomUUID(),
+        installmentId: installment.id,
+        paymentId: installment.paymentId,
+        tipo: "estorno",
+        valor: reversedAmount,
+        dataPagamento: todayIso(),
+        observacao: installment.observacao,
+        createdAt: nowIso(),
+      });
+    }
     return { ok: true };
   });
 
@@ -371,6 +472,19 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
     }
     for (const update of updates) {
       await installmentsRepo.update(update);
+      const amountAdded = roundMoney(update.valorPago - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
+      if (amountAdded > 0) {
+        await recordInsumoEvent({
+          id: randomUUID(),
+          installmentId: update.id,
+          paymentId: update.paymentId,
+          tipo: "pagamento",
+          valor: amountAdded,
+          dataPagamento: paymentDate,
+          observacao: update.observacao,
+          createdAt: nowIso(),
+        });
+      }
     }
     return { ok: true };
   });

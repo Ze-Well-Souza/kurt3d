@@ -85,10 +85,10 @@ async function createOrUpdateInsumoPayment(input: {
   };
   await paymentsRepo.update(updated);
 
-  const progressed = installmentsRepo.list.filter(
+  const existingInstallments = installmentsRepo.list.filter((installment) => installment.paymentId === input.paymentId);
+  const progressed = existingInstallments.filter(
     (installment) => installment.paymentId === input.paymentId && ((installment.valorPago ?? 0) > 0 || installment.pago),
   );
-  await installmentsRepo.deleteByPayment(input.paymentId);
 
   const perParcel = Math.round((input.custoTotal / parcelas) * 100) / 100;
   const lastParcelDiff = +(input.custoTotal - perParcel * parcelas).toFixed(2);
@@ -121,7 +121,25 @@ async function createOrUpdateInsumoPayment(input: {
       observacao: null,
     });
   }
-  await installmentsRepo.insertMany(newItems);
+  const existingById = new Map(existingInstallments.map((installment) => [installment.id, installment]));
+  const itemsToUpdate = newItems.filter((item) => existingById.has(item.id));
+  const itemsToInsert = newItems.filter((item) => !existingById.has(item.id));
+  const nextIds = new Set(newItems.map((item) => item.id));
+  const progressedToRemove = existingInstallments.filter(
+    (item) => !nextIds.has(item.id) && (item.valorPago ?? 0) > 0,
+  );
+  if (progressedToRemove.length > 0) {
+    throw new Error("Nao e possivel reduzir parcelas que ja possuem historico de pagamento.");
+  }
+  const idsToRemove = existingInstallments
+    .filter((item) => !nextIds.has(item.id) && (item.valorPago ?? 0) === 0)
+    .map((item) => item.id);
+
+  for (const item of itemsToUpdate) {
+    await installmentsRepo.update(item);
+  }
+  await installmentsRepo.insertMany(itemsToInsert);
+  await installmentsRepo.removeMany(idsToRemove);
   return { paymentId: input.paymentId };
 }
 

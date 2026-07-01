@@ -237,9 +237,23 @@ create table if not exists public.filamento_payment_installments (
   observacao text null
 );
 
+create table if not exists public.filamento_payment_events (
+  id text primary key,
+  installment_id text not null references public.filamento_payment_installments(id) on delete cascade,
+  payment_id text not null references public.filamento_payments(id) on delete cascade,
+  tipo text not null check (tipo in ('pagamento', 'estorno')),
+  valor double precision not null,
+  data_pagamento date not null,
+  observacao text null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_filamento_payments_batch on public.filamento_payments(batch_id);
 create index if not exists idx_filamento_installments_payment on public.filamento_payment_installments(payment_id);
 create index if not exists idx_filamento_installments_vencimento on public.filamento_payment_installments(vencimento);
+create index if not exists idx_filamento_payment_events_installment on public.filamento_payment_events(installment_id);
+create index if not exists idx_filamento_payment_events_payment on public.filamento_payment_events(payment_id);
+create index if not exists idx_filamento_payment_events_data on public.filamento_payment_events(data_pagamento);
 
 -- Backwards-compatible additions for existing filamentos table
 alter table public.filamentos add column if not exists batch_id text null;
@@ -270,9 +284,23 @@ create table if not exists public.insumo_payment_installments (
   observacao text null
 );
 
+create table if not exists public.insumo_payment_events (
+  id text primary key,
+  installment_id text not null references public.insumo_payment_installments(id) on delete cascade,
+  payment_id text not null references public.insumo_payments(id) on delete cascade,
+  tipo text not null check (tipo in ('pagamento', 'estorno')),
+  valor double precision not null,
+  data_pagamento date not null,
+  observacao text null,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_insumo_payments_insumo on public.insumo_payments(insumo_id);
 create index if not exists idx_insumo_installments_payment on public.insumo_payment_installments(payment_id);
 create index if not exists idx_insumo_installments_vencimento on public.insumo_payment_installments(vencimento);
+create index if not exists idx_insumo_payment_events_installment on public.insumo_payment_events(installment_id);
+create index if not exists idx_insumo_payment_events_payment on public.insumo_payment_events(payment_id);
+create index if not exists idx_insumo_payment_events_data on public.insumo_payment_events(data_pagamento);
 
 -- ═══════════ Production Calendar ═══════════
 create table if not exists public.production_calendar (

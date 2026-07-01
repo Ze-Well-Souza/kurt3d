@@ -48,6 +48,7 @@ type InsumoInstallmentRepoMock = {
   insertMany: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   deleteByPayment: ReturnType<typeof vi.fn>;
+  removeMany: ReturnType<typeof vi.fn>;
 };
 
 type LeadRepoMock = {
@@ -85,11 +86,13 @@ vi.mock("../server/db.server", () => ({
 vi.mock("../server/repositories.server", () => ({
   clientsRepo: vi.fn(async () => clientsRepoMock),
   expensesRepo: vi.fn(async () => expensesRepoMock),
-  filamentoInstallmentsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
+  filamentoInstallmentsRepo: vi.fn(async () => ({ list: [], save: vi.fn(), insertMany: vi.fn(), update: vi.fn(), deleteByPayment: vi.fn(), removeMany: vi.fn() })),
+  filamentoPaymentEventsRepo: vi.fn(async () => ({ list: [], insert: vi.fn() })),
   filamentoPaymentsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
   filamentosHistoryRepo: vi.fn(async () => ({ list: [], save: vi.fn(), archive: vi.fn() })),
   filamentosRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
   insumoInstallmentsRepo: vi.fn(async () => insumoInstallmentsRepoMock),
+  insumoPaymentEventsRepo: vi.fn(async () => ({ list: [], insert: vi.fn() })),
   insumoPaymentsRepo: vi.fn(async () => insumoPaymentsRepoMock),
   insumosRepo: vi.fn(async () => insumosRepoMock),
   inventoryRepo: vi.fn(async () => inventoryRepoMock),
@@ -231,6 +234,7 @@ describe("client linking", () => {
       insertMany: vi.fn(async () => undefined),
       update: vi.fn(async () => undefined),
       deleteByPayment: vi.fn(async () => undefined),
+      removeMany: vi.fn(async () => undefined),
     };
     leadsRepoMock = {
       list: [],

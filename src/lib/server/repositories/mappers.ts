@@ -5,10 +5,12 @@ import type {
   ExpenseSource,
   Filamento,
   FilamentoHistory,
+  FilamentoPaymentEvent,
   FilamentoPayment,
   FilamentoPaymentInstallment,
   FormaPagamento,
   Insumo,
+  InsumoPaymentEvent,
   InsumoPayment,
   InsumoPaymentInstallment,
   InventoryTxn,
@@ -438,6 +440,32 @@ export function toInstallmentRow(row: FilamentoPaymentInstallment) {
   };
 }
 
+export function fromFilamentoPaymentEventRow(row: any): FilamentoPaymentEvent {
+  return {
+    id: row.id,
+    installmentId: row.installment_id,
+    paymentId: row.payment_id,
+    tipo: row.tipo,
+    valor: row.valor,
+    dataPagamento: row.data_pagamento,
+    observacao: row.observacao ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+export function toFilamentoPaymentEventRow(row: FilamentoPaymentEvent) {
+  return {
+    id: row.id,
+    installment_id: row.installmentId,
+    payment_id: row.paymentId,
+    tipo: row.tipo,
+    valor: row.valor,
+    data_pagamento: row.dataPagamento,
+    observacao: row.observacao ?? null,
+    created_at: row.createdAt,
+  };
+}
+
 export function fromInsumoInstallmentRow(row: any): InsumoPaymentInstallment {
   return {
     id: row.id,
@@ -463,6 +491,32 @@ export function toInsumoInstallmentRow(row: InsumoPaymentInstallment) {
     data_pagamento: row.dataPagamento ?? null,
     valor_pago: row.valorPago ?? null,
     observacao: row.observacao ?? null,
+  };
+}
+
+export function fromInsumoPaymentEventRow(row: any): InsumoPaymentEvent {
+  return {
+    id: row.id,
+    installmentId: row.installment_id,
+    paymentId: row.payment_id,
+    tipo: row.tipo,
+    valor: row.valor,
+    dataPagamento: row.data_pagamento,
+    observacao: row.observacao ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+export function toInsumoPaymentEventRow(row: InsumoPaymentEvent) {
+  return {
+    id: row.id,
+    installment_id: row.installmentId,
+    payment_id: row.paymentId,
+    tipo: row.tipo,
+    valor: row.valor,
+    data_pagamento: row.dataPagamento,
+    observacao: row.observacao ?? null,
+    created_at: row.createdAt,
   };
 }
 

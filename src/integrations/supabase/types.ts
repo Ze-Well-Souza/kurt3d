@@ -157,6 +157,54 @@ export type Database = {
           },
         ]
       }
+      filamento_payment_events: {
+        Row: {
+          created_at: string
+          data_pagamento: string
+          id: string
+          installment_id: string
+          observacao: string | null
+          payment_id: string
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          data_pagamento: string
+          id: string
+          installment_id: string
+          observacao?: string | null
+          payment_id: string
+          tipo: string
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          data_pagamento?: string
+          id?: string
+          installment_id?: string
+          observacao?: string | null
+          payment_id?: string
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filamento_payment_events_installment_id_fkey"
+            columns: ["installment_id"]
+            isOneToOne: false
+            referencedRelation: "filamento_payment_installments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "filamento_payment_events_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "filamento_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       filamento_payments: {
         Row: {
           batch_id: string
@@ -224,6 +272,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "insumo_payment_installments_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "insumo_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insumo_payment_events: {
+        Row: {
+          created_at: string
+          data_pagamento: string
+          id: string
+          installment_id: string
+          observacao: string | null
+          payment_id: string
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          data_pagamento: string
+          id: string
+          installment_id: string
+          observacao?: string | null
+          payment_id: string
+          tipo: string
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          data_pagamento?: string
+          id?: string
+          installment_id?: string
+          observacao?: string | null
+          payment_id?: string
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insumo_payment_events_installment_id_fkey"
+            columns: ["installment_id"]
+            isOneToOne: false
+            referencedRelation: "insumo_payment_installments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insumo_payment_events_payment_id_fkey"
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "insumo_payments"
