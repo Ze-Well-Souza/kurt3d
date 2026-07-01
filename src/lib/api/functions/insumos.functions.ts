@@ -16,6 +16,10 @@ function buildInsumoExpenseCategory(classificacaoFinanceira: InsumoClassificacao
   return classificacaoFinanceira === "investimento" ? "Investimento / Imobilizado" : "Despesa Operacional";
 }
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 async function createOrUpdateInsumoPayment(input: {
   insumoId: string;
   paymentId?: string | null;
@@ -81,7 +85,9 @@ async function createOrUpdateInsumoPayment(input: {
   };
   await paymentsRepo.update(updated);
 
-  const paid = installmentsRepo.list.filter((installment) => installment.paymentId === input.paymentId && installment.pago);
+  const progressed = installmentsRepo.list.filter(
+    (installment) => installment.paymentId === input.paymentId && ((installment.valorPago ?? 0) > 0 || installment.pago),
+  );
   await installmentsRepo.deleteByPayment(input.paymentId);
 
   const perParcel = Math.round((input.custoTotal / parcelas) * 100) / 100;
@@ -89,12 +95,20 @@ async function createOrUpdateInsumoPayment(input: {
   const newItems: InsumoPaymentInstallment[] = [];
   for (let i = 0; i < parcelas; i++) {
     const numero = i + 1;
-    const existingPaid = paid.find((installment) => installment.numero === numero);
-    if (existingPaid) {
-      newItems.push(existingPaid);
+    const valor = i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+    const existingProgressed = progressed.find((installment) => installment.numero === numero);
+    if (existingProgressed) {
+      const paidAmount = Math.min(roundMoney(existingProgressed.valorPago ?? 0), valor);
+      newItems.push({
+        ...existingProgressed,
+        valor,
+        vencimento: addCalendarMonthsIso(input.dataParaPagamento, i),
+        pago: paidAmount >= valor,
+        valorPago: paidAmount > 0 ? paidAmount : null,
+        dataPagamento: paidAmount > 0 ? existingProgressed.dataPagamento : null,
+      });
       continue;
     }
-    const valor = i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
     newItems.push({
       id: randomUUID(),
       paymentId: input.paymentId,

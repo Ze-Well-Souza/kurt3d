@@ -6,6 +6,18 @@ import type { FilamentoPayment, FilamentoPaymentInstallment, InsumoPayment, Insu
 import { nowIso } from "../../server/db.server";
 import { filamentoInstallmentsRepo, filamentoPaymentsRepo, insumoInstallmentsRepo, insumoPaymentsRepo } from "../../server/repositories.server";
 
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function getInstallmentPaidAmount(installment: { valor: number; valorPago: number | null }) {
+  return Math.min(roundMoney(installment.valorPago ?? 0), installment.valor);
+}
+
+function getInstallmentRemainingAmount(installment: { valor: number; valorPago: number | null }) {
+  return Math.max(roundMoney(installment.valor - getInstallmentPaidAmount(installment)), 0);
+}
+
 export const createFilamentoPayment = createServerFn({ method: "POST" })
   .validator(
     z.object({
@@ -78,7 +90,9 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
     };
     await paymentsRepo.update(updated);
 
-    const paid = installmentsRepo.list.filter((installment) => installment.paymentId === data.paymentId && installment.pago);
+    const progressed = installmentsRepo.list.filter(
+      (installment) => installment.paymentId === data.paymentId && ((installment.valorPago ?? 0) > 0 || installment.pago),
+    );
     await installmentsRepo.deleteByPayment(data.paymentId);
 
     const perParcel = Math.round((data.custoTotal / data.parcelas) * 100) / 100;
@@ -86,12 +100,20 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
     const newItems: FilamentoPaymentInstallment[] = [];
     for (let i = 0; i < data.parcelas; i++) {
       const numero = i + 1;
-      const existingPaid = paid.find((installment) => installment.numero === numero);
-      if (existingPaid) {
-        newItems.push(existingPaid);
+      const valor = i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+      const existingProgressed = progressed.find((installment) => installment.numero === numero);
+      if (existingProgressed) {
+        const paidAmount = Math.min(existingProgressed.valorPago ?? 0, valor);
+        newItems.push({
+          ...existingProgressed,
+          valor,
+          vencimento: addCalendarMonthsIso(data.dataParaPagamento, i),
+          pago: paidAmount >= valor,
+          valorPago: paidAmount > 0 ? paidAmount : null,
+          dataPagamento: paidAmount > 0 ? existingProgressed.dataPagamento : null,
+        });
         continue;
       }
-      const valor = i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
       newItems.push({
         id: randomUUID(),
         paymentId: data.paymentId,
@@ -132,11 +154,20 @@ export const payInstallment = createServerFn({ method: "POST" })
     const installmentsRepo = await filamentoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela não encontrada.");
+    if (installment.pago) throw new Error("Parcela já está quitada.");
+    const remaining = getInstallmentRemainingAmount(installment);
+    const amountToAdd = roundMoney(data.valorPago ?? remaining);
+    if (amountToAdd <= 0) throw new Error("Informe um valor de pagamento maior que zero.");
+    if (amountToAdd - remaining > 0.001) {
+      throw new Error("O valor informado é maior que o saldo restante da parcela.");
+    }
+    const nextPaidAmount = roundMoney(getInstallmentPaidAmount(installment) + amountToAdd);
+    const settled = nextPaidAmount >= installment.valor;
     const updated: FilamentoPaymentInstallment = {
       ...installment,
-      pago: true,
+      pago: settled,
       dataPagamento: data.dataPagamento,
-      valorPago: data.valorPago ?? installment.valor,
+      valorPago: nextPaidAmount,
       observacao: data.observacao ?? installment.observacao,
     };
     await installmentsRepo.update(updated);
@@ -198,20 +229,28 @@ export const settlePayment = createServerFn({ method: "POST" })
     if (pending.length === 0) return { ok: true };
 
     const today = data.dataPagamento ?? todayIso();
-    let remaining = data.totalPago ?? pending.reduce((sum, installment) => sum + installment.valor, 0);
+    const totalRemaining = pending.reduce((sum, installment) => sum + getInstallmentRemainingAmount(installment), 0);
+    let remaining = data.totalPago ?? totalRemaining;
+    if (remaining <= 0) throw new Error("Informe um valor maior que zero para quitar.");
+    if (remaining - totalRemaining > 0.001) {
+      throw new Error("O valor informado é maior que o saldo restante do lote.");
+    }
     let distributed = 0;
     const updates: FilamentoPaymentInstallment[] = [];
     for (let index = 0; index < pending.length; index++) {
       const installment = pending[index];
       const isLast = index === pending.length - 1;
-      const valorPago = isLast ? Math.round((remaining - distributed) * 100) / 100 : installment.valor;
+      const currentPaid = getInstallmentPaidAmount(installment);
+      const installmentRemaining = getInstallmentRemainingAmount(installment);
+      const amountToAdd = isLast ? roundMoney(remaining - distributed) : installmentRemaining;
+      const valorPago = roundMoney(currentPaid + amountToAdd);
       updates.push({
         ...installment,
-        pago: true,
+        pago: valorPago >= installment.valor,
         dataPagamento: today,
         valorPago,
       });
-      distributed += valorPago;
+      distributed += amountToAdd;
     }
     for (const update of updates) {
       await installmentsRepo.update(update);
@@ -232,11 +271,20 @@ export const payInsumoInstallment = createServerFn({ method: "POST" })
     const installmentsRepo = await insumoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela do insumo não encontrada.");
+    if (installment.pago) throw new Error("Parcela do insumo já está quitada.");
+    const remaining = getInstallmentRemainingAmount(installment);
+    const amountToAdd = roundMoney(data.valorPago ?? remaining);
+    if (amountToAdd <= 0) throw new Error("Informe um valor de pagamento maior que zero.");
+    if (amountToAdd - remaining > 0.001) {
+      throw new Error("O valor informado é maior que o saldo restante da parcela.");
+    }
+    const nextPaidAmount = roundMoney(getInstallmentPaidAmount(installment) + amountToAdd);
+    const settled = nextPaidAmount >= installment.valor;
     const updated: InsumoPaymentInstallment = {
       ...installment,
-      pago: true,
+      pago: settled,
       dataPagamento: data.dataPagamento,
-      valorPago: data.valorPago ?? installment.valor,
+      valorPago: nextPaidAmount,
       observacao: data.observacao ?? installment.observacao,
     };
     await installmentsRepo.update(updated);
@@ -298,20 +346,28 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
     if (pending.length === 0) return { ok: true };
 
     const paymentDate = data.dataPagamento ?? todayIso();
-    let remaining = data.totalPago ?? pending.reduce((sum, installment) => sum + installment.valor, 0);
+    const totalRemaining = pending.reduce((sum, installment) => sum + getInstallmentRemainingAmount(installment), 0);
+    let remaining = data.totalPago ?? totalRemaining;
+    if (remaining <= 0) throw new Error("Informe um valor maior que zero para quitar.");
+    if (remaining - totalRemaining > 0.001) {
+      throw new Error("O valor informado é maior que o saldo restante da compra.");
+    }
     let distributed = 0;
     const updates: InsumoPaymentInstallment[] = [];
     for (let index = 0; index < pending.length; index++) {
       const installment = pending[index];
       const isLast = index === pending.length - 1;
-      const valorPago = isLast ? Math.round((remaining - distributed) * 100) / 100 : installment.valor;
+      const currentPaid = getInstallmentPaidAmount(installment);
+      const installmentRemaining = getInstallmentRemainingAmount(installment);
+      const amountToAdd = isLast ? roundMoney(remaining - distributed) : installmentRemaining;
+      const valorPago = roundMoney(currentPaid + amountToAdd);
       updates.push({
         ...installment,
-        pago: true,
+        pago: valorPago >= installment.valor,
         dataPagamento: paymentDate,
         valorPago,
       });
-      distributed += valorPago;
+      distributed += amountToAdd;
     }
     for (const update of updates) {
       await installmentsRepo.update(update);

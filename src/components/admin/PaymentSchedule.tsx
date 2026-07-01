@@ -47,12 +47,19 @@ export function PaymentSchedule({
   const [editVencimento, setEditVencimento] = useState("");
   const [editObservacao, setEditObservacao] = useState("");
 
+  const getPaidAmount = (installment: FilamentoPaymentInstallment) =>
+    Math.min(installment.valorPago ?? 0, installment.valor);
+  const getRemainingAmount = (installment: FilamentoPaymentInstallment) =>
+    Math.max(installment.valor - getPaidAmount(installment), 0);
+  const isPartial = (installment: FilamentoPaymentInstallment) =>
+    !installment.pago && getPaidAmount(installment) > 0;
+
   const sorted = [...installments].sort((a, b) => a.numero - b.numero);
   const paid = sorted.filter((i) => i.pago);
   const pending = sorted.filter((i) => !i.pago);
-  const totalPago = paid.reduce((s, i) => s + (i.valorPago ?? i.valor), 0);
-  const totalPendente = pending.reduce((s, i) => s + i.valor, 0);
-  const percent = payment.parcelas > 0 ? (paid.length / payment.parcelas) * 100 : 0;
+  const totalPago = sorted.reduce((s, i) => s + getPaidAmount(i), 0);
+  const totalPendente = pending.reduce((s, i) => s + getRemainingAmount(i), 0);
+  const percent = payment.custoTotal > 0 ? (totalPago / payment.custoTotal) * 100 : 0;
   const today = todayIso();
 
   return (
@@ -129,11 +136,22 @@ export function PaymentSchedule({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-xs">{brl(i.valor)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">
+                    <div>{brl(i.valor)}</div>
+                    {!i.pago && (
+                      <div className="text-[10px] text-muted-foreground">
+                        Falta {brl(getRemainingAmount(i))}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center">
                     {i.pago ? (
                       <Badge className="gap-1 bg-green-600 text-[10px]">
                         <Check className="h-3 w-3" /> Pago
+                      </Badge>
+                    ) : isPartial(i) ? (
+                      <Badge variant="outline" className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700">
+                        Parcial
                       </Badge>
                     ) : overdue ? (
                       <Badge variant="destructive" className="text-[10px]">Atrasado</Badge>
@@ -189,7 +207,7 @@ export function PaymentSchedule({
                                   setPayDialog({
                                     installmentId: i.id,
                                     dataPagamento: new Date().toISOString().slice(0, 10),
-                                    valorPago: String(i.valor),
+                                    valorPago: String(getRemainingAmount(i)),
                                   })
                                 }
                               >
@@ -263,6 +281,13 @@ export function PaymentSchedule({
           </DialogHeader>
           {payDialog && (
             <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Valor total da parcela: <strong className="text-foreground">{brl(sorted.find((item) => item.id === payDialog.installmentId)?.valor ?? 0)}</strong>
+                {" · "}
+                ja pago: <strong className="text-foreground">{brl(getPaidAmount(sorted.find((item) => item.id === payDialog.installmentId) ?? installments[0]))}</strong>
+                {" · "}
+                restante: <strong className="text-foreground">{brl(getRemainingAmount(sorted.find((item) => item.id === payDialog.installmentId) ?? installments[0]))}</strong>
+              </p>
               <div className="space-y-1">
                 <Label className="text-xs">Data do pagamento</Label>
                 <Input
@@ -272,7 +297,7 @@ export function PaymentSchedule({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Valor pago (R$)</Label>
+                <Label className="text-xs">Valor a adicionar (R$)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -285,14 +310,27 @@ export function PaymentSchedule({
                 <Button
                   onClick={async () => {
                     if (!payDialog) return;
+                    const installment = sorted.find((item) => item.id === payDialog.installmentId);
+                    if (!installment) return;
+                    const amount = Number(payDialog.valorPago);
+                    if (!Number.isFinite(amount) || amount <= 0 || amount > getRemainingAmount(installment)) {
+                      return;
+                    }
                     await onPay({
                       installmentId: payDialog.installmentId,
                       dataPagamento: payDialog.dataPagamento,
-                      valorPago: Number(payDialog.valorPago) || undefined,
+                      valorPago: amount,
                     });
                     setPayDialog(null);
                   }}
-                  disabled={isPending}
+                  disabled={
+                    isPending ||
+                    !(() => {
+                      const installment = sorted.find((item) => item.id === payDialog.installmentId);
+                      const amount = Number(payDialog.valorPago);
+                      return installment && Number.isFinite(amount) && amount > 0 && amount <= getRemainingAmount(installment);
+                    })()
+                  }
                 >
                   Confirmar
                 </Button>

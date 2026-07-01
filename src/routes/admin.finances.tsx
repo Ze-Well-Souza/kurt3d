@@ -33,6 +33,15 @@ const EXPENSE_CATEGORIES = ["Aluguel","Internet","Manutenção","Energia","Perda
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+const getInstallmentPaidAmount = (installment: { valor: number; valorPago: number | null }) =>
+  Math.min(installment.valorPago ?? 0, installment.valor);
+
+const getInstallmentRemainingAmount = (installment: { valor: number; valorPago: number | null }) =>
+  Math.max(installment.valor - getInstallmentPaidAmount(installment), 0);
+
+const isPartialInstallment = (installment: { pago: boolean; valor: number; valorPago: number | null }) =>
+  !installment.pago && getInstallmentPaidAmount(installment) > 0;
+
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   insumo: { label: "Insumo", color: "var(--filament-yellow)" },
   manual: { label: "Manual", color: "var(--filament-cyan)" },
@@ -64,6 +73,12 @@ function Finances() {
   const [purchaseMaterialFilter, setPurchaseMaterialFilter] = useState("all");
   const [highlightedInstallmentId, setHighlightedInstallmentId] = useState<string | null>(null);
   const [highlightedPaymentId, setHighlightedPaymentId] = useState<string | null>(null);
+  const [payDialog, setPayDialog] = useState<{
+    kind: "filamento" | "insumo";
+    installmentId: string;
+    dataPagamento: string;
+    valorPago: string;
+  } | null>(null);
   const [expForm, setExpForm] = useState({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" });
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
   const [periodAnchor, setPeriodAnchor] = useState(new Date().toISOString().slice(0, 7));
@@ -75,11 +90,15 @@ function Finances() {
     mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number }) =>
       payInstallment({ data: input }),
     onSuccess: (_data, variables) => {
+      const currentInstallment = filamentoInstallments.find((item) => item.id === variables.installmentId);
+      const remaining = currentInstallment ? getInstallmentRemainingAmount(currentInstallment) : 0;
+      const amount = variables.valorPago ?? remaining;
+      const settled = amount >= remaining;
       invalidate();
-      setInstallmentViewFilter("paid");
+      setInstallmentViewFilter(settled ? "paid" : "all");
       setHighlightedInstallmentId(variables.installmentId);
       setHighlightedPaymentId(null);
-      toast.success("Parcela marcada como paga. Confira em Pagas.");
+      toast.success(settled ? "Parcela quitada. Confira em Pagas." : "Pagamento parcial registrado. Confira em Todas.");
     },
   });
   const mutateSettlePayment = useMutation({
@@ -97,11 +116,15 @@ function Finances() {
     mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number }) =>
       payInsumoInstallment({ data: input }),
     onSuccess: (_data, variables) => {
+      const currentInstallment = insumoInstallments.find((item) => item.id === variables.installmentId);
+      const remaining = currentInstallment ? getInstallmentRemainingAmount(currentInstallment) : 0;
+      const amount = variables.valorPago ?? remaining;
+      const settled = amount >= remaining;
       invalidate();
-      setInstallmentViewFilter("paid");
+      setInstallmentViewFilter(settled ? "paid" : "all");
       setHighlightedInstallmentId(variables.installmentId);
       setHighlightedPaymentId(null);
-      toast.success("Parcela do insumo marcada como paga. Confira em Pagas.");
+      toast.success(settled ? "Parcela do insumo quitada. Confira em Pagas." : "Pagamento parcial do insumo registrado. Confira em Todas.");
     },
   });
   const mutateSettleInsumoPayment = useMutation({
@@ -211,14 +234,14 @@ function Finances() {
   const filteredFilamentoInstallments = useMemo(
     () =>
       filamentoInstallments.filter((installment) =>
-        isDateInSelectedPeriod(installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento),
+        isDateInSelectedPeriod(installment.pago || isPartialInstallment(installment) ? installment.dataPagamento ?? installment.vencimento : installment.vencimento),
       ),
     [filamentoInstallments, periodAnchor, periodPreset],
   );
   const filteredInsumoInstallments = useMemo(
     () =>
       insumoInstallments.filter((installment) =>
-        isDateInSelectedPeriod(installment.pago ? installment.dataPagamento ?? installment.vencimento : installment.vencimento),
+        isDateInSelectedPeriod(installment.pago || isPartialInstallment(installment) ? installment.dataPagamento ?? installment.vencimento : installment.vencimento),
       ),
     [insumoInstallments, periodAnchor, periodPreset],
   );
@@ -226,6 +249,7 @@ function Finances() {
     () => [...filteredFilamentoInstallments, ...filteredInsumoInstallments],
     [filteredFilamentoInstallments, filteredInsumoInstallments],
   );
+
 
   const totals = useMemo(() => {
     const receita = periodFilteredVendas.reduce((s, v) => s + v.valor, 0);
@@ -300,34 +324,39 @@ function Finances() {
     let atrasadas = 0;
     for (const inst of filteredInstallments) {
       if (!inst.pago) {
-        pendente += inst.valor;
+        pendente += getInstallmentRemainingAmount(inst);
         if (inst.vencimento <= today) atrasadas++;
         const diffDays = (parseIsoDateLocal(inst.vencimento).getTime() - parseIsoDateLocal(today).getTime()) / 86400000;
-        if (diffDays >= 0 && diffDays <= 30) vencendoEm30 += inst.valor;
-      } else if (inst.dataPagamento && inst.dataPagamento.slice(0, 7) === yearMonth) {
-        pagoNoMes += inst.valorPago ?? inst.valor;
+        if (diffDays >= 0 && diffDays <= 30) vencendoEm30 += getInstallmentRemainingAmount(inst);
+      }
+      if ((inst.pago || isPartialInstallment(inst)) && inst.dataPagamento && inst.dataPagamento.slice(0, 7) === yearMonth) {
+        pagoNoMes += getInstallmentPaidAmount(inst);
       }
     }
     return { pendente, pagoNoMes, vencendoEm30, atrasadas };
   }, [filteredInstallments]);
 
   const filamentoPaymentProgress = useMemo(() => {
-    const grouped = new Map<string, { total: number; paid: number }>();
+    const grouped = new Map<string, { totalInstallments: number; paidInstallments: number; totalAmount: number; paidAmount: number }>();
     for (const installment of filteredFilamentoInstallments) {
-      const current = grouped.get(installment.paymentId) ?? { total: 0, paid: 0 };
-      current.total += 1;
-      if (installment.pago) current.paid += 1;
+      const current = grouped.get(installment.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
+      current.totalInstallments += 1;
+      current.totalAmount += installment.valor;
+      current.paidAmount += getInstallmentPaidAmount(installment);
+      if (installment.pago) current.paidInstallments += 1;
       grouped.set(installment.paymentId, current);
     }
     return grouped;
   }, [filteredFilamentoInstallments]);
 
   const insumoPaymentProgress = useMemo(() => {
-    const grouped = new Map<string, { total: number; paid: number }>();
+    const grouped = new Map<string, { totalInstallments: number; paidInstallments: number; totalAmount: number; paidAmount: number }>();
     for (const installment of filteredInsumoInstallments) {
-      const current = grouped.get(installment.paymentId) ?? { total: 0, paid: 0 };
-      current.total += 1;
-      if (installment.pago) current.paid += 1;
+      const current = grouped.get(installment.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
+      current.totalInstallments += 1;
+      current.totalAmount += installment.valor;
+      current.paidAmount += getInstallmentPaidAmount(installment);
+      if (installment.pago) current.paidInstallments += 1;
       grouped.set(installment.paymentId, current);
     }
     return grouped;
@@ -341,14 +370,14 @@ function Finances() {
         const label = payment
           ? filamentos.filter((f) => f.batchId === payment.batchId).map((f) => f.sku).join(", ")
           : "";
-        const progress = filamentoPaymentProgress.get(i.paymentId) ?? { total: 0, paid: 0 };
+        const progress = filamentoPaymentProgress.get(i.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
         return { kind: "filamento" as const, inst: i, payment, label, overdue: !i.pago && i.vencimento <= today, progress };
       });
     const insumoEntries = filteredInsumoInstallments
       .map((i) => {
         const payment = insumoPayments.find((p) => p.id === i.paymentId) ?? null;
         const insumo = payment ? insumos.find((item) => item.id === payment.insumoId) : null;
-        const progress = insumoPaymentProgress.get(i.paymentId) ?? { total: 0, paid: 0 };
+        const progress = insumoPaymentProgress.get(i.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
         return { kind: "insumo" as const, inst: i, payment, label: insumo?.nome ?? "", overdue: !i.pago && i.vencimento <= today, progress };
       });
     const allEntries = [...filamentEntries, ...insumoEntries];
@@ -384,10 +413,17 @@ function Finances() {
     () => ({
       pending: filteredInstallments.filter((item) => !item.pago).length,
       paid: filteredInstallments.filter((item) => item.pago).length,
+      partial: filteredInstallments.filter((item) => isPartialInstallment(item)).length,
       total: filteredInstallments.length,
     }),
     [filteredInstallments],
   );
+
+  const selectedFinanceInstallment = useMemo(() => {
+    if (!payDialog) return null;
+    const list = payDialog.kind === "filamento" ? filteredFilamentoInstallments : filteredInsumoInstallments;
+    return list.find((item) => item.id === payDialog.installmentId) ?? null;
+  }, [filteredFilamentoInstallments, filteredInsumoInstallments, payDialog]);
 
   const filteredVendas = useMemo(() => {
     if (!search.trim()) return periodFilteredVendas;
@@ -1075,6 +1111,7 @@ function Finances() {
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>{scheduleCounts.pending} pendente(s)</span>
                 <span>· {scheduleCounts.paid} paga(s)</span>
+                <span>· {scheduleCounts.partial} parcial(is)</span>
                 <span>· {scheduleCounts.total} no período</span>
                 {installmentKpis.atrasadas > 0 && (
                   <span className="font-semibold text-destructive">
@@ -1121,7 +1158,7 @@ function Finances() {
           </div>
         </div>
         <div className="border-b border-border px-6 py-3 text-xs text-muted-foreground">
-          Ao clicar em <strong className="text-foreground">Pagar</strong>, a parcela e gravada como paga com data de pagamento e passa a aparecer em <strong className="text-foreground">Pagas</strong> ou <strong className="text-foreground">Todas</strong>.
+          Ao clicar em <strong className="text-foreground">Pagar</strong>, voce pode registrar o valor total ou um valor parcial. A parcela so vira <strong className="text-foreground">Pago</strong> quando o saldo restante chegar a zero.
         </div>
         {scheduleEntries.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-muted-foreground">
@@ -1167,20 +1204,20 @@ function Finances() {
                         <Badge
                           variant="secondary"
                           className={
-                            progress.total > 0 && progress.paid === progress.total
+                            progress.totalAmount > 0 && progress.paidAmount >= progress.totalAmount
                               ? "border-green-600/20 bg-green-50 text-green-700"
-                              : progress.paid > 0
+                              : progress.paidAmount > 0
                                 ? "border-amber-500/20 bg-amber-50 text-amber-700"
                                 : ""
                           }
                         >
-                          {progress.total > 0 && progress.paid === progress.total
+                          {progress.totalAmount > 0 && progress.paidAmount >= progress.totalAmount
                             ? "Quitado"
-                            : progress.paid > 0
-                              ? `Parcial ${progress.paid}/${progress.total}`
+                            : progress.paidAmount > 0
+                              ? `Parcial ${brl(progress.paidAmount)}`
                               : payment?.formaPagamento === "a_vista"
                                 ? "Em aberto"
-                                : `Em aberto 0/${progress.total}`}
+                                : `Em aberto 0/${progress.totalInstallments}`}
                         </Badge>
                       </div>
                     </TableCell>
@@ -1194,11 +1231,22 @@ function Finances() {
                     <TableCell className="tabular-nums text-xs text-muted-foreground">
                       {inst.dataPagamento ? formatIsoDatePtBr(inst.dataPagamento) : "—"}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{brl(inst.valor)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <div>{brl(inst.valor)}</div>
+                      {!inst.pago && (
+                        <div className="text-[10px] text-muted-foreground">
+                          Falta {brl(getInstallmentRemainingAmount(inst))}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center">
                       {inst.pago ? (
                         <Badge className="gap-1 bg-green-600 text-[10px]">
                           <Check className="h-3 w-3" /> Pago
+                        </Badge>
+                      ) : isPartialInstallment(inst) ? (
+                        <Badge variant="outline" className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700">
+                          Parcial
                         </Badge>
                       ) : overdue ? (
                         <Badge variant="destructive" className="text-[10px]">Atrasado</Badge>
@@ -1225,17 +1273,14 @@ function Finances() {
                           variant="outline"
                           className="h-7 gap-1 text-xs"
                           disabled={mutatePayInstallment.isPending || mutateSettlePayment.isPending || mutatePayInsumoInstallment.isPending || mutateSettleInsumoPayment.isPending}
-                          title={inst.pago ? "Pagamento já confirmado" : "Marcar parcela como paga"}
+                          title={inst.pago ? "Pagamento já confirmado" : "Registrar pagamento"}
                           onClick={() =>
-                            kind === "filamento"
-                              ? mutatePayInstallment.mutate({
-                                  installmentId: inst.id,
-                                  dataPagamento: todayIso(),
-                                })
-                              : mutatePayInsumoInstallment.mutate({
-                                  installmentId: inst.id,
-                                  dataPagamento: todayIso(),
-                                })
+                            setPayDialog({
+                              kind,
+                              installmentId: inst.id,
+                              dataPagamento: todayIso(),
+                              valorPago: String(getInstallmentRemainingAmount(inst)),
+                            })
                           }
                           style={{ visibility: inst.pago ? "hidden" : "visible" }}
                         >
@@ -1271,6 +1316,79 @@ function Finances() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!payDialog} onOpenChange={(open) => !open && setPayDialog(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Check className="h-4 w-4" /> Registrar pagamento
+            </DialogTitle>
+          </DialogHeader>
+          {payDialog && selectedFinanceInstallment && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Parcela de <strong className="text-foreground">{brl(selectedFinanceInstallment.valor)}</strong>
+                {" · "}
+                ja pago: <strong className="text-foreground">{brl(getInstallmentPaidAmount(selectedFinanceInstallment))}</strong>
+                {" · "}
+                restante: <strong className="text-foreground">{brl(getInstallmentRemainingAmount(selectedFinanceInstallment))}</strong>
+              </p>
+              <div className="space-y-1">
+                <Label className="text-xs">Data do pagamento</Label>
+                <Input
+                  type="date"
+                  value={payDialog.dataPagamento}
+                  onChange={(e) => setPayDialog((current) => current ? { ...current, dataPagamento: e.target.value } : current)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Valor a adicionar (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={payDialog.valorPago}
+                  onChange={(e) => setPayDialog((current) => current ? { ...current, valorPago: e.target.value } : current)}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPayDialog(null)}>Cancelar</Button>
+                <Button
+                  onClick={() => {
+                    if (!payDialog || !selectedFinanceInstallment) return;
+                    const amount = Number(payDialog.valorPago);
+                    if (!Number.isFinite(amount) || amount <= 0 || amount > getInstallmentRemainingAmount(selectedFinanceInstallment)) {
+                      return;
+                    }
+                    if (payDialog.kind === "filamento") {
+                      mutatePayInstallment.mutate({
+                        installmentId: payDialog.installmentId,
+                        dataPagamento: payDialog.dataPagamento,
+                        valorPago: amount,
+                      });
+                    } else {
+                      mutatePayInsumoInstallment.mutate({
+                        installmentId: payDialog.installmentId,
+                        dataPagamento: payDialog.dataPagamento,
+                        valorPago: amount,
+                      });
+                    }
+                    setPayDialog(null);
+                  }}
+                  disabled={
+                    mutatePayInstallment.isPending ||
+                    mutatePayInsumoInstallment.isPending ||
+                    !Number.isFinite(Number(payDialog.valorPago)) ||
+                    Number(payDialog.valorPago) <= 0 ||
+                    Number(payDialog.valorPago) > getInstallmentRemainingAmount(selectedFinanceInstallment)
+                  }
+                >
+                  Confirmar
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Expenses Section */}
       <div className="filament-top rounded-2xl border border-border bg-card">
