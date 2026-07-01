@@ -41,6 +41,12 @@ import { calcOrderCostHybrid } from "@/lib/domain/cost";
 import { getOrderAssetFileName, isOrderAssetReference } from "@/lib/domain/order-asset";
 import { computeOrderTotalsFromParts, summarizeOrderParts } from "@/lib/domain/order-parts";
 import { getOrderTrackingSummary } from "@/lib/domain/order-tracking";
+import {
+  BAMBU_PRESETS,
+  type BambuPresetId,
+  calcPortfolioPricing,
+  type PortfolioCalculatorEntryMode,
+} from "@/lib/domain/portfolio-pricing";
 import { useSnapshot } from "@/lib/hooks/use-snapshot";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizeText } from "@/lib/utils/normalization";
@@ -79,18 +85,6 @@ function getPaymentBadge(order: Order) {
   return { label: "Pendente", className: "border-yellow-600/30 bg-yellow-50 text-yellow-700" };
 }
 
-/* Bambu Lab printer presets — wattagem média durante impressão.
-   Fonte: bambucostpro.com / specs oficiais Bambu Lab. */
-const BAMBU_PRESETS = [
-  { id: "X1C",     label: "X1-Carbon",    watts: 350 },
-  { id: "X1E",     label: "X1E",          watts: 350 },
-  { id: "P1S",     label: "P1S",          watts: 190 },
-  { id: "P1P",     label: "P1P",          watts: 190 },
-  { id: "A1",      label: "A1",           watts: 150 },
-  { id: "A1Mini",  label: "A1 Mini",      watts:  60 },
-] as const;
-type BambuPresetId = (typeof BAMBU_PRESETS)[number]["id"];
-
 const projectSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome").max(100),
   categoria: z.enum(CATEGORIES),
@@ -108,46 +102,17 @@ type FormState = {
   nome: string; categoria: Category; linkModelo: string; filamentoId: string;
   custoRolo: string; pesoRolo: string; pesoPeca: string; tempoMin: string;
   quantidade: string; precoVenda: string; perdaPercent: string;
-  // novos — espelham BambuCost Pro
+  entryMode: PortfolioCalculatorEntryMode;
+  unidadesPorImpressao: string;
   modeloPreset: BambuPresetId; precoImpressora: string; vidaUtilHoras: string; margemPercent: string;
 };
 const initialForm: FormState = {
   nome: "", categoria: "Chaveiro", linkModelo: "", filamentoId: "",
   custoRolo: "", pesoRolo: "1000", pesoPeca: "", tempoMin: "",
   quantidade: "10", precoVenda: "", perdaPercent: "0",
+  entryMode: "slicer", unidadesPorImpressao: "1",
   modeloPreset: "A1", precoImpressora: "2999", vidaUtilHoras: "2000", margemPercent: "30",
 };
-
-function calc(p: {
-  custoRolo: number; pesoRolo: number; pesoPeca: number; tempoMin: number;
-  quantidade: number; precoVenda: number; perdaPercent: number;
-  settings?: AppSettings;
-  modeloPreset?: BambuPresetId; precoImpressora?: number; vidaUtilHoras?: number; margemPercent?: number;
-}) {
-  const s = p.settings ?? DEFAULT_APP_SETTINGS;
-  // Energia: usa wattagem do preset (kW = W/1000) — se preset informado, sobrescreve settings
-  const preset = p.modeloPreset ? BAMBU_PRESETS.find((m) => m.id === p.modeloPreset) : undefined;
-  const consumoKw = preset ? preset.watts / 1000 : s.consumoKw;
-  // Amortização: preço ÷ vida útil = R$/h; se não informados, usa settings
-  const amortHoraCalc = (p.precoImpressora && p.vidaUtilHoras && p.vidaUtilHoras > 0)
-    ? p.precoImpressora / p.vidaUtilHoras
-    : s.depreciacaoHora;
-
-  const custoFilamento = p.pesoRolo > 0 ? (p.custoRolo / p.pesoRolo) * p.pesoPeca : 0;
-  const custoEnergia = (p.tempoMin / 60) * consumoKw * s.tarifaEnergiaKwh;
-  const custoDepreciacao = (p.tempoMin / 60) * amortHoraCalc;
-  const custoFixo = s.custoFixoUnidade;
-  const custoBase = custoFilamento + custoEnergia + custoDepreciacao + custoFixo;
-  const custoPerda = custoBase * ((p.perdaPercent || 0) / 100);
-  const custoUnidade = custoBase + custoPerda;
-  const custoLote = custoUnidade * p.quantidade;
-  const receitaTotal = p.precoVenda * p.quantidade;
-  const lucroLiquido = receitaTotal - custoLote;
-  // Preço sugerido pela margem
-  const margem = p.margemPercent ?? 0;
-  const precoSugerido = custoUnidade * (1 + margem / 100);
-  return { custoUnidade, custoFilamento, custoEnergia, custoDepreciacao, custoFixo, custoPerda, custoLote, receitaTotal, lucroLiquido, precoSugerido, consumoKw, amortHora: amortHoraCalc };
-}
 
 const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const NO_CLIENT_SELECTED = "__none__";
@@ -259,19 +224,33 @@ function CalcPedidos() {
   /* ── calculator state ── */
   const numeric = useMemo(() => ({
     custoRolo: Number(form.custoRolo) || 0, pesoRolo: Number(form.pesoRolo) || 0,
-    pesoPeca: Number(form.pesoPeca) || 0, tempoMin: Number(form.tempoMin) || 0,
+    pesoEntrada: Number(form.pesoPeca) || 0, tempoEntradaMin: Number(form.tempoMin) || 0,
     quantidade: Number(form.quantidade) || 0, precoVenda: Number(form.precoVenda) || 0,
     perdaPercent: Number(form.perdaPercent) || 0,
+    entryMode: form.entryMode,
+    unidadesPorImpressao: Number(form.unidadesPorImpressao) || 1,
     modeloPreset: form.modeloPreset,
     precoImpressora: Number(form.precoImpressora) || 0,
     vidaUtilHoras: Number(form.vidaUtilHoras) || 0,
     margemPercent: Number(form.margemPercent) || 0,
   }), [form]);
-  const results = useMemo(() => calc({ ...numeric, settings }), [numeric, settings]);
+  const results = useMemo(() => calcPortfolioPricing({ ...numeric, settings }), [numeric, settings]);
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const isSlicerMode = form.entryMode === "slicer";
 
   const totals = useMemo(() => projects.reduce((acc, p) => {
-    const r = calc({ ...p, perdaPercent: p.perdaPercent ?? 0, settings });
+    const r = calcPortfolioPricing({
+      custoRolo: p.custoRolo,
+      pesoRolo: p.pesoRolo,
+      pesoEntrada: p.pesoPeca,
+      tempoEntradaMin: p.tempoMin,
+      quantidade: p.quantidade,
+      precoVenda: p.precoVenda,
+      perdaPercent: p.perdaPercent ?? 0,
+      entryMode: "unit",
+      unidadesPorImpressao: 1,
+      settings,
+    });
     acc.lucro += r.lucroLiquido; acc.receita += r.receitaTotal; return acc;
   }, { lucro: 0, receita: 0 }), [projects, settings]);
 
@@ -355,10 +334,20 @@ function CalcPedidos() {
   /* ── handlers ── */
   function submitProject(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = projectSchema.safeParse({ ...form, custoRolo: Number(form.custoRolo), pesoRolo: Number(form.pesoRolo), pesoPeca: Number(form.pesoPeca), tempoMin: Number(form.tempoMin), quantidade: Number(form.quantidade), precoVenda: Number(form.precoVenda), perdaPercent: Number(form.perdaPercent) || 0, linkModelo: form.linkModelo || undefined });
+    const parsed = projectSchema.safeParse({
+      ...form,
+      custoRolo: Number(form.custoRolo),
+      pesoRolo: Number(form.pesoRolo),
+      pesoPeca: results.pesoUnitario,
+      tempoMin: results.tempoUnitario,
+      quantidade: Number(form.quantidade),
+      precoVenda: Number(form.precoVenda),
+      perdaPercent: Number(form.perdaPercent) || 0,
+      linkModelo: form.linkModelo || undefined,
+    });
     if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos"); return; }
     mutateAddProject.mutate({ ...parsed.data, filamentoId: form.filamentoId || undefined });
-    setForm(initialForm);
+    setForm({ ...initialForm, pesoRolo: String(settings.defaultPesoRolo), quantidade: String(settings.defaultQuantidade) });
     toast.success("Projeto salvo.");
   }
   async function submitNewOrder(e: React.FormEvent) {
@@ -1145,34 +1134,109 @@ function CalcPedidos() {
 
           {/* ── Bloco 3: Filamento, peça e lote ── */}
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+            <Field
+              label="Modo de Entrada"
+              tip="Use 'Dados do Fatiador' quando for copiar peso e tempo direto do Bambu Studio/OrcaSlicer. Use 'Ja tenho media por unidade' se voce ja sabe os valores medios por nome."
+              className="md:col-span-2"
+            >
+              <Select value={form.entryMode} onValueChange={(v) => setField("entryMode", v as PortfolioCalculatorEntryMode)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="slicer">Dados do Fatiador</SelectItem>
+                  <SelectItem value="unit">Ja tenho media por unidade</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
             <NumberField label="Custo do Rolo (R$)" value={form.custoRolo} onChange={(v) => setField("custoRolo", v)} placeholder="120,00" tip="Quanto você pagou pelo rolo inteiro de filamento. Ex.: R$ 120 por um rolo Creality PLA de 1kg." />
             <NumberField label="Peso do Rolo (g)" value={form.pesoRolo} onChange={(v) => setField("pesoRolo", v)} placeholder="1000" tip="Peso total do rolo cheio. Padrão: 1000g (1kg). Verifique a embalagem do filamento." />
-            <NumberField label="Peso da Peça (g)" value={form.pesoPeca} onChange={(v) => setField("pesoPeca", v)} placeholder="6" tip="Quanto pesa UMA peça depois de impressa. Olhe no Bambu Studio / OrcaSlicer no painel à direita, em 'Filament'. Ex.: chaveiro = 6g." />
-            <NumberField label="Tempo de Impressão (min)" value={form.tempoMin} onChange={(v) => setField("tempoMin", v)} placeholder="35" tip="Tempo total de UMA impressão (não importa se é 1 peça ou várias na mesma placa). Veja no Bambu Studio, canto inferior direito, antes de enviar. Ex.: 35min." />
-            <NumberField label="Quantidade do Lote" value={form.quantidade} onChange={(v) => setField("quantidade", v)} placeholder="20" step="1" tip="Quantas peças TOTAIS você vai produzir desse projeto (somando todas as sessões de impressão, se forem várias). Ex.: 20 chaveiros vendidos = quantidade 20, mesmo que você imprima 5 por vez em 4 sessões." />
+            <NumberField
+              label={isSlicerMode ? "Peso do Fatiamento (g)" : "Peso Medio por Unidade (g)"}
+              value={form.pesoPeca}
+              onChange={(v) => setField("pesoPeca", v)}
+              placeholder={isSlicerMode ? "64,05" : "6"}
+              tip={
+                isSlicerMode
+                  ? "Copie o peso total mostrado pelo fatiador para esta placa/impressao. Ex.: no Bambu Studio, painel 'Filament/Modelo': 64,05g."
+                  : "Informe o peso medio de UMA unidade pronta. Ex.: um nome medio pesa 6g."
+              }
+            />
+            <NumberField
+              label={isSlicerMode ? "Tempo do Fatiamento (min)" : "Tempo Medio por Unidade (min)"}
+              value={form.tempoMin}
+              onChange={(v) => setField("tempoMin", v)}
+              placeholder={isSlicerMode ? "105" : "35"}
+              tip={
+                isSlicerMode
+                  ? "Copie o tempo total do fatiamento dessa placa. Ex.: 'Tempo total' de 1h45 = 105 minutos."
+                  : "Informe o tempo medio para produzir UMA unidade. Se voce ja calculou manualmente, use este modo."
+              }
+            />
+            <NumberField
+              label={isSlicerMode ? "Unidades nesse Fatiamento" : "Unidades por Impressao"}
+              value={form.unidadesPorImpressao}
+              onChange={(v) => setField("unidadesPorImpressao", v)}
+              placeholder="1"
+              step="1"
+              tip={
+                isSlicerMode
+                  ? "Quantos nomes/pecas estao representados nesse peso e nesse tempo do fatiador. Para o seu exemplo com 1 nome medio por vez, deixe 1."
+                  : "Se voce costuma imprimir mais de uma unidade por vez, informe aqui para estimar quantas impressoes serao necessarias no lote."
+              }
+            />
+            <NumberField
+              label="Quantidade do Pedido/Lote"
+              value={form.quantidade}
+              onChange={(v) => setField("quantidade", v)}
+              placeholder="25"
+              step="1"
+              tip="Total de unidades que o cliente pediu. No seu caso, para 25 nomes diferentes, informe 25."
+            />
             <NumberField label="% Desperdício" value={form.perdaPercent} onChange={(v) => setField("perdaPercent", v)} placeholder="0" step="1" tip="Percentual estimado de impressões que falham, descolam ou saem com defeito. Comece com 0%. Depois de imprimir um tempo, se 1 em 20 falha = 5%. Cobre prejuízos no preço final." />
             <div className="lg:col-span-2">
               <NumberField label="Preço de Venda (R$)" value={form.precoVenda} onChange={(v) => setField("precoVenda", v)} placeholder="15,00" tip="Quanto você cobra por UMA peça. Use o 'Aplicar sugerido' ao lado para preencher automaticamente com base na sua margem." />
             </div>
           </div>
 
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Leitura do Fatiador</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {isSlicerMode
+                    ? "A calculadora esta convertendo o peso/tempo total do fatiador para uma media por unidade e para o lote inteiro."
+                    : "A calculadora esta usando os valores medios por unidade que voce informou manualmente."}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <Badge variant="secondary">Media: {results.pesoUnitario.toFixed(2)}g/un.</Badge>
+                <Badge variant="secondary">Media: {results.tempoUnitario.toFixed(1)} min/un.</Badge>
+                <Badge variant="secondary">Impressoes no lote: {results.impressoesLote}</Badge>
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              Exemplo para o seu caso: se o nome medio pesa <strong>{form.pesoPeca || "64,05"}g</strong> e leva <strong>{form.tempoMin || "105"} min</strong> no fatiador,
+              com <strong>{form.unidadesPorImpressao || "1"}</strong> unidade por impressao e pedido de <strong>{form.quantidade || "25"}</strong> nomes,
+              o sistema usa essa media para sugerir um preco unitario e calcula o lote completo.
+            </p>
+          </div>
+
           {/* Results */}
           <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <ResultCard label="Custo Filamento /un." value={brl(results.custoFilamento)} accent="cyan" tip="Filamento usado em UMA peça × preço por grama. Fórmula: (Custo do Rolo ÷ Peso do Rolo) × Peso da Peça." />
-            <ResultCard label="Energia + Depreciação" value={brl(results.custoEnergia + results.custoDepreciacao)} accent="yellow" tip="Energia elétrica gasta na impressão + desgaste da máquina (amortização). Por peça." />
-            <ResultCard label="Desperdício" value={brl(results.custoPerda)} accent="pink" tip="Acréscimo de custo para cobrir as impressões que falham. Calculado como % do custo base." />
-            <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" tip="Custo por peça × Quantidade do Lote. É o quanto você gasta para produzir o lote inteiro." />
+            <ResultCard label="Custo Filamento /un." value={brl(results.custoFilamento)} accent="cyan" tip="Custo medio de filamento por unidade, calculado a partir do peso medio por unidade." />
+            <ResultCard label="Energia + Depreciação /un." value={brl(results.custoEnergia + results.custoDepreciacao)} accent="yellow" tip="Custo medio por unidade de energia e desgaste da maquina, respeitando o modo escolhido na entrada." />
+            <ResultCard label="Desperdício /un." value={brl(results.custoPerda)} accent="pink" tip="Acréscimo medio por unidade para cobrir perdas, falhas ou retrabalho." />
+            <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" tip="Custo total estimado para entregar todo o pedido/lote informado." />
             <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4">
               <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: ACCENT_COLORS.green }} />
               <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
-                Preço Sugerido <InfoTip text={`Custo por unidade + ${form.margemPercent || 0}% de margem. Clique em Aplicar para usar como Preço de Venda.`} />
+                Preço Sugerido /un. <InfoTip text={`Custo medio por unidade + ${form.margemPercent || 0}% de margem. Clique em Aplicar para usar como Preco de Venda por unidade.`} />
               </div>
               <div className="mt-2 font-display text-2xl font-bold tabular-nums" style={{ color: ACCENT_COLORS.green }}>{brl(results.precoSugerido)}</div>
               <Button type="button" size="sm" variant="outline" className="mt-2 h-7 gap-1 text-xs" onClick={() => setField("precoVenda", results.precoSugerido.toFixed(2))}>
                 <Wand2 className="h-3 w-3" /> Aplicar
               </Button>
             </div>
-            <ResultCard label="Lucro Líquido" value={brl(results.lucroLiquido)} accent={results.lucroLiquido >= 0 ? "green" : "magenta"} emphasize tip="Receita Total − Custo Total do Lote. Negativo = você está pagando para trabalhar." />
+            <ResultCard label="Lucro Líquido do Lote" value={brl(results.lucroLiquido)} accent={results.lucroLiquido >= 0 ? "green" : "magenta"} emphasize tip="Receita total do pedido menos custo total do lote." />
           </div>
 
           <div className="flex justify-end">
@@ -1206,7 +1270,18 @@ function CalcPedidos() {
               </TableHeader>
               <TableBody>
                 {filteredProjects.map((p) => {
-                  const r = calc({ ...p, perdaPercent: p.perdaPercent ?? 0, settings });
+                  const r = calcPortfolioPricing({
+                    custoRolo: p.custoRolo,
+                    pesoRolo: p.pesoRolo,
+                    pesoEntrada: p.pesoPeca,
+                    tempoEntradaMin: p.tempoMin,
+                    quantidade: p.quantidade,
+                    precoVenda: p.precoVenda,
+                    perdaPercent: p.perdaPercent ?? 0,
+                    entryMode: "unit",
+                    unidadesPorImpressao: 1,
+                    settings,
+                  });
                   return (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.nome}</TableCell>
