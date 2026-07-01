@@ -362,9 +362,24 @@ function Finances() {
         if (diffDays >= 0 && diffDays <= 30) vencendoEm30 += getInstallmentRemainingAmount(inst);
       }
     }
-    const pagoNoMes = filteredPaymentEvents
+    const installmentIdsWithEventThisMonth = new Set(
+      filteredPaymentEvents
+        .filter((event) => event.dataPagamento.slice(0, 7) === yearMonth)
+        .map((event) => event.installmentId),
+    );
+    const paidFallbackNoMes = filteredInstallments
+      .filter(
+        (inst) =>
+          !!inst.dataPagamento &&
+          inst.dataPagamento.slice(0, 7) === yearMonth &&
+          getInstallmentPaidAmount(inst) > 0 &&
+          !installmentIdsWithEventThisMonth.has(inst.id),
+      )
+      .reduce((sum, inst) => sum + getInstallmentPaidAmount(inst), 0);
+    const paidFromEventsNoMes = filteredPaymentEvents
       .filter((event) => event.dataPagamento.slice(0, 7) === yearMonth)
       .reduce((sum, event) => sum + getEventSignedAmount(event), 0);
+    const pagoNoMes = paidFromEventsNoMes + paidFallbackNoMes;
     return { pendente, pagoNoMes, vencendoEm30, atrasadas };
   }, [filteredInstallments, filteredPaymentEvents]);
 
