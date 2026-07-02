@@ -3,6 +3,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Filamento, FilamentoQualidade } from "../../domain/types";
 import { filamentosHistoryRepo, filamentosRepo } from "../../server/repositories.server";
+import { requireSession } from "../../server/require-session.server";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
 const filamentoQualidadeSchema = z.enum(["Ótimo", "bom", "médio", "ruim"]);
 
@@ -27,6 +29,8 @@ export const upsertFilamento = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await filamentosRepo();
     const id = data.id ?? randomUUID();
     const existing = repo.list.find((filamento) => filamento.id === id);
@@ -76,6 +80,8 @@ export const upsertFilamento = createServerFn({ method: "POST" })
 export const removeFilamento = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await filamentosRepo();
     await repo.save(repo.list.filter((filamento) => filamento.id !== data.id));
     return { ok: true };
@@ -91,6 +97,8 @@ export const archiveFilamento = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await filamentosRepo();
     const filamento = repo.list.find((item) => item.id === data.id);
     if (!filamento) return { ok: false as const, reason: "not_found" as const };
@@ -117,6 +125,8 @@ export const updateFilamentoQualidade = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await filamentosRepo();
     const filamento = repo.list.find((item) => item.id === data.id);
     if (!filamento) return { ok: false as const, reason: "not_found" as const };
@@ -140,6 +150,8 @@ export const updateFilamentoPeso = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await filamentosRepo();
     const filamento = repo.list.find((item) => item.id === data.id);
     if (!filamento) return { ok: false as const, reason: "not_found" as const };

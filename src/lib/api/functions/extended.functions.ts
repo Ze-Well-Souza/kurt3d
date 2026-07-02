@@ -9,6 +9,8 @@ import {
   savedReportsRepo,
 } from "../../server/repositories.server";
 import type { BudgetQuote, BudgetQuoteItem, PortfolioVideo, ProductionCalendarEvent, SavedReport } from "../../domain/types";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { requireSession } from "../../server/require-session.server";
 
 // ═══════════ Budget Quotes (Orçamentos) ═══════════
 
@@ -35,6 +37,8 @@ export const createBudgetQuote = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await budgetQuotesRepo();
     const now = nowIso();
     
@@ -80,6 +84,8 @@ export const updateBudgetQuote = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await budgetQuotesRepo();
     const quote = repo.list.find((q) => q.id === data.quoteId);
     if (!quote) return { ok: false, reason: "not_found" };
@@ -111,6 +117,8 @@ export const updateBudgetQuote = createServerFn({ method: "POST" })
 export const deleteBudgetQuote = createServerFn({ method: "POST" })
   .validator(z.object({ quoteId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await budgetQuotesRepo();
     await repo.remove(data.quoteId);
     return { ok: true };
@@ -119,6 +127,8 @@ export const deleteBudgetQuote = createServerFn({ method: "POST" })
 export const convertQuoteToOrder = createServerFn({ method: "POST" })
   .validator(z.object({ quoteId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const quotesRepo = await budgetQuotesRepo();
     const quote = quotesRepo.list.find((q) => q.id === data.quoteId);
     if (!quote) return { ok: false, reason: "not_found" };
@@ -146,6 +156,8 @@ export const addPortfolioVideo = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await portfolioVideosRepo();
     const now = nowIso();
     
@@ -182,6 +194,8 @@ export const updatePortfolioVideo = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await portfolioVideosRepo();
     const video = repo.list.find((v) => v.id === data.videoId);
     if (!video) return { ok: false, reason: "not_found" };
@@ -205,6 +219,8 @@ export const updatePortfolioVideo = createServerFn({ method: "POST" })
 export const deletePortfolioVideo = createServerFn({ method: "POST" })
   .validator(z.object({ videoId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await portfolioVideosRepo();
     await repo.remove(data.videoId);
     return { ok: true };
@@ -224,6 +240,8 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await productionCalendarRepo();
     const now = nowIso();
     
@@ -257,6 +275,8 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await productionCalendarRepo();
     const event = repo.list.find((e) => e.id === data.eventId);
     if (!event) return { ok: false, reason: "not_found" };
@@ -279,6 +299,8 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
 export const deleteCalendarEvent = createServerFn({ method: "POST" })
   .validator(z.object({ eventId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await productionCalendarRepo();
     await repo.remove(data.eventId);
     return { ok: true };
@@ -296,6 +318,8 @@ export const saveReport = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await savedReportsRepo();
     const now = nowIso();
     
@@ -317,6 +341,8 @@ export const saveReport = createServerFn({ method: "POST" })
 export const deleteSavedReport = createServerFn({ method: "POST" })
   .validator(z.object({ reportId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await savedReportsRepo();
     await repo.remove(data.reportId);
     return { ok: true };

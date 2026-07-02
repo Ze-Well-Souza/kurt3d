@@ -5,6 +5,8 @@ import { addCalendarMonthsIso } from "../../domain/installments";
 import type { Expense, FormaPagamento, Insumo, InsumoClassificacaoFinanceira, InsumoPayment, InsumoPaymentInstallment } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { expensesRepo, insumoInstallmentsRepo, insumoPaymentsRepo, insumosRepo } from "../../server/repositories.server";
+import { requireSession } from "../../server/require-session.server";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
 const paymentFields = {
   formaPagamento: z.enum(["a_vista", "parcelado"]).optional(),
@@ -156,6 +158,8 @@ export const addInsumo = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await insumosRepo();
     const provisionalPaymentId = data.formaPagamento && data.dataParaPagamento ? randomUUID() : null;
     const insumo: Insumo = {
@@ -222,6 +226,8 @@ export const addInsumo = createServerFn({ method: "POST" })
 export const removeInsumo = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await insumosRepo();
     const current = repo.list.find((insumo) => insumo.id === data.id) ?? null;
     await repo.save(repo.list.filter((insumo) => insumo.id !== data.id));
@@ -250,6 +256,8 @@ export const updateInsumo = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const [repo, expRepo] = await Promise.all([insumosRepo(), expensesRepo()]);
     const existing = repo.list.find((insumo) => insumo.id === data.id);
     if (!existing) return { ok: false as const, reason: "not_found" as const };

@@ -6,6 +6,7 @@ import { clientsRepo, ordersRepo, portfolioRepo } from "../../server/repositorie
 import { nowIso } from "../../server/db.server";
 import { requireSession } from "../../server/require-session.server";
 import { assertExplicitClientIdExists, resolveClientId } from "./shared";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
 export const addPortfolioProject = createServerFn({ method: "POST" })
   .validator(
@@ -24,6 +25,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSession();
     const repo = await portfolioRepo();
     const now = nowIso();
@@ -41,6 +43,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
 export const removePortfolioProject = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSession();
     const repo = await portfolioRepo();
     await repo.save(repo.list.filter((project) => project.id !== data.id));
@@ -65,6 +68,7 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSession();
     const portfolio = await portfolioRepo();
     const project = portfolio.list.find((item) => item.id === data.id);
@@ -99,6 +103,7 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSession();
     const [orders, portfolio, clientsData] = await Promise.all([ordersRepo(), portfolioRepo(), clientsRepo()]);
     const project = portfolio.list.find((item) => item.id === data.portfolioProjectId);

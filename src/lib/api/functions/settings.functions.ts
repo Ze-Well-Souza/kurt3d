@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { AppSettings } from "../../domain/types";
 import { settingsRepo } from "../../server/repositories.server";
+import { requireSession } from "../../server/require-session.server";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
 export const getSettings = createServerFn({ method: "GET" }).handler(async () => {
   const repo = await settingsRepo();
@@ -23,6 +25,8 @@ export const saveSettings = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const settings: AppSettings = {
       studioNome: data.studioNome,
       impressoraModelo: data.impressoraModelo,

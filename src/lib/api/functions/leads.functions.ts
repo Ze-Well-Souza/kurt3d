@@ -5,6 +5,8 @@ import type { Client, Lead, LeadImagem } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { syncLeadToCrm } from "../../server/lead-crm.server";
 import { clientsRepo, leadsRepo, ordersRepo } from "../../server/repositories.server";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { requireSession } from "../../server/require-session.server";
 import {
   buildLeadConversionNote,
   mergeNotes,
@@ -33,6 +35,7 @@ export const submitLead = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     const repo = await leadsRepo();
     const imagens: LeadImagem[] | null =
       data.imagens && data.imagens.length > 0
@@ -55,6 +58,8 @@ export const submitLead = createServerFn({ method: "POST" })
 export const convertLeadToClient = createServerFn({ method: "POST" })
   .validator(z.object({ leadId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const [leadsData, clientsData, ordersData] = await Promise.all([leadsRepo(), clientsRepo(), ordersRepo()]);
     const lead = leadsData.list.find((item) => item.id === data.leadId);
     if (!lead) return { ok: false as const, reason: "not_found" as const };

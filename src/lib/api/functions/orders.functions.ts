@@ -19,7 +19,9 @@ import {
   ordersRepo,
   portfolioRepo,
   vendasRepo,
-} from "../../server/repositories.server";`nimport { requireSession } from "../../server/require-session.server";
+} from "../../server/repositories.server";
+import { requireSession } from "../../server/require-session.server";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { normalizePhone } from "../../utils/normalization";
 import {
   allowedStatusTransition,
@@ -60,6 +62,8 @@ export const addOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const [repo, clientsData, partsRepo] = await Promise.all([ordersRepo(), clientsRepo(), orderPartsRepo()]);
     assertExplicitClientIdExists(clientsData.list, data.clientId);
     const now = nowIso();
@@ -110,6 +114,8 @@ export const addOrder = createServerFn({ method: "POST" })
 export const removeOrder = createServerFn({ method: "POST" })
   .validator(z.object({ orderId: z.string().min(1), reason: z.string().trim().min(1, "Informe o motivo").max(500) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await ordersRepo();
     const order = repo.list.find((item) => item.id === data.orderId);
 
@@ -139,6 +145,8 @@ export const removeOrder = createServerFn({ method: "POST" })
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .validator(z.object({ orderId: z.string().min(1), status: z.enum(["todo", "printing", "done"]) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const [orders, filamentos, portfolio, inv] = await Promise.all([
       ordersRepo(),
       filamentosRepo(),
@@ -207,6 +215,8 @@ export const finalizarDestino = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const destino = data.destino as OrderDestino;
     const [orders, vendas, portfolio, filamentos, expenses] = await Promise.all([
       ordersRepo(),
@@ -293,6 +303,7 @@ export const getPublicOrderTracking = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     const [orders, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
     const order = orders.list.find((item) => matchesOrderTrackingCode(item.id, data.code));
     if (!order) {
@@ -331,6 +342,7 @@ export const uploadOrderAsset = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     const reference = await uploadOrderAssetToStorage(data);
     return { ok: true as const, reference };
   });
@@ -338,6 +350,7 @@ export const uploadOrderAsset = createServerFn({ method: "POST" })
 export const resolveOrderAssetUrl = createServerFn({ method: "POST" })
   .validator(z.object({ reference: z.string().trim().min(1).max(1000) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     const url = await createOrderAssetSignedUrl(data.reference);
     return { ok: true as const, url };
   });
@@ -374,6 +387,8 @@ export const updateOrder = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const [orders, clientsData, partsRepo] = await Promise.all([ordersRepo(), clientsRepo(), orderPartsRepo()]);
     const order = orders.list.find((item) => item.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };
@@ -414,6 +429,8 @@ export const updateOrderPartStatus = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const [orders, partsRepo] = await Promise.all([ordersRepo(), orderPartsRepo()]);
     const order = orders.list.find((item) => item.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };

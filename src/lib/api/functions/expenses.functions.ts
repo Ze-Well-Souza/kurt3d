@@ -3,6 +3,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Expense } from "../../domain/types";
 import { expensesRepo } from "../../server/repositories.server";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { requireSession } from "../../server/require-session.server";
 
 export const addManualExpense = createServerFn({ method: "POST" })
   .validator(
@@ -14,6 +16,8 @@ export const addManualExpense = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await expensesRepo();
     const expense: Expense = {
       id: randomUUID(),
@@ -31,6 +35,8 @@ export const addManualExpense = createServerFn({ method: "POST" })
 export const removeExpense = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await expensesRepo();
     await repo.save(repo.list.filter((expense) => expense.id !== data.id));
     return { ok: true };

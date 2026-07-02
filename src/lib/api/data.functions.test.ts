@@ -108,6 +108,14 @@ vi.mock("../server/repositories.server", () => ({
   vendasRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
 }));
 
+vi.mock("../server/require-session.server", () => ({
+  requireSession: vi.fn(async () => "test-user-id"),
+}));
+
+vi.mock("../server/mutation-guard.server", () => ({
+  checkMutationRateLimit: vi.fn(async () => undefined),
+}));
+
 describe("removeOrder", () => {
   beforeEach(() => {
     ordersRepoMock = {

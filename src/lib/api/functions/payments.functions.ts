@@ -11,6 +11,8 @@ import type {
   InsumoPaymentInstallment,
 } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { requireSession } from "../../server/require-session.server";
 import {
   filamentoInstallmentsRepo,
   filamentoPaymentEventsRepo,
@@ -53,6 +55,8 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const paymentsRepo = await filamentoPaymentsRepo();
     const installmentsRepo = await filamentoInstallmentsRepo();
     const paymentId = randomUUID();
@@ -100,6 +104,8 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const paymentsRepo = await filamentoPaymentsRepo();
     const installmentsRepo = await filamentoInstallmentsRepo();
     const existing = paymentsRepo.list.find((payment) => payment.id === data.paymentId);
@@ -175,6 +181,8 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
 export const deleteFilamentoPayment = createServerFn({ method: "POST" })
   .validator(z.object({ paymentId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const paymentsRepo = await filamentoPaymentsRepo();
     const installmentsRepo = await filamentoInstallmentsRepo();
     await installmentsRepo.deleteByPayment(data.paymentId);
@@ -193,6 +201,8 @@ export const payInstallment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await filamentoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela não encontrada.");
@@ -229,6 +239,8 @@ export const payInstallment = createServerFn({ method: "POST" })
 export const revertInstallment = createServerFn({ method: "POST" })
   .validator(z.object({ installmentId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await filamentoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela não encontrada.");
@@ -265,6 +277,8 @@ export const updateInstallment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await filamentoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela não encontrada.");
@@ -287,6 +301,8 @@ export const settlePayment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await filamentoInstallmentsRepo();
     const pending = installmentsRepo.list
       .filter((installment) => installment.paymentId === data.paymentId && !installment.pago)
@@ -346,6 +362,8 @@ export const payInsumoInstallment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await insumoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela do insumo não encontrada.");
@@ -382,6 +400,8 @@ export const payInsumoInstallment = createServerFn({ method: "POST" })
 export const revertInsumoInstallment = createServerFn({ method: "POST" })
   .validator(z.object({ installmentId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await insumoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela do insumo não encontrada.");
@@ -418,6 +438,8 @@ export const updateInsumoInstallment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await insumoInstallmentsRepo();
     const installment = installmentsRepo.list.find((item) => item.id === data.installmentId);
     if (!installment) throw new Error("Parcela do insumo não encontrada.");
@@ -440,6 +462,8 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const installmentsRepo = await insumoInstallmentsRepo();
     const pending = installmentsRepo.list
       .filter((installment) => installment.paymentId === data.paymentId && !installment.pago)
@@ -492,6 +516,8 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
 export const deleteInsumoPayment = createServerFn({ method: "POST" })
   .validator(z.object({ paymentId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const paymentsRepo = await insumoPaymentsRepo();
     const installmentsRepo = await insumoInstallmentsRepo();
     await installmentsRepo.deleteByPayment(data.paymentId);

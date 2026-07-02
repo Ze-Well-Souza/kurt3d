@@ -5,6 +5,8 @@ import type { Client } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { clientsRepo, ordersRepo } from "../../server/repositories.server";
 import { relinkOrdersToClient } from "./shared";
+import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { requireSession } from "../../server/require-session.server";
 
 export const addClient = createServerFn({ method: "POST" })
   .validator(
@@ -16,6 +18,8 @@ export const addClient = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await clientsRepo();
     const now = nowIso();
     const client: Client = {
@@ -45,6 +49,8 @@ export const updateClient = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await clientsRepo();
     const existing = repo.list.find((client) => client.id === data.id);
     if (!existing) return { ok: false as const, reason: "not_found" as const };
@@ -68,6 +74,8 @@ export const updateClient = createServerFn({ method: "POST" })
 export const removeClient = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
     const repo = await clientsRepo();
     await repo.save(repo.list.filter((client) => client.id !== data.id));
     return { ok: true };
