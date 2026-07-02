@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Order, PortfolioProject } from "../../domain/types";
 import { clientsRepo, ordersRepo, portfolioRepo } from "../../server/repositories.server";
 import { nowIso } from "../../server/db.server";
+import { requireSession } from "../../server/require-session.server";
 import { assertExplicitClientIdExists, resolveClientId } from "./shared";
 
 export const addPortfolioProject = createServerFn({ method: "POST" })
@@ -23,6 +24,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await requireSession();
     const repo = await portfolioRepo();
     const now = nowIso();
     const project: PortfolioProject = {
@@ -39,6 +41,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
 export const removePortfolioProject = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await requireSession();
     const repo = await portfolioRepo();
     await repo.save(repo.list.filter((project) => project.id !== data.id));
     return { ok: true };
@@ -62,6 +65,7 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await requireSession();
     const portfolio = await portfolioRepo();
     const project = portfolio.list.find((item) => item.id === data.id);
     if (!project) return { ok: false as const, reason: "not_found" as const };
@@ -95,6 +99,7 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await requireSession();
     const [orders, portfolio, clientsData] = await Promise.all([ordersRepo(), portfolioRepo(), clientsRepo()]);
     const project = portfolio.list.find((item) => item.id === data.portfolioProjectId);
     if (!project) return { ok: false as const };

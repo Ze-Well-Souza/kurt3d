@@ -106,10 +106,14 @@ type FormState = {
   unidadesPorImpressao: string;
   modeloPreset: BambuPresetId; precoImpressora: string; vidaUtilHoras: string; margemPercent: string;
 };
+const FALLBACK_CUSTO_ROLO = 120;
+const FALLBACK_PESO_ROLO = 1000;
+const FALLBACK_QUANTIDADE = 10;
+
 const initialForm: FormState = {
   nome: "", categoria: "Chaveiro", linkModelo: "", filamentoId: "",
-  custoRolo: "", pesoRolo: "1000", pesoPeca: "", tempoMin: "",
-  quantidade: "10", precoVenda: "", perdaPercent: "0",
+  custoRolo: String(FALLBACK_CUSTO_ROLO), pesoRolo: String(FALLBACK_PESO_ROLO), pesoPeca: "", tempoMin: "",
+  quantidade: String(FALLBACK_QUANTIDADE), precoVenda: "", perdaPercent: "0",
   entryMode: "slicer", unidadesPorImpressao: "1",
   modeloPreset: "A1", precoImpressora: "2999", vidaUtilHoras: "2000", margemPercent: "30",
 };
@@ -197,7 +201,12 @@ function CalcPedidos() {
   const clients = snap.data?.clients ?? [];
   const settings = snap.data?.settings ?? DEFAULT_APP_SETTINGS;
   const [activeTab, setActiveTab] = useState<"calc" | "orders">("calc");
-  const [form, setForm] = useState<FormState>({ ...initialForm, pesoRolo: String(settings.defaultPesoRolo), quantidade: String(settings.defaultQuantidade) });
+  const [form, setForm] = useState<FormState>({
+    ...initialForm,
+    custoRolo: initialForm.custoRolo,
+    pesoRolo: String(settings.defaultPesoRolo || FALLBACK_PESO_ROLO),
+    quantidade: String(settings.defaultQuantidade || FALLBACK_QUANTIDADE),
+  });
 
   /* ── mutations ── */
   const mutateAddProject = useMutation({ mutationFn: (input: any) => addPortfolioProject({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
@@ -222,18 +231,26 @@ function CalcPedidos() {
   });
 
   /* ── calculator state ── */
-  const numeric = useMemo(() => ({
-    custoRolo: Number(form.custoRolo) || 0, pesoRolo: Number(form.pesoRolo) || 0,
-    pesoEntrada: Number(form.pesoPeca) || 0, tempoEntradaMin: Number(form.tempoMin) || 0,
-    quantidade: Number(form.quantidade) || 0, precoVenda: Number(form.precoVenda) || 0,
-    perdaPercent: Number(form.perdaPercent) || 0,
-    entryMode: form.entryMode,
-    unidadesPorImpressao: Number(form.unidadesPorImpressao) || 1,
-    modeloPreset: form.modeloPreset,
-    precoImpressora: Number(form.precoImpressora) || 0,
-    vidaUtilHoras: Number(form.vidaUtilHoras) || 0,
-    margemPercent: Number(form.margemPercent) || 0,
-  }), [form]);
+  const numeric = useMemo(() => {
+    const parsedPesoRolo = Number(form.pesoRolo) || settings.defaultPesoRolo || FALLBACK_PESO_ROLO;
+    const parsedQuantidade = Number(form.quantidade) || settings.defaultQuantidade || FALLBACK_QUANTIDADE;
+    const parsedCustoRolo = Number(form.custoRolo) || FALLBACK_CUSTO_ROLO;
+    return {
+      custoRolo: parsedCustoRolo,
+      pesoRolo: parsedPesoRolo,
+      pesoEntrada: Number(form.pesoPeca) || 0,
+      tempoEntradaMin: Number(form.tempoMin) || 0,
+      quantidade: parsedQuantidade,
+      precoVenda: Number(form.precoVenda) || 0,
+      perdaPercent: Number(form.perdaPercent) || 0,
+      entryMode: form.entryMode,
+      unidadesPorImpressao: Number(form.unidadesPorImpressao) || 1,
+      modeloPreset: form.modeloPreset,
+      precoImpressora: Number(form.precoImpressora) || 0,
+      vidaUtilHoras: Number(form.vidaUtilHoras) || 0,
+      margemPercent: Number(form.margemPercent) || 0,
+    };
+  }, [form, settings]);
   const results = useMemo(() => calcPortfolioPricing({ ...numeric, settings }), [numeric, settings]);
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const isSlicerMode = form.entryMode === "slicer";

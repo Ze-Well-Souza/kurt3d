@@ -71,7 +71,7 @@ export function calcPortfolioPricing(input: PortfolioCalculatorInput): Portfolio
   const tempoUnitario = entryMode === "slicer" ? tempoEntradaMin / unidadesPorImpressao : tempoEntradaMin;
   const impressoesLote = quantidade > 0 ? (entryMode === "slicer" ? Math.ceil(quantidade / unidadesPorImpressao) : quantidade) : 0;
 
-  const custoPorGrama = input.pesoRolo > 0 ? input.custoRolo / input.pesoRolo : 0;
+  const custoPorGrama = input.pesoRolo > 0 ? Math.max(0, clampNumber(input.custoRolo)) / Math.max(1, clampNumber(input.pesoRolo)) : 0;
   const custoFilamentoLote = custoPorGrama * pesoUnitario * quantidade;
   const custoEnergiaPorImpressao = (tempoEntradaMin / 60) * consumoKw * s.tarifaEnergiaKwh;
   const custoDepreciacaoPorImpressao = (tempoEntradaMin / 60) * amortHoraCalc;
@@ -79,13 +79,13 @@ export function calcPortfolioPricing(input: PortfolioCalculatorInput): Portfolio
   const custoDepreciacaoLote = impressoesLote * custoDepreciacaoPorImpressao;
   const custoFixoLote = s.custoFixoUnidade * quantidade;
   const custoBaseLote = custoFilamentoLote + custoEnergiaLote + custoDepreciacaoLote + custoFixoLote;
-  const custoPerda = custoBaseLote * ((input.perdaPercent || 0) / 100);
+  const perdaPercent = Math.max(0, Math.min(100, clampNumber(input.perdaPercent ?? 0)));
+  const custoPerda = custoBaseLote * (perdaPercent / 100);
   const custoLote = custoBaseLote + custoPerda;
   const custoUnidade = quantidade > 0 ? custoLote / quantidade : 0;
   const receitaTotal = Math.max(0, clampNumber(input.precoVenda)) * quantidade;
   const lucroLiquido = receitaTotal - custoLote;
-  const margem = Math.max(0, clampNumber(input.margemPercent ?? 0));
-  const precoSugerido = custoUnidade * (1 + margem / 100);
+  const precoSugerido = custoUnidade * (1 + Math.max(0, Math.min(1000, clampNumber(input.margemPercent ?? 0))) / 100);
 
   return {
     custoUnidade,

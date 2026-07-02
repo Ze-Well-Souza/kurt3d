@@ -19,7 +19,7 @@ import {
   ordersRepo,
   portfolioRepo,
   vendasRepo,
-} from "../../server/repositories.server";
+} from "../../server/repositories.server";`nimport { requireSession } from "../../server/require-session.server";
 import { normalizePhone } from "../../utils/normalization";
 import {
   allowedStatusTransition,
