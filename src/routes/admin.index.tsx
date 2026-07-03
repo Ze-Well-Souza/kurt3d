@@ -1,20 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { brl } from "@/lib/utils";
+import { useOrders } from "@/lib/hooks/use-orders";
+import { useVendas } from "@/lib/hooks/use-vendas";
+import { useExpenses } from "@/lib/hooks/use-expenses";
 
 export const Route = createFileRoute("/admin/")({
   component: Dashboard,
 });
 
-const brl = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
 function Dashboard() {
-  const snap = useSnapshot();
-  const orders = snap.data?.orders ?? [];
-  const vendas = snap.data?.vendas ?? [];
-  const expenses = snap.data?.expenses ?? [];
+  const { data: ordersData } = useOrders();
+  const { data: vendasData } = useVendas();
+  const { data: expensesData } = useExpenses();
+  const orders = ordersData ?? [];
+  const vendas = vendasData ?? [];
+  const expenses = expensesData ?? [];
   const [period, setPeriod] = useState<"month" | "all">("month");
 
   const periodLabel = period === "month" ? "este mês" : "total";

@@ -54,8 +54,12 @@ import {
 } from "@/lib/api/data.functions";
 import { addCalendarMonthsIso, formatIsoDatePtBr, todayIso } from "@/lib/domain/installments";
 import type { Filamento, FilamentoHistory, FilamentoPayment, FilamentoPaymentInstallment, FilamentoQualidade, FormaPagamento, Insumo, InsumoClassificacaoFinanceira, InsumoPayment, InsumoPaymentInstallment } from "@/lib/domain/types";
+import { brl } from "@/lib/utils";
 import { SearchInput } from "@/components/SearchInput";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useFilamentos } from "@/lib/hooks/use-filamentos";
+import { useInsumos } from "@/lib/hooks/use-insumos";
+import { useFilamentoPayments } from "@/lib/hooks/use-filamento-payments";
+import { useInsumoPayments } from "@/lib/hooks/use-insumo-payments";
 import { normalizeText } from "@/lib/utils/normalization";
 import { PaymentSchedule } from "@/components/admin/PaymentSchedule";
 import { DetailRow, Field, NumberField } from "@/components/admin/stock-fields";
@@ -163,9 +167,6 @@ const initialInsumoForm: InsumoForm = {
   dataParaPagamento: "",
 };
 
-const brl = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
 const QUALIDADE_CONFIG: Record<FilamentoQualidade, { label: string; color: string; icon: typeof ThumbsUp }> = {
   "Ótimo": { label: "Ótimo", color: "var(--filament-cyan)", icon: ThumbsUp },
   bom: { label: "Bom", color: "var(--filament-green)", icon: ThumbsUp },
@@ -195,89 +196,94 @@ type FilamentoView = Filamento & { reservedGrams?: number; disponivelGrams?: num
 
 function Stock() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
-  const filamentos = (snap.data?.filamentos ?? []) as FilamentoView[];
-  const filamentosHistory = (snap.data?.filamentosHistory ?? []) as FilamentoHistory[];
-  const insumos = (snap.data?.insumos ?? []) as Insumo[];
-  const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
-  const filamentoInstallments = (snap.data?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
-  const insumoPayments = (snap.data?.insumoPayments ?? []) as InsumoPayment[];
-  const insumoInstallments = (snap.data?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
+  const { data: filamentosData } = useFilamentos();
+  const { data: insumosData } = useInsumos();
+  const { data: fpData } = useFilamentoPayments();
+  const { data: ipData } = useInsumoPayments();
+  const filamentos = (filamentosData?.filamentos ?? []) as FilamentoView[];
+  const filamentosHistory = (filamentosData?.filamentosHistory ?? []) as FilamentoHistory[];
+  const insumos = (insumosData ?? []) as Insumo[];
+  const filamentoPayments = (fpData?.filamentoPayments ?? []) as FilamentoPayment[];
+  const filamentoInstallments = (fpData?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
+  const insumoPayments = (ipData?.insumoPayments ?? []) as InsumoPayment[];
+  const insumoInstallments = (ipData?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["snapshot"] });
+  const invalidateFilamentos = () => qc.invalidateQueries({ queryKey: ["filamentos"] });
+  const invalidateInsumos = () => qc.invalidateQueries({ queryKey: ["insumos"] });
+  const invalidateFPayments = () => qc.invalidateQueries({ queryKey: ["filamento-payments"] });
 
   const mutateFilamento = useMutation({
     mutationFn: (input: z.infer<typeof filamentoSchema> & { id?: string; batchId?: string; paymentId?: string }) => upsertFilamento({ data: input as any }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFilamentos,
   });
 
   const mutateRemoveFilamento = useMutation({
     mutationFn: (id: string) => removeFilamento({ data: { id } }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFilamentos,
   });
 
   const mutateArchive = useMutation({
     mutationFn: (input: { id: string; qualidade?: FilamentoQualidade; observacao?: string; dataFim?: string }) =>
       archiveFilamento({ data: input }),
     onSuccess: () => {
-      invalidate();
+      invalidateFilamentos();
       toast.success("Filamento arquivado no histórico.");
     },
   });
 
   const mutateInsumo = useMutation({
     mutationFn: (input: z.infer<typeof insumoSchema>) => addInsumo({ data: input as any }),
-    onSuccess: invalidate,
+    onSuccess: invalidateInsumos,
   });
 
   const mutateUpdateInsumo = useMutation({
     mutationFn: (input: z.infer<typeof insumoSchema> & { id: string }) => updateInsumo({ data: input as any }),
-    onSuccess: invalidate,
+    onSuccess: invalidateInsumos,
   });
 
   const mutateRemoveInsumo = useMutation({
     mutationFn: (id: string) => removeInsumo({ data: { id } }),
-    onSuccess: invalidate,
+    onSuccess: invalidateInsumos,
   });
 
   const mutateCreatePayment = useMutation({
     mutationFn: (input: { batchId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; dataParaPagamento: string }) =>
       createFilamentoPayment({ data: input }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFPayments,
   });
 
   const mutateUpdatePayment = useMutation({
     mutationFn: (input: { paymentId: string; formaPagamento: FormaPagamento; custoTotal: number; parcelas: number; dataParaPagamento: string }) =>
       updateFilamentoPayment({ data: input }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFPayments,
   });
 
   const mutateDeletePayment = useMutation({
     mutationFn: (paymentId: string) => deleteFilamentoPayment({ data: { paymentId } }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFPayments,
   });
 
   const mutatePayInstallment = useMutation({
     mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number; observacao?: string }) =>
       payInstallment({ data: input }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFPayments,
   });
 
   const mutateRevertInstallment = useMutation({
     mutationFn: (installmentId: string) => revertInstallment({ data: { installmentId } }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFPayments,
   });
 
   const mutateUpdateInstallment = useMutation({
     mutationFn: (input: { installmentId: string; vencimento?: string; valor?: number; observacao?: string }) =>
       updateInstallment({ data: input }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFPayments,
   });
 
   const mutateSettlePayment = useMutation({
     mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
       settlePayment({ data: input }),
-    onSuccess: invalidate,
+    onSuccess: invalidateFPayments,
   });
 
   const allUsedSkus = useMemo(

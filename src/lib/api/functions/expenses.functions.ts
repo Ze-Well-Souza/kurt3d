@@ -6,6 +6,11 @@ import { expensesRepo } from "../../server/repositories.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
+export const listExpenses = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await expensesRepo();
+  return repo.list;
+});
+
 export const addManualExpense = createServerFn({ method: "POST" })
   .validator(
     z.object({

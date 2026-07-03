@@ -18,7 +18,7 @@ import { changePassword, listUsers, createUser, deleteUser, getSiteContent, save
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useSettings } from "@/lib/hooks/use-settings";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 
 export const Route = createFileRoute("/admin/settings")({
@@ -54,8 +54,8 @@ function toForm(s: AppSettings): SettingsForm {
 
 function SettingsPage() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
-  const currentSettings = snap.data?.settings ?? DEFAULT_APP_SETTINGS;
+  const { data: currentSettingsData } = useSettings();
+  const currentSettings = currentSettingsData ?? DEFAULT_APP_SETTINGS;
   const [form, setForm] = useState<SettingsForm>(toForm(currentSettings));
   const [hasChanges, setHasChanges] = useState(false);
   const handleSaveError = useToastErrorHandler({ fallbackMessage: "Erro ao salvar." });
@@ -82,7 +82,7 @@ function SettingsPage() {
   const mutate = useMutation({
     mutationFn: (input: AppSettings) => saveSettings({ data: input }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["snapshot"] });
+      qc.invalidateQueries({ queryKey: ["settings"] });
       setHasChanges(false);
       toast.success("Configurações salvas com sucesso.");
     },

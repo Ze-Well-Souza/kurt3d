@@ -28,6 +28,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { brl } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import {
   addOrder, finalizarDestino, updateOrderStatus, removeOrder,
@@ -47,7 +48,11 @@ import {
   calcPortfolioPricing,
   type PortfolioCalculatorEntryMode,
 } from "@/lib/domain/portfolio-pricing";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useOrders } from "@/lib/hooks/use-orders";
+import { useFilamentos } from "@/lib/hooks/use-filamentos";
+import { usePortfolio } from "@/lib/hooks/use-portfolio";
+import { useClients } from "@/lib/hooks/use-clients";
+import { useSettings } from "@/lib/hooks/use-settings";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizeText } from "@/lib/utils/normalization";
 
@@ -118,7 +123,6 @@ const initialForm: FormState = {
   modeloPreset: "A1", precoImpressora: "2999", vidaUtilHoras: "2000", margemPercent: "30",
 };
 
-const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const NO_CLIENT_SELECTED = "__none__";
 const MAX_ORDER_ASSET_SIZE = 25 * 1024 * 1024;
 const ORDER_ASSET_ACCEPT = ".stl,.3mf,model/stl,application/sla,application/vnd.ms-package.3dmanufacturing-3dmodel+xml";
@@ -193,13 +197,17 @@ function buildEmptyOrderPart(): NewOrderPartForm {
 /* ═══════════════════════ MAIN COMPONENT ═══════════════════════ */
 function CalcPedidos() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
+  const { data: ordersData } = useOrders();
+  const { data: filamentosData } = useFilamentos();
+  const { data: portfolioData } = usePortfolio();
+  const { data: clientsData } = useClients();
+  const { data: settingsData } = useSettings();
   const handleUpdateError = useToastErrorHandler({ fallbackMessage: "Erro ao atualizar." });
-  const orders = snap.data?.orders ?? [];
-  const filamentos = snap.data?.filamentos ?? [];
-  const projects = snap.data?.portfolio ?? [];
-  const clients = snap.data?.clients ?? [];
-  const settings = snap.data?.settings ?? DEFAULT_APP_SETTINGS;
+  const orders = ordersData ?? [];
+  const filamentos = filamentosData?.filamentos ?? [];
+  const projects = portfolioData ?? [];
+  const clients = clientsData ?? [];
+  const settings = settingsData ?? DEFAULT_APP_SETTINGS;
   const [activeTab, setActiveTab] = useState<"calc" | "orders">("calc");
   const [form, setForm] = useState<FormState>({
     ...initialForm,
@@ -208,16 +216,19 @@ function CalcPedidos() {
     quantidade: String(settings.defaultQuantidade || FALLBACK_QUANTIDADE),
   });
 
+  const invalidateOrders = () => qc.invalidateQueries({ queryKey: ["orders"] });
+  const invalidatePortfolio = () => qc.invalidateQueries({ queryKey: ["portfolio"] });
+
   /* ── mutations ── */
-  const mutateAddProject = useMutation({ mutationFn: (input: any) => addPortfolioProject({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
-  const mutateRemoveProject = useMutation({ mutationFn: (id: string) => removePortfolioProject({ data: { id } }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
-  const mutateCreateOrder = useMutation({ mutationFn: (input: { portfolioProjectId: string; client: string; clientId?: string; quantity: number }) => createOrderFromPortfolio({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
-  const mutateStatus = useMutation({ mutationFn: (input: { orderId: string; status: "todo" | "printing" | "done" }) => updateOrderStatus({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
-  const mutateAddOrder = useMutation({ mutationFn: (input: any) => addOrder({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
-  const mutateFinalizar = useMutation({ mutationFn: (input: any) => finalizarDestino({ data: input }), onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }) });
-  const mutateRemoveOrder = useMutation({ mutationFn: (input: { orderId: string; reason: string }) => removeOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido excluído."); } });
-  const mutateUpdateOrder = useMutation({ mutationFn: (input: any) => updateOrder({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Pedido atualizado."); }, onError: handleUpdateError });
-  const mutateUpdateProject = useMutation({ mutationFn: (input: any) => updatePortfolioProject({ data: input }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Projeto atualizado."); }, onError: handleUpdateError });
+  const mutateAddProject = useMutation({ mutationFn: (input: any) => addPortfolioProject({ data: input }), onSuccess: () => invalidatePortfolio() });
+  const mutateRemoveProject = useMutation({ mutationFn: (id: string) => removePortfolioProject({ data: { id } }), onSuccess: () => invalidatePortfolio() });
+  const mutateCreateOrder = useMutation({ mutationFn: (input: { portfolioProjectId: string; client: string; clientId?: string; quantity: number }) => createOrderFromPortfolio({ data: input }), onSuccess: () => invalidateOrders() });
+  const mutateStatus = useMutation({ mutationFn: (input: { orderId: string; status: "todo" | "printing" | "done" }) => updateOrderStatus({ data: input }), onSuccess: () => invalidateOrders() });
+  const mutateAddOrder = useMutation({ mutationFn: (input: any) => addOrder({ data: input }), onSuccess: () => invalidateOrders() });
+  const mutateFinalizar = useMutation({ mutationFn: (input: any) => finalizarDestino({ data: input }), onSuccess: () => invalidateOrders() });
+  const mutateRemoveOrder = useMutation({ mutationFn: (input: { orderId: string; reason: string }) => removeOrder({ data: input }), onSuccess: () => { invalidateOrders(); toast.success("Pedido excluído."); } });
+  const mutateUpdateOrder = useMutation({ mutationFn: (input: any) => updateOrder({ data: input }), onSuccess: () => { invalidateOrders(); toast.success("Pedido atualizado."); }, onError: handleUpdateError });
+  const mutateUpdateProject = useMutation({ mutationFn: (input: any) => updatePortfolioProject({ data: input }), onSuccess: () => { invalidatePortfolio(); toast.success("Projeto atualizado."); }, onError: handleUpdateError });
   const mutateUploadOrderAsset = useMutation({
     mutationFn: (input: { fileName: string; contentType: string; dataBase64: string }) => uploadOrderAsset({ data: input }),
   });
@@ -227,7 +238,7 @@ function CalcPedidos() {
   const mutateUpdateOrderPartStatus = useMutation({
     mutationFn: (input: { orderId: string; partId: string; status: OrderPartStatus }) => updateOrderPartStatus({ data: input }),
     onError: handleUpdateError,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
+    onSuccess: () => invalidateOrders(),
   });
 
   /* ── calculator state ── */

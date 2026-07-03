@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { brl } from "@/lib/utils";
 import { SearchInput } from "@/components/SearchInput";
 import { addManualExpense, removeExpense, payInstallment, payInsumoInstallment, settleInsumoPayment, settlePayment } from "@/lib/api/data.functions";
 import { formatIsoDatePtBr, parseIsoDateLocal, todayIso } from "@/lib/domain/installments";
@@ -31,7 +33,13 @@ import type {
   InsumoPaymentEvent,
   InsumoPaymentInstallment,
 } from "@/lib/domain/types";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useOrders } from "@/lib/hooks/use-orders";
+import { useFilamentos } from "@/lib/hooks/use-filamentos";
+import { useVendas } from "@/lib/hooks/use-vendas";
+import { useInsumos } from "@/lib/hooks/use-insumos";
+import { useExpenses } from "@/lib/hooks/use-expenses";
+import { useFilamentoPayments, useFilamentoPaymentEvents } from "@/lib/hooks/use-filamento-payments";
+import { useInsumoPayments, useInsumoPaymentEvents } from "@/lib/hooks/use-insumo-payments";
 import { normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/finances")({
@@ -39,9 +47,6 @@ export const Route = createFileRoute("/admin/finances")({
 });
 
 const EXPENSE_CATEGORIES = ["Aluguel","Internet","Manutenção","Energia","Perda de Material","Transporte","Marketing","Outros"] as const;
-
-const brl = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 const getInstallmentPaidAmount = (installment: { valor: number; valorPago: number | null }) =>
   Math.min(installment.valorPago ?? 0, installment.valor);
@@ -74,19 +79,27 @@ type PaymentHistoryTypeFilter = "all" | "pagamento" | "estorno";
 
 function Finances() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
-  const vendas = snap.data?.vendas ?? [];
-  const orders = snap.data?.orders ?? [];
-  const filamentos = (snap.data?.filamentos ?? []) as Filamento[];
-  const filamentosHistory = (snap.data?.filamentosHistory ?? []) as FilamentoHistory[];
-  const insumos = (snap.data?.insumos ?? []) as Insumo[];
-  const expenses = snap.data?.expenses ?? [];
-  const filamentoPayments = (snap.data?.filamentoPayments ?? []) as FilamentoPayment[];
-  const filamentoInstallments = (snap.data?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
-  const filamentoPaymentEvents = (snap.data?.filamentoPaymentEvents ?? []) as FilamentoPaymentEvent[];
-  const insumoPayments = (snap.data?.insumoPayments ?? []) as InsumoPayment[];
-  const insumoInstallments = (snap.data?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
-  const insumoPaymentEvents = (snap.data?.insumoPaymentEvents ?? []) as InsumoPaymentEvent[];
+  const { data: vendasData } = useVendas();
+  const { data: ordersData } = useOrders();
+  const { data: filamentosData } = useFilamentos();
+  const { data: insumosData } = useInsumos();
+  const { data: expensesData } = useExpenses();
+  const { data: fpData } = useFilamentoPayments();
+  const { data: fpeData } = useFilamentoPaymentEvents();
+  const { data: ipData } = useInsumoPayments();
+  const { data: ipeData } = useInsumoPaymentEvents();
+  const vendas = vendasData ?? [];
+  const orders = ordersData ?? [];
+  const filamentos = (filamentosData?.filamentos ?? []) as (Filamento & { label?: string; reservedGrams?: number; disponivelGrams?: number })[];
+  const filamentosHistory = (filamentosData?.filamentosHistory ?? []) as FilamentoHistory[];
+  const insumos = (insumosData ?? []) as Insumo[];
+  const expenses = expensesData ?? [];
+  const filamentoPayments = (fpData?.filamentoPayments ?? []) as FilamentoPayment[];
+  const filamentoInstallments = (fpData?.filamentoInstallments ?? []) as FilamentoPaymentInstallment[];
+  const filamentoPaymentEvents = (fpeData ?? []) as FilamentoPaymentEvent[];
+  const insumoPayments = (ipData?.insumoPayments ?? []) as InsumoPayment[];
+  const insumoInstallments = (ipData?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
+  const insumoPaymentEvents = (ipeData ?? []) as InsumoPaymentEvent[];
 
   const [search, setSearch] = useState("");
   const [showExpense, setShowExpense] = useState(false);
@@ -109,9 +122,17 @@ function Finances() {
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
   const [periodAnchor, setPeriodAnchor] = useState(new Date().toISOString().slice(0, 7));
 
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); };
-  const mutateAddExp = useMutation({ mutationFn: (data: any) => addManualExpense({ data }), onSuccess: () => { invalidate(); toast.success("Despesa adicionada."); setShowExpense(false); setExpForm({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" }); } });
-  const mutateRemoveExp = useMutation({ mutationFn: (id: string) => removeExpense({ data: { id } }), onSuccess: () => { invalidate(); toast.success("Despesa removida."); } });
+  const invalidateExpenses = () => qc.invalidateQueries({ queryKey: ["expenses"] });
+  const invalidateFilamentoPayments = () => {
+    qc.invalidateQueries({ queryKey: ["filamento-payments"] });
+    qc.invalidateQueries({ queryKey: ["filamento-payment-events"] });
+  };
+  const invalidateInsumoPayments = () => {
+    qc.invalidateQueries({ queryKey: ["insumo-payments"] });
+    qc.invalidateQueries({ queryKey: ["insumo-payment-events"] });
+  };
+  const mutateAddExp = useMutation({ mutationFn: (data: any) => addManualExpense({ data }), onSuccess: () => { invalidateExpenses(); toast.success("Despesa adicionada."); setShowExpense(false); setExpForm({ descricao: "", valor: "", data: new Date().toISOString().slice(0, 10), categoria: "" }); } });
+  const mutateRemoveExp = useMutation({ mutationFn: (id: string) => removeExpense({ data: { id } }), onSuccess: () => { invalidateExpenses(); toast.success("Despesa removida."); } });
   const mutatePayInstallment = useMutation({
     mutationFn: (input: { installmentId: string; dataPagamento: string; valorPago?: number }) =>
       payInstallment({ data: input }),
@@ -120,7 +141,7 @@ function Finances() {
       const remaining = currentInstallment ? getInstallmentRemainingAmount(currentInstallment) : 0;
       const amount = variables.valorPago ?? remaining;
       const settled = amount >= remaining;
-      invalidate();
+      invalidateFilamentoPayments();
       setInstallmentViewFilter(settled ? "paid" : "all");
       setHighlightedInstallmentId(variables.installmentId);
       setHighlightedPaymentId(null);
@@ -131,7 +152,7 @@ function Finances() {
     mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
       settlePayment({ data: input }),
     onSuccess: (_data, variables) => {
-      invalidate();
+      invalidateFilamentoPayments();
       setInstallmentViewFilter("paid");
       setHighlightedInstallmentId(null);
       setHighlightedPaymentId(variables.paymentId);
@@ -146,7 +167,7 @@ function Finances() {
       const remaining = currentInstallment ? getInstallmentRemainingAmount(currentInstallment) : 0;
       const amount = variables.valorPago ?? remaining;
       const settled = amount >= remaining;
-      invalidate();
+      invalidateInsumoPayments();
       setInstallmentViewFilter(settled ? "paid" : "all");
       setHighlightedInstallmentId(variables.installmentId);
       setHighlightedPaymentId(null);
@@ -157,7 +178,7 @@ function Finances() {
     mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
       settleInsumoPayment({ data: input }),
     onSuccess: (_data, variables) => {
-      invalidate();
+      invalidateInsumoPayments();
       setInstallmentViewFilter("paid");
       setHighlightedInstallmentId(null);
       setHighlightedPaymentId(variables.paymentId);

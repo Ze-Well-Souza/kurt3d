@@ -8,6 +8,11 @@ import { relinkOrdersToClient } from "./shared";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
+export const listClients = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await clientsRepo();
+  return repo.list;
+});
+
 export const addClient = createServerFn({ method: "POST" })
   .validator(
     z.object({

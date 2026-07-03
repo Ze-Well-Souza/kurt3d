@@ -9,4 +9,5 @@ export * from "./functions/clients.functions";
 export * from "./functions/expenses.functions";
 export * from "./functions/payments.functions";
 export * from "./functions/extended.functions";
+export * from "./functions/vendas.functions";
 

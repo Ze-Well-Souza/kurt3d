@@ -16,6 +16,7 @@ import { logger } from "../server/logger.server";
 import { clearRateLimit, getClientIp, inspectRateLimit, recordRateLimitFailure } from "../server/rate-limit.server";
 import { isSecureRequest } from "../server/request-security.server";
 import { siteContentRepo } from "../server/repositories.server";
+import { siteContentSchema } from "../domain/site-content-schema";
 import type { SiteContent } from "../domain/types";
 import { normalizePhone, normalizeText } from "../utils/normalization";
 
@@ -177,7 +178,7 @@ export const getSiteContent = createServerFn({ method: "GET" }).handler(async ()
 });
 
 export const saveSiteContent = createServerFn({ method: "POST" })
-  .validator(z.any())
+  .validator(siteContentSchema)
   .handler(async ({ data }) => {
     await requireSession();
     const repo = await siteContentRepo();

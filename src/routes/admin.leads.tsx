@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { convertLeadToClient } from "@/lib/api/data.functions";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useLeads } from "@/lib/hooks/use-leads";
+import { useClients } from "@/lib/hooks/use-clients";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizePhone, normalizeText } from "@/lib/utils/normalization";
 
@@ -20,16 +21,18 @@ export const Route = createFileRoute("/admin/leads")({
 
 function LeadsPage() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
-  const leads = snap.data?.leads ?? [];
-  const clients = snap.data?.clients ?? [];
+  const { data: leadsData, isLoading: leadsLoading } = useLeads();
+  const { data: clientsData } = useClients();
+  const leads = leadsData ?? [];
+  const clients = clientsData ?? [];
   const [search, setSearch] = useState("");
   const handleConvertLeadError = useToastErrorHandler({ fallbackMessage: "Falha ao converter lead." });
 
   const mutateConvertLead = useMutation({
     mutationFn: (leadId: string) => convertLeadToClient({ data: { leadId } }),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["snapshot"] });
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      qc.invalidateQueries({ queryKey: ["clients"] });
       toast.success(result.created ? "Lead convertido em cliente." : "Lead vinculado a cliente existente.");
     },
     onError: handleConvertLeadError,
@@ -75,9 +78,9 @@ function LeadsPage() {
         </div>
       </div>
 
-      {snap.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {leadsLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
-      {!snap.isLoading && filtered.length === 0 && (
+      {!leadsLoading && filtered.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground" />

@@ -8,6 +8,11 @@ import { expensesRepo, insumoInstallmentsRepo, insumoPaymentsRepo, insumosRepo }
 import { requireSession } from "../../server/require-session.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
+export const listInsumos = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await insumosRepo();
+  return repo.list;
+});
+
 const paymentFields = {
   formaPagamento: z.enum(["a_vista", "parcelado"]).optional(),
   parcelas: z.number().int().min(1).max(48).optional(),

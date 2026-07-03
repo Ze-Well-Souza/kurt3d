@@ -22,6 +22,38 @@ import {
   insumoPaymentsRepo,
 } from "../../server/repositories.server";
 
+export const listFilamentoPayments = createServerFn({ method: "GET" }).handler(async () => {
+  const [payments, installments] = await Promise.all([
+    filamentoPaymentsRepo(),
+    filamentoInstallmentsRepo(),
+  ]);
+  return {
+    filamentoPayments: payments.list,
+    filamentoInstallments: installments.list,
+  };
+});
+
+export const listInsumoPayments = createServerFn({ method: "GET" }).handler(async () => {
+  const [payments, installments] = await Promise.all([
+    insumoPaymentsRepo(),
+    insumoInstallmentsRepo(),
+  ]);
+  return {
+    insumoPayments: payments.list,
+    insumoInstallments: installments.list,
+  };
+});
+
+export const listFilamentoPaymentEvents = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await filamentoPaymentEventsRepo();
+  return repo.list;
+});
+
+export const listInsumoPaymentEvents = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await insumoPaymentEventsRepo();
+  return repo.list;
+});
+
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }

@@ -213,7 +213,8 @@ export type Expense = {
 export type LeadImagem = {
   nome: string;
   tipo: string;
-  dataUrl: string;
+  publicUrl: string;
+  storagePath?: string;
 };
 
 export type Lead = {

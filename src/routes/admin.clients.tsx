@@ -13,10 +13,12 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { brl } from "@/lib/utils";
 import { SearchInput } from "@/components/SearchInput";
 import { addClient, updateClient, removeClient } from "@/lib/api/data.functions";
 import type { Client, Order } from "@/lib/domain/types";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useClients } from "@/lib/hooks/use-clients";
+import { useOrders } from "@/lib/hooks/use-orders";
 import { normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/clients")({
@@ -26,9 +28,10 @@ export const Route = createFileRoute("/admin/clients")({
 
 function ClientsPage() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
-  const clients = snap.data?.clients ?? [];
-  const orders = snap.data?.orders ?? [];
+  const { data: clientsData } = useClients();
+  const { data: ordersData } = useOrders();
+  const clients = clientsData ?? [];
+  const orders = ordersData ?? [];
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -36,9 +39,9 @@ function ClientsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", whatsapp: "", email: "", notas: "" });
 
-  const mutateAdd = useMutation({ mutationFn: (data: any) => addClient({ data }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Cliente cadastrado."); setForm({ nome: "", whatsapp: "", email: "", notas: "" }); setShowForm(false); } });
-  const mutateUpdate = useMutation({ mutationFn: (data: any) => updateClient({ data }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Cliente atualizado."); setEditClient(null); } });
-  const mutateRemove = useMutation({ mutationFn: (id: string) => removeClient({ data: { id } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshot"] }); toast.success("Cliente removido."); setDeleteId(null); } });
+  const mutateAdd = useMutation({ mutationFn: (data: any) => addClient({ data }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["clients"] }); toast.success("Cliente cadastrado."); setForm({ nome: "", whatsapp: "", email: "", notas: "" }); setShowForm(false); } });
+  const mutateUpdate = useMutation({ mutationFn: (data: any) => updateClient({ data }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["clients"] }); toast.success("Cliente atualizado."); setEditClient(null); } });
+  const mutateRemove = useMutation({ mutationFn: (id: string) => removeClient({ data: { id } }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["clients"] }); toast.success("Cliente removido."); setDeleteId(null); } });
 
   const filtered = useMemo(() => {
     if (!search.trim()) return clients;
@@ -53,8 +56,6 @@ function ClientsPage() {
   function clientOrders(client: Client): Order[] {
     return orders.filter((o) => o.clientId === client.id);
   }
-
-  const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
     <div className="space-y-6">

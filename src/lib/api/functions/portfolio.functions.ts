@@ -8,6 +8,11 @@ import { requireSession } from "../../server/require-session.server";
 import { assertExplicitClientIdExists, resolveClientId } from "./shared";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
+export const listPortfolio = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await portfolioRepo();
+  return repo.list;
+});
+
 export const addPortfolioProject = createServerFn({ method: "POST" })
   .validator(
     z.object({

@@ -594,7 +594,7 @@ function Contact() {
 
     setLoading(true);
     try {
-      await submitLead({
+      const result = await submitLead({
         data: {
           nome,
           whatsapp,
@@ -609,8 +609,8 @@ function Contact() {
       setImages([]);
       // Open WhatsApp with pre-formatted message
       const imgNote =
-        imgList.length > 0
-          ? `\n\n📎 ${imgList.length} imagem(ns) anexa(s): envie-as em seguida nesta conversa.`
+        result.imagens && result.imagens.length > 0
+          ? `\n\n📎 ${result.imagens.length} imagem(ns) anexa(s): ${result.imagens.map((i) => i.publicUrl).join(", ")}`
           : "";
       const linkNote = linkProjeto.trim() ? `\n\nLink de referência: ${linkProjeto.trim()}` : "";
       const text = encodeURIComponent(

@@ -2,9 +2,31 @@ import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Filamento, FilamentoQualidade } from "../../domain/types";
-import { filamentosHistoryRepo, filamentosRepo } from "../../server/repositories.server";
+import { computeReservedByFilament } from "../../domain/inventory";
+import { filamentosHistoryRepo, filamentosRepo, inventoryRepo } from "../../server/repositories.server";
 import { requireSession } from "../../server/require-session.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { buildFilamentoLabel } from "./shared";
+
+export const listFilamentos = createServerFn({ method: "GET" }).handler(async () => {
+  const [filamentos, inv, history] = await Promise.all([
+    filamentosRepo(),
+    inventoryRepo(),
+    filamentosHistoryRepo(),
+  ]);
+
+  const reservedMap = computeReservedByFilament(inv.list);
+
+  return {
+    filamentos: filamentos.list.map((filamento) => ({
+      ...filamento,
+      reservedGrams: reservedMap[filamento.id] ?? 0,
+      disponivelGrams: Math.max(0, filamento.pesoAtual - (reservedMap[filamento.id] ?? 0)),
+      label: buildFilamentoLabel(filamento),
+    })),
+    filamentosHistory: history.list,
+  };
+});
 
 const filamentoQualidadeSchema = z.enum(["Ótimo", "bom", "médio", "ruim"]);
 

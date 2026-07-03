@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { brl } from "@/lib/utils";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -39,14 +40,17 @@ import {
 } from "@/components/ui/table";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useOrders } from "@/lib/hooks/use-orders";
+import { useVendas } from "@/lib/hooks/use-vendas";
+import { useFilamentos } from "@/lib/hooks/use-filamentos";
+import { useExpenses } from "@/lib/hooks/use-expenses";
+import { useCalendarEvents } from "@/lib/hooks/use-calendar-events";
+import { useBudgetQuotes } from "@/lib/hooks/use-budget-quotes";
 import { normalizeText } from "@/lib/utils/normalization";
 
 export const Route = createFileRoute("/admin/reports")({
   component: Reports,
 });
-
-const brl = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 type ReportPeriodPreset = "7d" | "30d" | "90d" | "all" | "custom";
 
@@ -67,15 +71,19 @@ interface PerformanceMetrics {
 
 function Reports() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
-  
-  const orders = snap.data?.orders ?? [];
-  const vendas = snap.data?.vendas ?? [];
-  const clients = snap.data?.clients ?? [];
-  const filamentos = snap.data?.filamentos ?? [];
-  const expenses = snap.data?.expenses ?? [];
-  const calendarEvents = snap.data?.calendarEvents ?? [];
-  const budgetQuotes = snap.data?.budgetQuotes ?? [];
+  const { data: ordersData } = useOrders();
+  const { data: vendasData } = useVendas();
+  const { data: filamentosData } = useFilamentos();
+  const { data: expensesData } = useExpenses();
+  const { data: calendarEventsData } = useCalendarEvents();
+  const { data: budgetQuotesData } = useBudgetQuotes();
+
+  const orders = ordersData ?? [];
+  const vendas = vendasData ?? [];
+  const filamentos = filamentosData?.filamentos ?? [];
+  const expenses = expensesData ?? [];
+  const calendarEvents = calendarEventsData ?? [];
+  const budgetQuotes = budgetQuotesData ?? [];
 
   const [periodPreset, setPeriodPreset] = useState<ReportPeriodPreset>("30d");
   const [reportType, setReportType] = useState<"overview" | "revenue" | "performance" | "inventory">("overview");
@@ -233,8 +241,8 @@ function Reports() {
       converted: budgetQuotes.filter((q) => q.status === "converted").length,
       rejected: budgetQuotes.filter((q) => q.status === "rejected").length,
       expired: budgetQuotes.filter((q) => q.status === "expired").length,
+      conversionRate: 0,
     };
-    stats.conversionRate = stats.total > 0 ? (stats.converted / stats.total) * 100 : 0;
     return stats;
   }, [budgetQuotes]);
 

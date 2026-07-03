@@ -13,7 +13,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "@/lib/api/data.functions";
 import type { ProductionCalendarEvent } from "@/lib/domain/types";
-import { useSnapshot } from "@/lib/hooks/use-snapshot";
+import { useOrders } from "@/lib/hooks/use-orders";
+import { useCalendarEvents } from "@/lib/hooks/use-calendar-events";
 
 export const Route = createFileRoute("/admin/calendar")({
   component: Calendar,
@@ -35,9 +36,10 @@ const STATUS_LABELS: Record<string, string> = {
 
 function Calendar() {
   const qc = useQueryClient();
-  const snap = useSnapshot();
-  const orders = snap.data?.orders ?? [];
-  const calendarEvents = (snap.data?.calendarEvents ?? []) as ProductionCalendarEvent[];
+  const { data: ordersData } = useOrders();
+  const { data: calendarEventsData } = useCalendarEvents();
+  const orders = ordersData ?? [];
+  const calendarEvents = (calendarEventsData ?? []) as ProductionCalendarEvent[];
   
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [showEventDialog, setShowEventDialog] = useState(false);
@@ -54,7 +56,7 @@ function Calendar() {
     status: "scheduled" as ProductionCalendarEvent["status"],
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["snapshot"] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["calendar-events"] });
 
   const mutateCreate = useMutation({
     mutationFn: (data: any) => createCalendarEvent({ data }),

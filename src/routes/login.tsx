@@ -37,7 +37,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const ctx = Route.useRouteContext();
 
-  const [phone, setPhone] = useState("11967428594");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [nome, setNome] = useState("");
   const [username, setUsername] = useState("admin");
@@ -93,7 +93,7 @@ function LoginPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone-setup">Telefone</Label>
-                <Input id="phone-setup" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="11967428594" />
+                <Input id="phone-setup" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefone com DDD" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="username">Usuário (login alternativo)</Label>
@@ -114,7 +114,7 @@ function LoginPage() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="11967428594" />
+                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefone com DDD" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>

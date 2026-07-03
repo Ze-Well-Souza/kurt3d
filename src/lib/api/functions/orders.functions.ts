@@ -27,8 +27,29 @@ import {
   allowedStatusTransition,
   assertExplicitClientIdExists,
   computeOrderReservedGrams,
+  hydrateOrderClientLinks,
   resolveClientId,
 } from "./shared";
+
+export const listOrders = createServerFn({ method: "GET" }).handler(async () => {
+  const [orders, orderParts, clients] = await Promise.all([
+    ordersRepo(),
+    orderPartsRepo(),
+    clientsRepo(),
+  ]);
+
+  const partsByOrderId = orderParts.list.reduce<Record<string, typeof orderParts.list>>((acc, part) => {
+    (acc[part.orderId] ??= []).push(part);
+    return acc;
+  }, {});
+
+  const ordersView = hydrateOrderClientLinks(orders.list, clients.list).map((order) => ({
+    ...order,
+    parts: partsByOrderId[order.id] ?? [],
+  }));
+
+  return ordersView;
+});
 
 const orderPartInputSchema = z.object({
   nome: z.string().trim().min(1).max(140),

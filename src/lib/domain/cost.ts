@@ -12,11 +12,6 @@ export type CostBreakdown = {
   lucroLiquido: number;
 };
 
-const CONSUMO_A1_KW = DEFAULT_APP_SETTINGS.consumoKw;
-const TARIFA_ENERGIA = DEFAULT_APP_SETTINGS.tarifaEnergiaKwh;
-const DEPRECIACAO_HORA = DEFAULT_APP_SETTINGS.depreciacaoHora;
-const CUSTO_FIXO_UNIDADE = DEFAULT_APP_SETTINGS.custoFixoUnidade;
-
 function clampNumber(n: number) {
   return Number.isFinite(n) ? n : 0;
 }

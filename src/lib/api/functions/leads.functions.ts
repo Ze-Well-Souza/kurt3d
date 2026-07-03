@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { Client, Lead, LeadImagem } from "../../domain/types";
+import type { Client, Lead } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { syncLeadToCrm } from "../../server/lead-crm.server";
 import { clientsRepo, leadsRepo, ordersRepo } from "../../server/repositories.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
+import { uploadImagesToStorage } from "../../server/lead-image-upload.server";
 import {
   buildLeadConversionNote,
   mergeNotes,
@@ -14,6 +15,11 @@ import {
   normalizePhone,
   relinkOrdersToClient,
 } from "./shared";
+
+export const listLeads = createServerFn({ method: "GET" }).handler(async () => {
+  const repo = await leadsRepo();
+  return repo.list;
+});
 
 export const submitLead = createServerFn({ method: "POST" })
   .validator(
@@ -37,10 +43,21 @@ export const submitLead = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     const repo = await leadsRepo();
-    const imagens: LeadImagem[] | null =
-      data.imagens && data.imagens.length > 0
-        ? data.imagens.map((imagem) => ({ nome: imagem.nome, tipo: imagem.tipo, dataUrl: imagem.dataUrl }))
-        : null;
+
+    // Upload images to Supabase Storage — original base64 is NOT stored in DB
+    let imagens: Lead["imagens"] = null;
+    if (data.imagens && data.imagens.length > 0) {
+      const uploaded = await uploadImagesToStorage(data.imagens);
+      if (uploaded.length > 0) {
+        imagens = uploaded.map((img) => ({
+          nome: img.nome,
+          tipo: img.tipo,
+          publicUrl: img.publicUrl,
+          storagePath: img.storagePath,
+        }));
+      }
+    }
+
     const lead: Lead = {
       id: randomUUID(),
       nome: data.nome,
@@ -52,7 +69,7 @@ export const submitLead = createServerFn({ method: "POST" })
     };
     await repo.insert(lead);
     await syncLeadToCrm(lead);
-    return { ok: true };
+    return { ok: true, imagens: imagens ?? undefined };
   });
 
 export const convertLeadToClient = createServerFn({ method: "POST" })
