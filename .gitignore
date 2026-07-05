@@ -313,3 +313,4 @@ Icon?
 *.VC.VC.opendb-wal
 *.VC.db-shm
 *.VC.VC.opendb-sh......
+.env
