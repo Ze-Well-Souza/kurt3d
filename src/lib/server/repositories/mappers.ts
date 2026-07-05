@@ -252,7 +252,19 @@ export function toOrderPartRow(row: OrderPart) {
   };
 }
 
+function safeParseJsonArray(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value) {
+    try {
+      return JSON.parse(value);
+    } catch { /* ignore */ }
+  }
+  return [];
+}
+
 export function fromPortfolioRow(row: any): PortfolioProject {
+  const filamentosRaw = safeParseJsonArray(row.filamentos);
+  const custosExtrasRaw = safeParseJsonArray(row.custos_extras);
   return {
     id: row.id,
     nome: row.nome,
@@ -268,6 +280,12 @@ export function fromPortfolioRow(row: any): PortfolioProject {
     perdaPercent: row.perda_percent ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    filamentos: filamentosRaw.length > 0 ? filamentosRaw as PortfolioProject["filamentos"] : undefined,
+    custosExtras: custosExtrasRaw.length > 0 ? custosExtrasRaw as PortfolioProject["custosExtras"] : undefined,
+    custoKwh: row.custo_kwh ?? null,
+    custoTrabalhoHoras: row.custo_mao_obra_horas ?? null,
+    custoTrabalhoValorHora: row.custo_mao_obra_valor_hora ?? null,
+    taxaGateway: row.taxa_gateway ?? null,
   };
 }
 
@@ -287,6 +305,12 @@ export function toPortfolioRow(row: PortfolioProject) {
     perda_percent: row.perdaPercent ?? 0,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
+    filamentos: row.filamentos ? JSON.parse(JSON.stringify(row.filamentos)) : [],
+    custos_extras: row.custosExtras ? JSON.parse(JSON.stringify(row.custosExtras)) : [],
+    custo_kwh: row.custoKwh ?? null,
+    custo_mao_obra_horas: row.custoTrabalhoHoras ?? null,
+    custo_mao_obra_valor_hora: row.custoTrabalhoValorHora ?? null,
+    taxa_gateway: row.taxaGateway ?? null,
   };
 }
 

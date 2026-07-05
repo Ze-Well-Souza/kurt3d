@@ -13,6 +13,25 @@ export const listPortfolio = createServerFn({ method: "GET" }).handler(async () 
   return repo.list;
 });
 
+const calculatorFilamentoItemSchema = z.object({
+  id: z.string().min(1),
+  source: z.enum(["stock", "manual"]),
+  filamentoId: z.string().nullable().optional(),
+  sku: z.string().nullable().optional(),
+  marca: z.string().nullable().optional(),
+  cor: z.string().nullable().optional(),
+  precoRolo: z.number().min(0),
+  pesoRolo: z.number().min(0),
+  pesoUsado: z.number().min(0),
+});
+
+const calculatorExtraCostSchema = z.object({
+  id: z.string().min(1),
+  nome: z.string().min(1),
+  custo: z.number().min(0),
+  quantidade: z.number().min(0),
+});
+
 export const addPortfolioProject = createServerFn({ method: "POST" })
   .validator(
     z.object({
@@ -27,6 +46,13 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       quantidade: z.number().int().min(1).max(100000),
       precoVenda: z.number().min(0).max(1000000),
       perdaPercent: z.number().min(0).max(100).optional(),
+      // New multi-filament + cost fields
+      filamentos: z.array(calculatorFilamentoItemSchema).optional(),
+      custosExtras: z.array(calculatorExtraCostSchema).optional(),
+      custoKwh: z.number().min(0).nullable().optional(),
+      custoTrabalhoHoras: z.number().min(0).nullable().optional(),
+      custoTrabalhoValorHora: z.number().min(0).nullable().optional(),
+      taxaGateway: z.number().min(0).max(100).nullable().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -39,7 +65,22 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       createdAt: now,
       updatedAt: now,
       perdaPercent: data.perdaPercent ?? 0,
-      ...data,
+      nome: data.nome,
+      categoria: data.categoria,
+      linkModelo: data.linkModelo,
+      filamentoId: data.filamentoId,
+      custoRolo: data.custoRolo,
+      pesoRolo: data.pesoRolo,
+      pesoPeca: data.pesoPeca,
+      tempoMin: data.tempoMin,
+      quantidade: data.quantidade,
+      precoVenda: data.precoVenda,
+      filamentos: data.filamentos,
+      custosExtras: data.custosExtras,
+      custoKwh: data.custoKwh ?? null,
+      custoTrabalhoHoras: data.custoTrabalhoHoras ?? null,
+      custoTrabalhoValorHora: data.custoTrabalhoValorHora ?? null,
+      taxaGateway: data.taxaGateway ?? null,
     };
     await repo.save([project, ...repo.list]);
     return { ok: true };
@@ -70,6 +111,13 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       quantidade: z.number().int().min(1),
       precoVenda: z.number().min(0.01),
       perdaPercent: z.number().min(0).max(100).nullable(),
+      // New multi-filament + cost fields
+      filamentos: z.array(calculatorFilamentoItemSchema).optional(),
+      custosExtras: z.array(calculatorExtraCostSchema).optional(),
+      custoKwh: z.number().min(0).nullable().optional(),
+      custoTrabalhoHoras: z.number().min(0).nullable().optional(),
+      custoTrabalhoValorHora: z.number().min(0).nullable().optional(),
+      taxaGateway: z.number().min(0).max(100).nullable().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -92,6 +140,12 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       quantidade: data.quantidade,
       precoVenda: data.precoVenda,
       perdaPercent: data.perdaPercent ?? 0,
+      filamentos: data.filamentos,
+      custosExtras: data.custosExtras,
+      custoKwh: data.custoKwh ?? null,
+      custoTrabalhoHoras: data.custoTrabalhoHoras ?? null,
+      custoTrabalhoValorHora: data.custoTrabalhoValorHora ?? null,
+      taxaGateway: data.taxaGateway ?? null,
       updatedAt: nowIso(),
     };
     await portfolio.save(portfolio.list.map((item) => (item.id === project.id ? updated : item)));

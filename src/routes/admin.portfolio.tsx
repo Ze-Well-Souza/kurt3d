@@ -35,7 +35,7 @@ import {
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
   updateOrder, updatePortfolioProject, uploadOrderAsset, resolveOrderAssetUrl, updateOrderPartStatus,
 } from "@/lib/api/data.functions";
-import type { Order, OrderPart, OrderPartStatus, Status, Filamento, AppSettings, PortfolioProject } from "@/lib/domain/types";
+import type { Order, OrderPart, OrderPartStatus, Status, Filamento, AppSettings, PortfolioProject, CalculatorFilamentoInput, CalculatorExtraCost } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
@@ -46,6 +46,7 @@ import {
   BAMBU_PRESETS,
   type BambuPresetId,
   calcPortfolioPricing,
+  calcAdvancedPortfolioPricing,
   type PortfolioCalculatorEntryMode,
 } from "@/lib/domain/portfolio-pricing";
 import { useOrders } from "@/lib/hooks/use-orders";
@@ -110,10 +111,27 @@ type FormState = {
   entryMode: PortfolioCalculatorEntryMode;
   unidadesPorImpressao: string;
   modeloPreset: BambuPresetId; precoImpressora: string; vidaUtilHoras: string; margemPercent: string;
+  // New multi-filament + cost fields
+  filamentos: CalculatorFilamentoInput[];
+  custosExtras: CalculatorExtraCost[];
+  custoKwh: string;
+  custoTrabalhoHoras: string;
+  custoTrabalhoValorHora: string;
+  taxaGateway: string;
 };
 const FALLBACK_CUSTO_ROLO = 120;
 const FALLBACK_PESO_ROLO = 1000;
 const FALLBACK_QUANTIDADE = 10;
+
+function buildEmptyFilamentoItem(): CalculatorFilamentoInput {
+  const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `fil-${Date.now()}-${Math.random()}`;
+  return { id, source: "stock", precoRolo: 0, pesoRolo: 0, pesoUsado: 0 };
+}
+
+function buildEmptyExtraCost(): CalculatorExtraCost {
+  const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `ec-${Date.now()}-${Math.random()}`;
+  return { id, nome: "", custo: 0, quantidade: 1 };
+}
 
 const initialForm: FormState = {
   nome: "", categoria: "Chaveiro", linkModelo: "", filamentoId: "",
@@ -121,6 +139,12 @@ const initialForm: FormState = {
   quantidade: String(FALLBACK_QUANTIDADE), precoVenda: "", perdaPercent: "0",
   entryMode: "slicer", unidadesPorImpressao: "1",
   modeloPreset: "A1", precoImpressora: "2999", vidaUtilHoras: "2000", margemPercent: "30",
+  filamentos: [buildEmptyFilamentoItem()],
+  custosExtras: [],
+  custoKwh: "",
+  custoTrabalhoHoras: "",
+  custoTrabalhoValorHora: "",
+  taxaGateway: "0",
 };
 
 const NO_CLIENT_SELECTED = "__none__";
@@ -260,16 +284,22 @@ function CalcPedidos() {
       precoImpressora: Number(form.precoImpressora) || 0,
       vidaUtilHoras: Number(form.vidaUtilHoras) || 0,
       margemPercent: Number(form.margemPercent) || 0,
+      filamentos: form.filamentos,
+      custosExtras: form.custosExtras,
+      taxaGateway: Number(form.taxaGateway) || 0,
+      custoTrabalhoHoras: Number(form.custoTrabalhoHoras) || 0,
+      custoTrabalhoValorHora: Number(form.custoTrabalhoValorHora) || 0,
+      custoKwhOverride: Number(form.custoKwh) || 0,
     };
   }, [form, settings]);
-  const results = useMemo(() => calcPortfolioPricing({ ...numeric, settings }), [numeric, settings]);
+  const results = useMemo(() => calcAdvancedPortfolioPricing({ ...numeric, settings }), [numeric, settings]);
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const isSlicerMode = form.entryMode === "slicer";
   const effectiveUnitPrice = numeric.precoVenda > 0 ? numeric.precoVenda : results.precoSugerido;
   const effectiveLotProfit = effectiveUnitPrice * numeric.quantidade - results.custoLote;
 
   const totals = useMemo(() => projects.reduce((acc, p) => {
-    const r = calcPortfolioPricing({
+    const r = calcAdvancedPortfolioPricing({
       custoRolo: p.custoRolo,
       pesoRolo: p.pesoRolo,
       pesoEntrada: p.pesoPeca,
@@ -280,6 +310,12 @@ function CalcPedidos() {
       entryMode: "unit",
       unidadesPorImpressao: 1,
       settings,
+      filamentos: p.filamentos,
+      custosExtras: p.custosExtras,
+      taxaGateway: p.taxaGateway ?? 0,
+      custoTrabalhoHoras: p.custoTrabalhoHoras ?? 0,
+      custoTrabalhoValorHora: p.custoTrabalhoValorHora ?? 0,
+      custoKwhOverride: p.custoKwh ?? 0,
     });
     acc.lucro += r.lucroLiquido; acc.receita += r.receitaTotal; return acc;
   }, { lucro: 0, receita: 0 }), [projects, settings]);
@@ -376,8 +412,23 @@ function CalcPedidos() {
       linkModelo: form.linkModelo || undefined,
     });
     if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos"); return; }
-    mutateAddProject.mutate({ ...parsed.data, filamentoId: form.filamentoId || undefined });
-    setForm({ ...initialForm, pesoRolo: String(settings.defaultPesoRolo), quantidade: String(settings.defaultQuantidade) });
+    mutateAddProject.mutate({
+      ...parsed.data,
+      filamentoId: form.filamentoId || undefined,
+      filamentos: form.filamentos.filter((f) => f.pesoUsado > 0),
+      custosExtras: form.custosExtras.filter((c) => c.nome.trim() && c.custo > 0),
+      custoKwh: Number(form.custoKwh) || null,
+      custoTrabalhoHoras: Number(form.custoTrabalhoHoras) || null,
+      custoTrabalhoValorHora: Number(form.custoTrabalhoValorHora) || null,
+      taxaGateway: Number(form.taxaGateway) || null,
+    });
+    setForm({
+      ...initialForm,
+      pesoRolo: String(settings.defaultPesoRolo),
+      quantidade: String(settings.defaultQuantidade),
+      filamentos: [buildEmptyFilamentoItem()],
+      custosExtras: [],
+    });
     toast.success("Projeto salvo.");
   }
   async function submitNewOrder(e: React.FormEvent) {
@@ -1133,12 +1184,6 @@ function CalcPedidos() {
               </Select>
             </Field>
             <Field label="Link do Modelo (MakerWorld/STL)" tip="URL do modelo 3D (MakerWorld, Printables, Thingiverse). Opcional — facilita reimprimir depois." className="md:col-span-2"><Input value={form.linkModelo} onChange={(e) => setField("linkModelo", e.target.value)} placeholder="https://makerworld.com/en/models/..." type="url" /></Field>
-            <Field label="Filamento (Rolo)" tip="Selecione um rolo do seu estoque para preencher automaticamente Custo do Rolo e Peso do Rolo." className="md:col-span-2">
-              <Select value={form.filamentoId} onValueChange={(v) => { setField("filamentoId", v); const f = filamentos.find((x) => x.id === v); if (f) { setField("custoRolo", String(f.precoPago)); setField("pesoRolo", String(f.pesoInicial)); } }}>
-                <SelectTrigger><SelectValue placeholder="Selecione o rolo" /></SelectTrigger>
-                <SelectContent>{filamentos.map((f: any) => (<SelectItem key={f.id} value={f.id}>[{f.sku}] {f.marca} - {f.cor} (Disponível {(f.disponivelGrams ?? f.pesoAtual)}g)</SelectItem>))}</SelectContent>
-              </Select>
-            </Field>
           </div>
 
           {/* ── Bloco 2: Impressora (preset Bambu Lab) ── */}
@@ -1162,7 +1207,7 @@ function CalcPedidos() {
             </p>
           </div>
 
-          {/* ── Bloco 3: Filamento, peça e lote ── */}
+          {/* ── Bloco 3: Peça, tempo e lote ── */}
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             <Field
               label="Modo de Entrada"
@@ -1177,8 +1222,6 @@ function CalcPedidos() {
                 </SelectContent>
               </Select>
             </Field>
-            <NumberField label="Custo do Rolo (R$)" value={form.custoRolo} onChange={(v) => setField("custoRolo", v)} placeholder="120,00" tip="Quanto você pagou pelo rolo inteiro de filamento. Ex.: R$ 120 por um rolo Creality PLA de 1kg." />
-            <NumberField label="Peso do Rolo (g)" value={form.pesoRolo} onChange={(v) => setField("pesoRolo", v)} placeholder="1000" tip="Peso total do rolo cheio. Padrão: 1000g (1kg). Verifique a embalagem do filamento." />
             <NumberField
               label={isSlicerMode ? "Peso do Fatiamento (g)" : "Peso Medio por Unidade (g)"}
               value={form.pesoPeca}
@@ -1227,6 +1270,212 @@ function CalcPedidos() {
             </div>
           </div>
 
+          {/* ═══════ LISTA DINAMICA DE FILAMENTOS ═══════ */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Layers className="h-3.5 w-3.5" /> Filamentos
+              </div>
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => {
+                const novo = buildEmptyFilamentoItem();
+                setField("filamentos", [...form.filamentos, novo]);
+              }}>
+                <Plus className="h-3.5 w-3.5" /> Adicionar Filamento
+              </Button>
+            </div>
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              Adicone quantos filamentos forem necessarios. O custo de material e a soma de (Peso Usado x Custo por grama) de todos os itens.
+            </p>
+            <div className="space-y-3">
+              {form.filamentos.map((fil, idx) => {
+                const filFromStock = fil.source === "stock" && fil.filamentoId
+                  ? filamentos.find((f) => f.id === fil.filamentoId)
+                  : undefined;
+                return (
+                  <div key={fil.id} className="rounded-xl border border-border bg-background p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground">Filamento {idx + 1}</span>
+                      <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          if (form.filamentos.length <= 1) return;
+                          setField("filamentos", form.filamentos.filter((_, i) => i !== idx));
+                        }}
+                        disabled={form.filamentos.length <= 1}
+                        aria-label="Remover filamento">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="mb-2 flex items-center gap-3">
+                      <span className="text-[11px] text-muted-foreground">Origem:</span>
+                      <button type="button"
+                        className={cn("rounded-md px-2.5 py-1 text-xs font-medium transition-colors", fil.source === "stock" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}
+                        onClick={() => {
+                          const updated = [...form.filamentos];
+                          updated[idx] = { ...updated[idx], source: "stock", filamentoId: undefined, sku: undefined, marca: undefined, cor: undefined, precoRolo: 0, pesoRolo: 0 };
+                          setField("filamentos", updated);
+                        }}>
+                        Puxar do Estoque
+                      </button>
+                      <button type="button"
+                        className={cn("rounded-md px-2.5 py-1 text-xs font-medium transition-colors", fil.source === "manual" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}
+                        onClick={() => {
+                          const updated = [...form.filamentos];
+                          updated[idx] = { ...updated[idx], source: "manual", filamentoId: undefined };
+                          setField("filamentos", updated);
+                        }}>
+                        Insercao Manual
+                      </button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {fil.source === "stock" ? (
+                        <div className="sm:col-span-2 lg:col-span-2">
+                          <Field label="Filamento (Rolo)" tip="Selecione um rolo do estoque. Preco e peso sao preenchidos automaticamente.">
+                            <Select value={fil.filamentoId ?? ""} onValueChange={(v) => {
+                              const f = filamentos.find((x) => x.id === v);
+                              const updated = [...form.filamentos];
+                              updated[idx] = {
+                                ...updated[idx],
+                                filamentoId: v,
+                                sku: f?.sku ?? null,
+                                marca: f?.marca ?? null,
+                                cor: f?.cor ?? null,
+                                precoRolo: f?.precoPago ?? 0,
+                                pesoRolo: f?.pesoInicial ?? 0,
+                              };
+                              setField("filamentos", updated);
+                            }}>
+                              <SelectTrigger><SelectValue placeholder="Selecione o rolo" /></SelectTrigger>
+                              <SelectContent>{filamentos.map((f: any) => (<SelectItem key={f.id} value={f.id}>[{f.sku}] {f.marca} - {f.cor} (Disponivel {(f.disponivelGrams ?? f.pesoAtual)}g)</SelectItem>))}</SelectContent>
+                            </Select>
+                          </Field>
+                          {filFromStock && (
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              Rolo: R$ {filFromStock.precoPago.toFixed(2)} · {filFromStock.pesoInicial}g · R$ {(filFromStock.precoPago / filFromStock.pesoInicial).toFixed(4)}/g
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <NumberField label="Preco do Rolo (R$)" value={String(fil.precoRolo || "")} onChange={(v) => {
+                            const updated = [...form.filamentos];
+                            updated[idx] = { ...updated[idx], precoRolo: Number(v) || 0 };
+                            setField("filamentos", updated);
+                          }} placeholder="120,00" />
+                          <NumberField label="Peso do Rolo (g)" value={String(fil.pesoRolo || "")} onChange={(v) => {
+                            const updated = [...form.filamentos];
+                            updated[idx] = { ...updated[idx], pesoRolo: Number(v) || 0 };
+                            setField("filamentos", updated);
+                          }} placeholder="1000" />
+                        </>
+                      )}
+                      <NumberField label="Peso Usado na Impressao (g)" value={String(fil.pesoUsado || "")} onChange={(v) => {
+                        const updated = [...form.filamentos];
+                        updated[idx] = { ...updated[idx], pesoUsado: Number(v) || 0 };
+                        setField("filamentos", updated);
+                      }} placeholder="45" tip="Quantos gramas deste filamento serao usados na impressao final." />
+                      {fil.pesoRolo > 0 && fil.pesoUsado > 0 && (
+                        <div className="flex items-end pb-2">
+                          <span className="text-xs text-muted-foreground">
+                            Custo: <strong className="filament-text">{brl((fil.precoRolo / fil.pesoRolo) * fil.pesoUsado)}</strong>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {results.custoFilamentosDetalhado !== undefined && results.custoFilamentosDetalhado > 0 && (
+              <div className="mt-3 flex justify-end border-t border-border pt-3">
+                <span className="text-xs font-semibold">Custo total dos filamentos: <strong className="filament-text">{brl(results.custoFilamentosDetalhado)}</strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* ═══════ CUSTOS EXTRAS ═══════ */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Package className="h-3.5 w-3.5" /> Custos Adicionais
+              </div>
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => {
+                setField("custosExtras", [...form.custosExtras, buildEmptyExtraCost()]);
+              }}>
+                <Plus className="h-3.5 w-3.5" /> Adicionar Custo
+              </Button>
+            </div>
+            <p className="mb-3 text-[11px] text-muted-foreground">
+              Custos extras como embalagem, cola, post-processamento, etc.
+            </p>
+            {form.custosExtras.length === 0 ? (
+              <p className="text-center text-xs text-muted-foreground py-4">Nenhum custo adicional cadastrado. Clique em "Adicionar Custo" para incluir.</p>
+            ) : (
+              <div className="space-y-3">
+                {form.custosExtras.map((ec, idx) => (
+                  <div key={ec.id} className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-background p-3">
+                    <div className="flex-1 min-w-[120px]">
+                      <Field label="Nome">
+                        <Input value={ec.nome} onChange={(e) => {
+                          const updated = [...form.custosExtras];
+                          updated[idx] = { ...updated[idx], nome: e.target.value };
+                          setField("custosExtras", updated);
+                        }} placeholder="Ex.: Embalagem" />
+                      </Field>
+                    </div>
+                    <NumberField label="Custo Unit. (R$)" value={String(ec.custo || "")} onChange={(v) => {
+                      const updated = [...form.custosExtras];
+                      updated[idx] = { ...updated[idx], custo: Number(v) || 0 };
+                      setField("custosExtras", updated);
+                    }} placeholder="2,50" />
+                    <NumberField label="Quantidade" value={String(ec.quantidade || "")} onChange={(v) => {
+                      const updated = [...form.custosExtras];
+                      updated[idx] = { ...updated[idx], quantidade: Number(v) || 0 };
+                      setField("custosExtras", updated);
+                    }} placeholder="1" step="1" />
+                    {ec.custo > 0 && ec.quantidade > 0 && (
+                      <div className="flex items-end pb-2">
+                        <span className="text-xs text-muted-foreground">
+                          Total: <strong>{brl(ec.custo * ec.quantidade)}</strong>
+                        </span>
+                      </div>
+                    )}
+                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                      onClick={() => setField("custosExtras", form.custosExtras.filter((_, i) => i !== idx))}
+                      aria-label="Remover custo">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {results.custoExtraTotal !== undefined && results.custoExtraTotal > 0 && (
+              <div className="mt-3 flex justify-end border-t border-border pt-3">
+                <span className="text-xs font-semibold">Total custos adicionais: <strong className="filament-text">{brl(results.custoExtraTotal)}</strong></span>
+              </div>
+            )}
+          </div>
+
+          {/* ═══════ ENERGIA + MAO DE OBRA + TAXA ═══════ */}
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Calculator className="h-3.5 w-3.5" /> Energia, Mao de Obra e Taxas
+            </div>
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <NumberField label="Custo do kWh (R$)" value={form.custoKwh} onChange={(v) => setField("custoKwh", v)} placeholder={String(settings.tarifaEnergiaKwh)} tip="Deixe em branco para usar o valor das Configuracoes (R$ {settings.tarifaEnergiaKwh})." />
+              <NumberField label="Horas de Mao de Obra" value={form.custoTrabalhoHoras} onChange={(v) => setField("custoTrabalhoHoras", v)} placeholder="0" step="0.5" tip="Horas trabalhadas no processo (preparacao, pos-processamento, embalagem)." />
+              <NumberField label="Valor da Hora (R$)" value={form.custoTrabalhoValorHora} onChange={(v) => setField("custoTrabalhoValorHora", v)} placeholder="25,00" tip="Quanto voce cobra por hora de trabalho. Ex.: R$ 25/h." />
+              <NumberField label="Taxa do Gateway/Marketplace (%)" value={form.taxaGateway} onChange={(v) => setField("taxaGateway", v)} placeholder="0" step="0.5" tip="Percentual de taxa da plataforma de venda (Shopee, Mercado Livre, etc.). Ex.: 10%." />
+            </div>
+            {results.custoTrabalho !== undefined && results.custoTrabalho > 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Custo de mao de obra: <strong>{brl(results.custoTrabalho)}</strong>
+                {Number(form.custoKwh) > 0 && (
+                  <> · Custo de energia (com kWh informado): <strong>{brl(results.custoEnergia * numeric.quantidade)}</strong></>
+                )}
+              </p>
+            )}
+          </div>
+
           <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1244,22 +1493,24 @@ function CalcPedidos() {
               </div>
             </div>
             <p className="mt-3 text-[11px] text-muted-foreground">
-              Exemplo para o seu caso: se o nome medio pesa <strong>{form.pesoPeca || "64,05"}g</strong> e leva <strong>{form.tempoMin || "105"} min</strong> no fatiador,
-              com <strong>{form.unidadesPorImpressao || "1"}</strong> unidade por impressao e pedido de <strong>{form.quantidade || "25"}</strong> nomes,
+              Exemplo para o seu caso: se a peca pesa <strong>{form.pesoPeca || "64,05"}g</strong> e leva <strong>{form.tempoMin || "105"} min</strong> no fatiador,
+              com <strong>{form.unidadesPorImpressao || "1"}</strong> unidade por impressao e pedido de <strong>{form.quantidade || "25"}</strong> pecas,
               o sistema usa essa media para sugerir um preco unitario e calcula o lote completo.
             </p>
           </div>
 
           {/* Results */}
           <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <ResultCard label="Custo Filamento /un." value={brl(results.custoFilamento)} accent="cyan" tip="Custo medio de filamento por unidade, calculado a partir do peso medio por unidade." />
-            <ResultCard label="Energia + Depreciação /un." value={brl(results.custoEnergia + results.custoDepreciacao)} accent="yellow" tip="Custo medio por unidade de energia e desgaste da maquina, respeitando o modo escolhido na entrada." />
-            <ResultCard label="Desperdício /un." value={brl(results.custoPerda)} accent="pink" tip="Acréscimo medio por unidade para cobrir perdas, falhas ou retrabalho." />
+            <ResultCard label="Filamentos" value={brl(results.custoFilamentosDetalhado ?? results.custoFilamento * numeric.quantidade)} accent="cyan" tip="Custo total de todos os filamentos usados no lote." />
+            <ResultCard label="Energia + Depreciacao" value={brl((results.custoEnergia + results.custoDepreciacao) * numeric.quantidade)} accent="yellow" tip="Custo total de energia e desgaste da maquina para o lote inteiro." />
+            <ResultCard label="Custos Extras" value={brl(results.custoExtraTotal ?? 0)} accent="pink" tip="Soma de todos os custos adicionais (embalagem, cola, etc.)" />
+            <ResultCard label="Mao de Obra" value={brl(results.custoTrabalho ?? 0)} accent="orange" tip="Custo de mao de obra (horas x valor hora)." />
+            <ResultCard label="Desperdicio" value={brl(results.custoPerda * numeric.quantidade)} accent="pink" tip="Acrescimo para cobrir perdas, falhas ou retrabalho." />
             <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" tip="Custo total estimado para entregar todo o pedido/lote informado." />
             <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4">
               <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: ACCENT_COLORS.green }} />
               <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
-                Preço Sugerido /un. <InfoTip text={`Custo medio por unidade + ${form.margemPercent || 0}% de margem. Clique em Aplicar para usar como Preco de Venda por unidade.`} />
+                Preco Sugerido /un. <InfoTip text={`Custo medio por unidade + ${form.margemPercent || 0}% de margem${Number(form.taxaGateway) > 0 ? ` + ${form.taxaGateway}% de taxa do gateway` : ""}. Clique em "Aplicar" para usar como Preco de Venda por unidade.`} />
               </div>
               <div className="mt-2 font-display text-2xl font-bold tabular-nums" style={{ color: ACCENT_COLORS.green }}>{brl(results.precoSugerido)}</div>
               <Button type="button" size="sm" variant="outline" className="mt-2 h-7 gap-1 text-xs" onClick={() => setField("precoVenda", results.precoSugerido.toFixed(2))}>
@@ -1267,7 +1518,7 @@ function CalcPedidos() {
               </Button>
             </div>
             <ResultCard
-              label="Lucro Líquido do Lote"
+              label="Lucro Liquido do Lote"
               value={brl(effectiveLotProfit)}
               accent={effectiveLotProfit >= 0 ? "green" : "magenta"}
               emphasize
@@ -1437,7 +1688,7 @@ function NumberField({ label, value, onChange, placeholder, step = "0.01", tip }
   return <Field label={label} tip={tip}><Input type="number" inputMode="decimal" min={0} step={step} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></Field>;
 }
 
-const ACCENT_COLORS: Record<string, string> = { cyan: "#5fa8a3", green: "#8aab6e", yellow: "#e0a93b", pink: "#d98ca0", magenta: "#8a3a52" };
+const ACCENT_COLORS: Record<string, string> = { cyan: "#5fa8a3", green: "#8aab6e", yellow: "#e0a93b", pink: "#d98ca0", magenta: "#8a3a52", orange: "#e8914a" };
 
 function ResultCard({ label, value, accent, emphasize = false, tip }: { label: string; value: string; accent: keyof typeof ACCENT_COLORS; emphasize?: boolean; tip?: string }) {
   const color = ACCENT_COLORS[accent];

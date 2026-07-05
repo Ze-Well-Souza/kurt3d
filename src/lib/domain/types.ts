@@ -165,6 +165,27 @@ export type Insumo = {
   classificacaoFinanceira: InsumoClassificacaoFinanceira;
 };
 
+export type CalculatorFilamentoSource = "stock" | "manual";
+
+export type CalculatorFilamentoInput = {
+  id: string;
+  source: CalculatorFilamentoSource;
+  filamentoId?: string | null;
+  sku?: string | null;
+  marca?: string | null;
+  cor?: string | null;
+  precoRolo: number;
+  pesoRolo: number;
+  pesoUsado: number;
+};
+
+export type CalculatorExtraCost = {
+  id: string;
+  nome: string;
+  custo: number;
+  quantidade: number;
+};
+
 export type PortfolioProject = {
   id: string;
   nome: string;
@@ -180,6 +201,13 @@ export type PortfolioProject = {
   perdaPercent?: number;
   createdAt: string;
   updatedAt: string;
+  // New multi-filament + cost fields
+  filamentos?: CalculatorFilamentoInput[];
+  custosExtras?: CalculatorExtraCost[];
+  custoKwh?: number | null;
+  custoTrabalhoHoras?: number | null;
+  custoTrabalhoValorHora?: number | null;
+  taxaGateway?: number | null;
 };
 
 export type PublicPortfolioProject = PortfolioProject & {
