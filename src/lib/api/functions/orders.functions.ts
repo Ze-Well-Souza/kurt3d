@@ -70,6 +70,7 @@ export const addOrder = createServerFn({ method: "POST" })
       quantity: z.number().int().min(1).max(100000),
       timeMinutes: z.number().min(1).max(100000),
       filamentoId: z.string().min(1).optional(),
+      filamentoIds: z.array(z.string().min(1)).max(10).optional(),
       gramsPerUnit: z.number().min(0.1).max(100000).optional(),
       linkProjeto: z.string().trim().max(500).optional().refine(isValidOrderProjectReference, {
         message: "Referencia do projeto invalida.",
@@ -116,6 +117,7 @@ export const addOrder = createServerFn({ method: "POST" })
       quantity: data.quantity,
       timeMinutes: aggregated?.timeMinutes ?? data.timeMinutes,
       filamentoId: data.filamentoId,
+      filamentoIds: data.filamentoIds?.length ? data.filamentoIds : undefined,
       gramsPerUnit: aggregated?.gramsPerUnit ?? data.gramsPerUnit,
       linkProjeto: data.linkProjeto ?? null,
       multiPart: normalizedParts.length > 0 ? true : (data.multiPart ?? false),

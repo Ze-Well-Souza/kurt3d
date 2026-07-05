@@ -31,6 +31,7 @@ export type Order = {
 
   portfolioProjectId?: string;
   filamentoId?: string;
+  filamentoIds?: string[];
   gramsPerUnit?: number;
 
   valorRecebido?: number;

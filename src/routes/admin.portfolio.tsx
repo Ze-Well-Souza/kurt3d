@@ -341,7 +341,7 @@ function CalcPedidos() {
   /* ── order dialogs ── */
   const [orderDialog, setOrderDialog] = useState<{ open: boolean; projectId: string; client: string; clientId: string; quantity: string }>({ open: false, projectId: "", client: "", clientId: "", quantity: "1" });
   const [showNewOrder, setShowNewOrder] = useState(false);
-  const [newOrder, setNewOrder] = useState({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+  const [newOrder, setNewOrder] = useState({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", filamentoIds: [] as string[], gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
   const [newOrderAsset, setNewOrderAsset] = useState<File | null>(null);
   const [newOrderParts, setNewOrderParts] = useState<NewOrderPartForm[]>([buildEmptyOrderPart()]);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
@@ -353,7 +353,7 @@ function CalcPedidos() {
   const [updatingPartId, setUpdatingPartId] = useState<string | null>(null);
 
   function resetNewOrderForm() {
-    setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+    setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", filamentoIds: [], gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
     setNewOrderAsset(null);
     setNewOrderParts([buildEmptyOrderPart()]);
   }
@@ -529,7 +529,8 @@ function CalcPedidos() {
         projectName: newOrder.projectName.trim() || "Pedido",
         quantity: Number(newOrder.quantity) || 1,
         timeMinutes: partsPayload?.length ? newOrderPartsTotals.timeMinutes : (Number(newOrder.timeMinutes) || 60),
-        filamentoId: newOrder.filamentoId || undefined,
+        filamentoId: newOrder.filamentoIds.length > 0 ? newOrder.filamentoIds[0] : (newOrder.filamentoId || undefined),
+        filamentoIds: newOrder.filamentoIds.length > 0 ? newOrder.filamentoIds : undefined,
         gramsPerUnit: partsPayload?.length ? newOrderPartsTotals.gramsPerUnit : (newOrder.gramsPerUnit ? Number(newOrder.gramsPerUnit) : undefined),
         linkProjeto, multiPart: newOrder.multiPart,
         precoVenda: newOrder.precoVenda ? Number(newOrder.precoVenda) : undefined,
@@ -626,7 +627,7 @@ function CalcPedidos() {
 
       {/* ── New Order dialog ── */}
       <Dialog open={showNewOrder} onOpenChange={(open) => { setShowNewOrder(open); if (!open) resetNewOrderForm(); }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader><DialogTitle>Novo pedido</DialogTitle></DialogHeader>
           <form className="grid gap-4" onSubmit={submitNewOrder}>
             <div className="grid gap-2">
@@ -668,12 +669,59 @@ function CalcPedidos() {
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2"><Label>Filamento</Label>
-                <Select value={newOrder.filamentoId} onValueChange={(v) => setNewOrder((s) => ({ ...s, filamentoId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>))}</SelectContent>
-                </Select>
+              <div className="grid gap-2 sm:col-span-2">
+                <div className="flex items-center justify-between">
+                  <Label>Filamentos</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => setNewOrder((s) => ({ ...s, filamentoIds: [...s.filamentoIds, ""] }))}
+                  >
+                    <Plus className="h-3 w-3" /> Adicionar filamento
+                  </Button>
+                </div>
+                {newOrder.filamentoIds.length === 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start text-muted-foreground"
+                    onClick={() => setNewOrder((s) => ({ ...s, filamentoIds: [""] }))}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Selecionar filamento
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    {newOrder.filamentoIds.map((fId, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Select
+                          value={fId}
+                          onValueChange={(v) => setNewOrder((s) => {
+                            const ids = [...s.filamentoIds];
+                            ids[idx] = v;
+                            return { ...s, filamentoIds: ids };
+                          })}
+                        >
+                          <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                          <SelectContent>{filamentos.map((f) => (<SelectItem key={f.id} value={f.id}>{f.label}</SelectItem>))}</SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => setNewOrder((s) => ({ ...s, filamentoIds: s.filamentoIds.filter((_, i) => i !== idx) }))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>{newOrder.multiPart ? "Gramas totais (calculado)" : "Gramas / unidade"}</Label>
                 <Input
@@ -860,7 +908,7 @@ function CalcPedidos() {
 
       {/* ── Order Detail dialog ── */}
       <Dialog open={!!detailOrder} onOpenChange={(open) => { if (!open) setDetailOrder(null); }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader><DialogTitle>Detalhes do Pedido</DialogTitle></DialogHeader>
           {detailOrder && (() => {
             const fil = detailOrder.filamentoId ? filamentos.find((f) => f.id === detailOrder.filamentoId) : undefined;
@@ -879,7 +927,11 @@ function CalcPedidos() {
                   <DetailItem label="Cliente" value={detailOrder.client} />
                   <DetailItem label="Quantidade" value={`${detailOrder.quantity} un.`} />
                   <DetailItem label="Tempo" value={formatTime(detailOrder.timeMinutes)} />
-                  <DetailItem label="Filamento" value={fil?.label ?? (detailOrder.filamentoId ? `ID: ${detailOrder.filamentoId}` : "—")} />
+                  <DetailItem label="Filamento" value={
+                    detailOrder.filamentoIds?.length
+                      ? detailOrder.filamentoIds.map((id) => filamentos.find((f) => f.id === id)?.label ?? id).join(", ")
+                      : (fil?.label ?? (detailOrder.filamentoId ? `ID: ${detailOrder.filamentoId}` : "\u2014"))
+                  } />
                   <DetailItem label="Gramas / un." value={detailOrder.gramsPerUnit ? `${detailOrder.gramsPerUnit}g` : "—"} />
                   <DetailItem label="Status" value={statusLabel} />
                   <DetailItem label="Multi-partes" value={detailOrder.multiPart ? "Sim" : "Não"} />
