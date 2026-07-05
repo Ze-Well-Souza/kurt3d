@@ -63,7 +63,28 @@ export const Route = createFileRoute("/admin/portfolio")({
 });
 
 /* ── constants ── */
-const CATEGORIES = ["Chaveiro","Miniatura","Peça Mecânica","Decoração","Cosplay","Protótipo"] as const;
+const CATEGORIES = [
+  "Chaveiro",
+  "Miniatura",
+  "Peça Mecânica",
+  "Decoração",
+  "Cosplay",
+  "Protótipo",
+  "Casa & Organização",
+  "Brinquedo & Jogo",
+  "Ferramenta",
+  "Hobby & DIY",
+  "Arte",
+  "Moda & Acessórios",
+  "Educação",
+  "Eletrônicos & Suportes",
+  "Jardinagem",
+  "Esporte & Outdoors",
+  "Animais & Pets",
+  "Jóias & Bijuteria",
+  "Réplica & Colecionável",
+  "Outro",
+] as const;
 type Category = (typeof CATEGORIES)[number];
 const PAYMENT_METHODS = ["PIX","Cartão de Crédito","Cartão de Débito","Dinheiro","Transferência"] as const;
 const COLUMNS: { id: Status; title: string; hint: string }[] = [
