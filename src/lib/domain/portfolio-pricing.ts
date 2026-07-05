@@ -2,12 +2,7 @@ import type { AppSettings, CalculatorFilamentoInput, CalculatorExtraCost } from 
 import { DEFAULT_APP_SETTINGS } from "./types";
 
 export const BAMBU_PRESETS = [
-  { id: "X1C", label: "X1-Carbon", watts: 350 },
-  { id: "X1E", label: "X1E", watts: 350 },
-  { id: "P1S", label: "P1S", watts: 190 },
-  { id: "P1P", label: "P1P", watts: 190 },
-  { id: "A1", label: "A1", watts: 150 },
-  { id: "A1Mini", label: "A1 Mini", watts: 60 },
+  { id: "A1", label: "Bambu Lab A1", watts: 150 },
 ] as const;
 
 export type BambuPresetId = (typeof BAMBU_PRESETS)[number]["id"];
@@ -68,6 +63,7 @@ export type AdvancedPortfolioCalculatorInput = PortfolioCalculatorInput & {
   custoTrabalhoHoras?: number;
   custoTrabalhoValorHora?: number;
   custoKwhOverride?: number;
+  consumoKwOverride?: number;
 };
 
 function sumFilamentosCost(filamentos: CalculatorFilamentoInput[]): number {
@@ -93,7 +89,7 @@ function sumExtraCosts(custos: CalculatorExtraCost[]): number {
 export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorInput): PortfolioCalculatorResult {
   const s = input.settings ?? DEFAULT_APP_SETTINGS;
   const preset = input.modeloPreset ? BAMBU_PRESETS.find((m) => m.id === input.modeloPreset) : undefined;
-  const consumoKw = preset ? preset.watts / 1000 : s.consumoKw;
+  const consumoKw = input.consumoKwOverride ?? (preset ? preset.watts / 1000 : s.consumoKw);
   const amortHoraCalc =
     input.precoImpressora && input.vidaUtilHoras && input.vidaUtilHoras > 0
       ? input.precoImpressora / input.vidaUtilHoras

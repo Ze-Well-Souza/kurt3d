@@ -20,6 +20,11 @@ alter table public.portfolio_projects
 alter table public.portfolio_projects
   add column if not exists custo_kwh double precision null;
 
+-- Per-project consumption override (kW).
+-- Overrides the auto-calculated consumption from the printer preset.
+alter table public.portfolio_projects
+  add column if not exists consumo_kw double precision null;
+
 -- Labor cost: hours worked.
 alter table public.portfolio_projects
   add column if not exists custo_mao_obra_horas double precision null;

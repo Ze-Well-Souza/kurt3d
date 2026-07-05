@@ -205,6 +205,7 @@ export type PortfolioProject = {
   filamentos?: CalculatorFilamentoInput[];
   custosExtras?: CalculatorExtraCost[];
   custoKwh?: number | null;
+  custoKwOverride?: number | null;
   custoTrabalhoHoras?: number | null;
   custoTrabalhoValorHora?: number | null;
   taxaGateway?: number | null;
