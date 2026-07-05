@@ -5,10 +5,7 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import {
-  Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays,
-  Trash2, Calculator, ListChecks, Eye, AlertTriangle, Pencil, Search, Info, Wand2, Download,
-} from "lucide-react";
+import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -43,6 +40,7 @@ import { getOrderAssetFileName, isOrderAssetReference } from "@/lib/domain/order
 import { computeOrderTotalsFromParts, summarizeOrderParts } from "@/lib/domain/order-parts";
 import { getOrderTrackingSummary } from "@/lib/domain/order-tracking";
 import {
+  BAMBU_PRESETS,
   type BambuPresetId,
   calcPortfolioPricing,
   calcAdvancedPortfolioPricing,
@@ -135,7 +133,6 @@ type FormState = {
   filamentos: CalculatorFilamentoInput[];
   custosExtras: CalculatorExtraCost[];
   custoKwh: string;
-  consumoKw: string;
   custoTrabalhoHoras: string;
   custoTrabalhoValorHora: string;
   taxaGateway: string;
@@ -159,11 +156,10 @@ const initialForm: FormState = {
   custoRolo: String(FALLBACK_CUSTO_ROLO), pesoRolo: String(FALLBACK_PESO_ROLO), pesoPeca: "", tempoMin: "",
   quantidade: String(FALLBACK_QUANTIDADE), precoVenda: "", perdaPercent: "0",
   entryMode: "slicer", unidadesPorImpressao: "1",
-  modeloPreset: "A1", precoImpressora: "5299", vidaUtilHoras: "2000", margemPercent: "30",
+  modeloPreset: "A1", precoImpressora: "2999", vidaUtilHoras: "2000", margemPercent: "30",
   filamentos: [buildEmptyFilamentoItem()],
   custosExtras: [],
   custoKwh: "",
-  consumoKw: "",
   custoTrabalhoHoras: "",
   custoTrabalhoValorHora: "",
   taxaGateway: "0",
@@ -312,7 +308,6 @@ function CalcPedidos() {
       custoTrabalhoHoras: Number(form.custoTrabalhoHoras) || 0,
       custoTrabalhoValorHora: Number(form.custoTrabalhoValorHora) || 0,
       custoKwhOverride: Number(form.custoKwh) || 0,
-      consumoKwOverride: Number(form.consumoKw) || 0,
     };
   }, [form, settings]);
   const results = useMemo(() => calcAdvancedPortfolioPricing({ ...numeric, settings }), [numeric, settings]);
@@ -339,7 +334,6 @@ function CalcPedidos() {
       custoTrabalhoHoras: p.custoTrabalhoHoras ?? 0,
       custoTrabalhoValorHora: p.custoTrabalhoValorHora ?? 0,
       custoKwhOverride: p.custoKwh ?? 0,
-      consumoKwOverride: p.custoKwOverride ?? 0,
     });
     acc.lucro += r.lucroLiquido; acc.receita += r.receitaTotal; return acc;
   }, { lucro: 0, receita: 0 }), [projects, settings]);
@@ -442,7 +436,6 @@ function CalcPedidos() {
       filamentos: form.filamentos.filter((f) => f.pesoUsado > 0),
       custosExtras: form.custosExtras.filter((c) => c.nome.trim() && c.custo > 0),
       custoKwh: Number(form.custoKwh) || null,
-      custoKwOverride: Number(form.consumoKw) || null,
       custoTrabalhoHoras: Number(form.custoTrabalhoHoras) || null,
       custoTrabalhoValorHora: Number(form.custoTrabalhoValorHora) || null,
       taxaGateway: Number(form.taxaGateway) || null,
@@ -1211,25 +1204,24 @@ function CalcPedidos() {
             <Field label="Link do Modelo (MakerWorld/STL)" tip="URL do modelo 3D (MakerWorld, Printables, Thingiverse). Opcional — facilita reimprimir depois." className="md:col-span-2"><Input value={form.linkModelo} onChange={(e) => setField("linkModelo", e.target.value)} placeholder="https://makerworld.com/en/models/..." type="url" /></Field>
           </div>
 
-          {/* ── Bloco 2: Impressora (Bambu Lab A1) ── */}
+          {/* ── Bloco 2: Impressora (preset Bambu Lab) ── */}
           <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
             <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Calculator className="h-3.5 w-3.5" /> Impressora e Amortização
             </div>
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-              <div className="md:col-span-1">
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Modelo</label>
-                <div className="flex h-10 items-center rounded-md border border-border bg-background px-3 text-sm">
-                  Bambu Lab A1 — 150W
-                </div>
-              </div>
-              <NumberField label="Preço da Impressora (R$)" value={form.precoImpressora} onChange={(v) => setField("precoImpressora", v)} placeholder="5299,00" tip="Quanto você pagou pela impressora. Usado para calcular a amortização (desgaste) por hora. Sua A1: R$ 5.299." />
+              <Field label="Modelo Bambu Lab" tip="Preset oficial Bambu Lab. Define a wattagem usada no cálculo de energia. Ex.: A1 = 150W, X1-Carbon = 350W.">
+                <Select value={form.modeloPreset} onValueChange={(v) => setField("modeloPreset", v as BambuPresetId)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{BAMBU_PRESETS.map((m) => (<SelectItem key={m.id} value={m.id}>{m.label} — {m.watts}W</SelectItem>))}</SelectContent>
+                </Select>
+              </Field>
+              <NumberField label="Preço da Impressora (R$)" value={form.precoImpressora} onChange={(v) => setField("precoImpressora", v)} placeholder="2999,00" tip="Quanto você pagou pela impressora. Usado para calcular a amortização (desgaste) por hora. Ex.: A1 ≈ R$ 2.999." />
               <NumberField label="Vida Útil (horas)" value={form.vidaUtilHoras} onChange={(v) => setField("vidaUtilHoras", v)} placeholder="2000" step="100" tip="Quantas horas você espera que a impressora dure antes de precisar trocar partes principais. Padrão: 2000h (~2-3 anos de uso intenso)." />
               <NumberField label="% Margem de Lucro" value={form.margemPercent} onChange={(v) => setField("margemPercent", v)} placeholder="30" step="1" tip="Percentual de lucro sobre o custo. Ex.: custo R$ 2, margem 30% → preço sugerido R$ 2,60. O bambucostpro.com usa 30% como padrão." />
             </div>
             <p className="mt-3 text-[11px] text-muted-foreground">
-              Amortização calculada: <strong className="filament-text">{brl(results.amortHora)}/h</strong> (Preço ÷ Vida útil) · Consumo: <strong>{(Number(form.consumoKw) || results.consumoKw * 1000).toFixed(0)}W</strong>
-              {Number(form.consumoKw) > 0 && " (manual)"}
+              Amortização calculada: <strong className="filament-text">{brl(results.amortHora)}/h</strong> (Preço ÷ Vida útil) · Consumo: <strong>{(results.consumoKw * 1000).toFixed(0)}W</strong>
             </p>
           </div>
 
@@ -1486,19 +1478,18 @@ function CalcPedidos() {
             <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Calculator className="h-3.5 w-3.5" /> Energia, Mao de Obra e Taxas
             </div>
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5">
-              <NumberField label="Custo do kWh (R$)" value={form.custoKwh} onChange={(v) => setField("custoKwh", v)} placeholder={String(settings.tarifaEnergiaKwh)} tip="Valor pago por kWh. Deixe em branco para usar o padrao das Configuracoes." />
-              <NumberField label="Consumo da Impressora (kW)" value={form.consumoKw} onChange={(v) => setField("consumoKw", v)} placeholder="0,15" step="0.01" tip="Consumo em kW (ex.: 0,15 = 150W). Deixe em branco para usar o valor automatico do preset A1." />
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <NumberField label="Custo do kWh (R$)" value={form.custoKwh} onChange={(v) => setField("custoKwh", v)} placeholder={String(settings.tarifaEnergiaKwh)} tip="Deixe em branco para usar o valor das Configuracoes (R$ {settings.tarifaEnergiaKwh})." />
               <NumberField label="Horas de Mao de Obra" value={form.custoTrabalhoHoras} onChange={(v) => setField("custoTrabalhoHoras", v)} placeholder="0" step="0.5" tip="Horas trabalhadas no processo (preparacao, pos-processamento, embalagem)." />
               <NumberField label="Valor da Hora (R$)" value={form.custoTrabalhoValorHora} onChange={(v) => setField("custoTrabalhoValorHora", v)} placeholder="25,00" tip="Quanto voce cobra por hora de trabalho. Ex.: R$ 25/h." />
               <NumberField label="Taxa do Gateway/Marketplace (%)" value={form.taxaGateway} onChange={(v) => setField("taxaGateway", v)} placeholder="0" step="0.5" tip="Percentual de taxa da plataforma de venda (Shopee, Mercado Livre, etc.). Ex.: 10%." />
             </div>
-            {(Number(form.custoKwh) > 0 || Number(form.consumoKw) > 0) && (
+            {results.custoTrabalho !== undefined && results.custoTrabalho > 0 && (
               <p className="mt-2 text-[11px] text-muted-foreground">
-                {results.custoTrabalho !== undefined && results.custoTrabalho > 0 && (<>Custo de mao de obra: <strong>{brl(results.custoTrabalho)}</strong> · </>)}
-                Custo de energia no lote: <strong>{brl(results.custoEnergia * numeric.quantidade)}</strong>
-                {Number(form.consumoKw) > 0 && <> (consumo manual: {form.consumoKw} kW)</>}
-                {Number(form.custoKwh) > 0 && <> (tarifa manual: R$ {form.custoKwh}/kWh)</>}
+                Custo de mao de obra: <strong>{brl(results.custoTrabalho)}</strong>
+                {Number(form.custoKwh) > 0 && (
+                  <> · Custo de energia (com kWh informado): <strong>{brl(results.custoEnergia * numeric.quantidade)}</strong></>
+                )}
               </p>
             )}
           </div>
