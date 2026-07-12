@@ -31,13 +31,14 @@ create table if not exists public.filamentos (
   peso_inicial double precision not null,
   peso_atual double precision not null,
   preco_pago double precision not null,
-  data_compra text not null,
-  data_entrega text null,
-  data_fim text null,
+  data_compra date not null,
+  data_entrega date null,
+  data_fim date null,
   qualidade public.filamento_qualidade null,
   observacao text null,
-  comentario text null,
   link_produto text null,
+  batch_id text null,
+  payment_id text null,
   created_at timestamptz not null default now()
 );
 
@@ -50,13 +51,14 @@ create table if not exists public.filamentos_history (
   peso_inicial double precision not null,
   peso_atual double precision not null,
   preco_pago double precision not null,
-  data_compra text not null,
-  data_entrega text null,
-  data_fim text null,
+  data_compra date not null,
+  data_entrega date null,
+  data_fim date null,
   qualidade public.filamento_qualidade null,
   observacao text null,
-  comentario text null,
   link_produto text null,
+  batch_id text null,
+  payment_id text null,
   arquivado_at timestamptz not null default now()
 );
 
@@ -71,6 +73,7 @@ create table if not exists public.orders (
   updated_at timestamptz not null,
   portfolio_project_id text null,
   filamento_id text null,
+  filamento_ids jsonb null,
   grams_per_unit double precision null,
   valor_recebido double precision null,
   destino text null,
@@ -78,7 +81,7 @@ create table if not exists public.orders (
   multi_part boolean null default false,
   preco_venda double precision null,
   forma_pagamento text null,
-  data_pagamento text null,
+  data_pagamento date null,
   client_id text null
 );
 
@@ -110,6 +113,19 @@ create table if not exists public.portfolio_projects (
   quantidade integer not null,
   preco_venda double precision not null,
   perda_percent double precision null default 0,
+  -- Visibility control
+  is_public boolean not null default false,
+  published_at timestamptz null,
+  -- Portfolio image
+  image_url text null,
+  -- Multi-filament calculator fields (JSONB)
+  filamentos jsonb not null default '[]',
+  custos_extras jsonb not null default '[]',
+  custo_kwh double precision null,
+  consumo_kw double precision null,
+  custo_mao_obra_horas double precision null,
+  custo_mao_obra_valor_hora double precision null,
+  taxa_gateway double precision null default 0,
   created_at timestamptz not null,
   updated_at timestamptz not null
 );
@@ -117,7 +133,7 @@ create table if not exists public.portfolio_projects (
 create table if not exists public.insumos (
   id text primary key,
   nome text not null,
-  data_compra text not null,
+  data_compra date not null,
   quantidade text not null,
   preco_total double precision not null,
   link_produto text null,
@@ -150,7 +166,7 @@ create table if not exists public.expenses (
   source text not null,
   ref_id text not null,
   valor double precision not null,
-  data text not null,
+  data date not null,
   descricao text not null,
   categoria text null
 );

@@ -367,7 +367,7 @@ export const settlePayment = createServerFn({ method: "POST" })
     }
     for (const update of updates) {
       await installmentsRepo.update(update);
-      const amountAdded = roundMoney(update.valorPago - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
+      const amountAdded = roundMoney((update.valorPago ?? 0) - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
       if (amountAdded > 0) {
         await recordFilamentoEvent({
           id: randomUUID(),
@@ -528,7 +528,7 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
     }
     for (const update of updates) {
       await installmentsRepo.update(update);
-      const amountAdded = roundMoney(update.valorPago - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
+      const amountAdded = roundMoney((update.valorPago ?? 0) - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
       if (amountAdded > 0) {
         await recordInsumoEvent({
           id: randomUUID(),

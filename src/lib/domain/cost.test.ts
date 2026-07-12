@@ -141,6 +141,7 @@ describe("calcOrderCostHybrid", () => {
       tempoMin: 60,
       quantidade: 1,
       precoVenda: 40,
+      isPublic: false,
       createdAt: "2024-01-01",
       updatedAt: "2024-01-01",
     };
@@ -173,6 +174,7 @@ describe("calcOrderCostHybrid", () => {
       tempoMin: 0,
       quantidade: 1,
       precoVenda: 0,
+      isPublic: false,
       createdAt: "2026-01-01",
       updatedAt: "2026-01-01",
       filamentoId: "f1",

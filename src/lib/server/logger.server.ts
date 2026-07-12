@@ -67,7 +67,7 @@ function write(level: LogLevel, event: string, context?: Record<string, unknown>
     ts: new Date().toISOString(),
     level,
     event,
-    ...redactValue(context ?? {}),
+    ...(redactValue(context ?? {}) as Record<string, unknown>),
   });
 
   if (level === "error") console.error(payload);

@@ -1,5 +1,5 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, Settings, ThumbsUp, Layers, Calculator, Users, UserCheck, LogOut, MessageSquare, BarChart3, Calendar as CalendarIcon, FileVideo } from "lucide-react";
+import { LayoutDashboard, Wallet, Settings, ThumbsUp, Layers, Calculator, Users, UserCheck, LogOut, MessageSquare, BarChart3, Calendar as CalendarIcon, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -26,7 +26,7 @@ const items = [
   { title: "Finanças", url: "/admin/finances", icon: Wallet },
   { title: "Relatórios", url: "/admin/reports", icon: BarChart3 },
   { title: "Calendário", url: "/admin/calendar", icon: CalendarIcon },
-  { title: "Vídeos", url: "/admin/videos", icon: FileVideo },
+  { title: "Orçamentos", url: "/admin/orcamentos", icon: FileText },
   { title: "Configurações", url: "/admin/settings", icon: Settings },
 ];
 

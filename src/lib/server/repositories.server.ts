@@ -25,7 +25,9 @@ export { budgetQuotesRepo } from "./repositories/extended-repos";
 export { portfolioVideosRepo } from "./repositories/extended-repos";
 export { savedReportsRepo } from "./repositories/extended-repos";
 
+import { inventoryRepo as _invRepo } from "./repositories/inventory.repo";
+
 export async function computeReservedMap() {
-  const inv = await inventoryRepo();
+  const inv = await _invRepo();
   return computeReservedByFilament(inv.list);
 }

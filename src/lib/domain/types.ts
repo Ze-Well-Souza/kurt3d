@@ -203,6 +203,7 @@ export type PortfolioProject = {
   // Visibility control
   isPublic: boolean;
   publishedAt?: string | null;
+  imageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   // New multi-filament + cost fields

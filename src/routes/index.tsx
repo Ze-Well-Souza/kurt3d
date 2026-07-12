@@ -195,11 +195,11 @@ function Gallery() {
     [portfolio],
   );
   const materials = useMemo(
-    () => ["Todos", ...Array.from(new Set(portfolio.map((p) => p.filamentoMaterial).filter(Boolean)))],
+    () => ["Todos", ...Array.from(new Set(portfolio.map((p) => p.filamentoMaterial).filter((v): v is string => v !== null && v !== undefined)))],
     [portfolio],
   );
   const colors = useMemo(
-    () => ["Todas", ...Array.from(new Set(portfolio.map((p) => p.filamentoCor).filter(Boolean)))],
+    () => ["Todas", ...Array.from(new Set(portfolio.map((p) => p.filamentoCor).filter((v): v is string => v !== null && v !== undefined)))],
     [portfolio],
   );
   const filteredPortfolio = useMemo(
@@ -240,12 +240,22 @@ function Gallery() {
           {/* Video card placeholder — ready for MP4/Reels */}
           <VideoCard />
 
-          {filteredPortfolio.map((p) => (
+          {filteredPortfolio.map((p) => {
+            const hasImage = !!p.imageUrl;
+            return (
             <figure
               key={p.id}
               className="group relative overflow-hidden rounded-xl border border-border bg-card"
             >
-              <div className="flex h-full flex-col justify-between p-5">
+              {hasImage && (
+                <img
+                  src={p.imageUrl!}
+                  alt={p.nome}
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover opacity-30 transition-opacity duration-500 group-hover:opacity-20"
+                />
+              )}
+              <div className="relative z-10 flex h-full flex-col justify-between p-5">
                 <div>
                   <Badge variant="secondary" className="mb-2">{p.categoria}</Badge>
                   <div className="mb-2 flex flex-wrap gap-1">
@@ -267,7 +277,7 @@ function Gallery() {
                 </div>
               </div>
               {/* Kurtido hover effect */}
-              <div className="pointer-events-none absolute inset-0 translate-y-full bg-gradient-to-t from-background/90 via-background/40 to-transparent transition-transform duration-500 group-hover:translate-y-0">
+              <div className="pointer-events-none absolute inset-0 z-20 translate-y-full bg-gradient-to-t from-background/90 via-background/40 to-transparent transition-transform duration-500 group-hover:translate-y-0">
                 <div className="absolute inset-x-0 bottom-0 p-4">
                   <p className="text-xs font-semibold filament-text">Kurtido com qualidade!</p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -276,7 +286,8 @@ function Gallery() {
                 </div>
               </div>
             </figure>
-          ))}
+          );
+          })}
         </div>
       ) : (
         <div className="grid auto-rows-[180px] grid-cols-2 gap-4 md:grid-cols-4">

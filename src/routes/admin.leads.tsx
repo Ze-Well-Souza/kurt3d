@@ -172,14 +172,14 @@ function LeadsPage() {
                     {lead.imagens.map((img, idx) => (
                       <a
                         key={idx}
-                        href={img.dataUrl}
+                        href={img.publicUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         title={img.nome}
                         className="group relative block aspect-square overflow-hidden rounded-md border border-border bg-muted"
                       >
                         <img
-                          src={img.dataUrl}
+                          src={img.publicUrl}
                           alt={img.nome}
                           className="h-full w-full object-cover transition-transform group-hover:scale-105"
                         />

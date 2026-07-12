@@ -4,11 +4,12 @@ import { z } from "zod";
 import { nowIso } from "../../server/db.server";
 import {
   budgetQuotesRepo,
+  ordersRepo,
   portfolioVideosRepo,
   productionCalendarRepo,
   savedReportsRepo,
 } from "../../server/repositories.server";
-import type { BudgetQuote, BudgetQuoteItem, PortfolioVideo, ProductionCalendarEvent, SavedReport } from "../../domain/types";
+import type { BudgetQuote, BudgetQuoteItem, Order, PortfolioVideo, ProductionCalendarEvent, SavedReport } from "../../domain/types";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
@@ -117,7 +118,6 @@ export const updateBudgetQuote = createServerFn({ method: "POST" })
       validityDays: data.validityDays,
       status: data.status ?? quote.status,
       notes: data.notes ?? null,
-      updatedAt: now,
     };
     
     await repo.upsert(updated);
@@ -139,15 +139,39 @@ export const convertQuoteToOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const quotesRepo = await budgetQuotesRepo();
+    const [quotesRepo, orders] = await Promise.all([budgetQuotesRepo(), ordersRepo()]);
     const quote = quotesRepo.list.find((q) => q.id === data.quoteId);
-    if (!quote) return { ok: false, reason: "not_found" };
-    if (quote.status !== "approved") return { ok: false, reason: "not_approved" };
-    
-    // This will be integrated with orders.functions.ts to create actual order
-    const updated: BudgetQuote = { ...quote, status: "converted", convertedToOrderId: "pending" };
+    if (!quote) return { ok: false, reason: "not_found" as const };
+    if (quote.status !== "approved") return { ok: false, reason: "not_approved" as const };
+
+    const now = nowIso();
+    const orderId = randomUUID();
+
+    // Create one order for the entire quote (items are bundled as a multi-part order or single summary)
+    const totalTime = quote.items.reduce((sum, item) => sum + item.timeMinutes * item.quantity, 0);
+    const totalGrams = quote.items.reduce((sum, item) => sum + item.materialGrams * item.quantity, 0);
+    const avgGramsPerUnit = quote.items.length > 0 ? totalGrams / quote.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+
+    const order: Order = {
+      id: orderId,
+      client: quote.clientName,
+      projectName: `Orçamento #${quote.id.slice(0, 8)}`,
+      quantity: quote.items.reduce((sum, item) => sum + item.quantity, 0),
+      timeMinutes: totalTime || 1,
+      status: "todo",
+      createdAt: now,
+      updatedAt: now,
+      gramsPerUnit: avgGramsPerUnit || undefined,
+      precoVenda: quote.total,
+      linkProjeto: null,
+      multiPart: quote.items.length > 1 || undefined,
+    };
+
+    // Save order and update quote
+    await orders.save([order, ...orders.list]);
+    const updated: BudgetQuote = { ...quote, status: "converted", convertedToOrderId: orderId };
     await quotesRepo.upsert(updated);
-    return { ok: true, quoteId: quote.id };
+    return { ok: true as const, quoteId: quote.id, orderId };
   });
 
 // ═══════════ Portfolio Videos ═══════════

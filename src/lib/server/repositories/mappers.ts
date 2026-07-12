@@ -88,12 +88,12 @@ export function fromFilamentoRow(row: any): Filamento {
     pesoInicial: row.peso_inicial,
     pesoAtual: row.peso_atual,
     precoPago: row.preco_pago,
-    dataCompra: row.data_compra,
-    dataEntrega: row.data_entrega ?? null,
-    dataFim: row.data_fim ?? null,
+    dataCompra: typeof row.data_compra === "string" ? row.data_compra : String(row.data_compra ?? ""),
+    dataEntrega: row.data_entrega ? (typeof row.data_entrega === "string" ? row.data_entrega : String(row.data_entrega)) : null,
+    dataFim: row.data_fim ? (typeof row.data_fim === "string" ? row.data_fim : String(row.data_fim)) : null,
     qualidade: normalizeFilamentoQualidade(row.qualidade),
-    observacao: row.observacao ?? row.comentario ?? null,
-    comentario: row.comentario ?? row.observacao ?? null,
+    observacao: row.observacao ?? null,
+    comentario: row.observacao ?? null,
     linkProduto: row.link_produto ?? null,
     batchId: row.batch_id ?? null,
     paymentId: row.payment_id ?? null,
@@ -101,7 +101,7 @@ export function fromFilamentoRow(row: any): Filamento {
 }
 
 export function toFilamentoRow(row: Filamento) {
-  const observacao = row.observacao ?? row.comentario ?? null;
+  const observacao = row.observacao ?? null;
   return {
     id: row.id,
     sku: row.sku,
@@ -115,7 +115,6 @@ export function toFilamentoRow(row: Filamento) {
     data_entrega: row.dataEntrega ?? null,
     data_fim: row.dataFim ?? null,
     qualidade: row.qualidade ?? null,
-    comentario: observacao,
     observacao,
     link_produto: row.linkProduto ?? null,
     batch_id: row.batchId ?? null,
@@ -133,12 +132,12 @@ export function fromFilamentoHistoryRow(row: any): FilamentoHistory {
     pesoInicial: row.peso_inicial,
     pesoAtual: row.peso_atual,
     precoPago: row.preco_pago,
-    dataCompra: row.data_compra,
-    dataEntrega: row.data_entrega ?? null,
-    dataFim: row.data_fim ?? null,
+    dataCompra: typeof row.data_compra === "string" ? row.data_compra : String(row.data_compra ?? ""),
+    dataEntrega: row.data_entrega ? (typeof row.data_entrega === "string" ? row.data_entrega : String(row.data_entrega)) : null,
+    dataFim: row.data_fim ? (typeof row.data_fim === "string" ? row.data_fim : String(row.data_fim)) : null,
     qualidade: normalizeFilamentoQualidade(row.qualidade),
-    observacao: row.observacao ?? row.comentario ?? null,
-    comentario: row.comentario ?? row.observacao ?? null,
+    observacao: row.observacao ?? null,
+    comentario: row.observacao ?? null,
     linkProduto: row.link_produto ?? null,
     batchId: row.batch_id ?? null,
     paymentId: row.payment_id ?? null,
@@ -147,7 +146,7 @@ export function fromFilamentoHistoryRow(row: any): FilamentoHistory {
 }
 
 export function toFilamentoHistoryRow(row: FilamentoHistory) {
-  const observacao = row.observacao ?? row.comentario ?? null;
+  const observacao = row.observacao ?? null;
   return {
     id: row.id,
     sku: row.sku,
@@ -161,7 +160,6 @@ export function toFilamentoHistoryRow(row: FilamentoHistory) {
     data_entrega: row.dataEntrega ?? null,
     data_fim: row.dataFim ?? null,
     qualidade: row.qualidade ?? null,
-    comentario: observacao,
     observacao,
     link_produto: row.linkProduto ?? null,
     batch_id: row.batchId ?? null,
@@ -280,6 +278,9 @@ export function fromPortfolioRow(row: any): PortfolioProject {
     quantidade: row.quantidade,
     precoVenda: row.preco_venda,
     perdaPercent: row.perda_percent ?? 0,
+    isPublic: row.is_public ?? false,
+    publishedAt: row.published_at ?? null,
+    imageUrl: row.image_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     filamentos: filamentosRaw.length > 0 ? filamentosRaw as PortfolioProject["filamentos"] : undefined,
@@ -306,6 +307,9 @@ export function toPortfolioRow(row: PortfolioProject) {
     quantidade: row.quantidade,
     preco_venda: row.precoVenda,
     perda_percent: row.perdaPercent ?? 0,
+    is_public: row.isPublic ?? false,
+    published_at: row.publishedAt ?? null,
+    image_url: row.imageUrl ?? null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
     filamentos: row.filamentos ? JSON.parse(JSON.stringify(row.filamentos)) : [],

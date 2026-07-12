@@ -18,6 +18,7 @@ import { Route as AdminStockRouteImport } from './routes/admin.stock'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminPortfolioRouteImport } from './routes/admin.portfolio'
+import { Route as AdminOrcamentosRouteImport } from './routes/admin.orcamentos'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminFinancesRouteImport } from './routes/admin.finances'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
@@ -68,6 +69,11 @@ const AdminPortfolioRoute = AdminPortfolioRouteImport.update({
   path: '/portfolio',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminOrcamentosRoute = AdminOrcamentosRouteImport.update({
+  id: '/orcamentos',
+  path: '/orcamentos',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminLeadsRoute = AdminLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/admin/clients': typeof AdminClientsRoute
   '/admin/finances': typeof AdminFinancesRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/orcamentos': typeof AdminOrcamentosRoute
   '/admin/portfolio': typeof AdminPortfolioRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/admin/clients': typeof AdminClientsRoute
   '/admin/finances': typeof AdminFinancesRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/orcamentos': typeof AdminOrcamentosRoute
   '/admin/portfolio': typeof AdminPortfolioRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/admin/clients': typeof AdminClientsRoute
   '/admin/finances': typeof AdminFinancesRoute
   '/admin/leads': typeof AdminLeadsRoute
+  '/admin/orcamentos': typeof AdminOrcamentosRoute
   '/admin/portfolio': typeof AdminPortfolioRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/finances'
     | '/admin/leads'
+    | '/admin/orcamentos'
     | '/admin/portfolio'
     | '/admin/reports'
     | '/admin/settings'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/finances'
     | '/admin/leads'
+    | '/admin/orcamentos'
     | '/admin/portfolio'
     | '/admin/reports'
     | '/admin/settings'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/finances'
     | '/admin/leads'
+    | '/admin/orcamentos'
     | '/admin/portfolio'
     | '/admin/reports'
     | '/admin/settings'
@@ -253,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPortfolioRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/orcamentos': {
+      id: '/admin/orcamentos'
+      path: '/orcamentos'
+      fullPath: '/admin/orcamentos'
+      preLoaderRoute: typeof AdminOrcamentosRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/leads': {
       id: '/admin/leads'
       path: '/leads'
@@ -289,6 +308,7 @@ interface AdminRouteChildren {
   AdminClientsRoute: typeof AdminClientsRoute
   AdminFinancesRoute: typeof AdminFinancesRoute
   AdminLeadsRoute: typeof AdminLeadsRoute
+  AdminOrcamentosRoute: typeof AdminOrcamentosRoute
   AdminPortfolioRoute: typeof AdminPortfolioRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -301,6 +321,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminClientsRoute: AdminClientsRoute,
   AdminFinancesRoute: AdminFinancesRoute,
   AdminLeadsRoute: AdminLeadsRoute,
+  AdminOrcamentosRoute: AdminOrcamentosRoute,
   AdminPortfolioRoute: AdminPortfolioRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,

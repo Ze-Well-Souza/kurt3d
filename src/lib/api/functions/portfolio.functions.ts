@@ -8,6 +8,7 @@ import { nowIso } from "../../server/db.server";
 import { requireSession } from "../../server/require-session.server";
 import { assertExplicitClientIdExists, resolveClientId } from "./shared";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { uploadPortfolioImage, deletePortfolioImage } from "../../server/portfolio-image-upload.server";
 
 export const listPortfolio = createServerFn({ method: "GET" }).handler(async () => {
   const repo = await portfolioRepo();
@@ -49,6 +50,8 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       perdaPercent: z.number().min(0).max(100).optional(),
       // Visibility control
       isPublic: z.boolean().default(false),
+      // Portfolio image (base64 data URL)
+      imageDataUrl: z.string().max(7_000_000).optional(),
       // New multi-filament + cost fields
       filamentos: z.array(calculatorFilamentoItemSchema).optional(),
       custosExtras: z.array(calculatorExtraCostSchema).optional(),
@@ -64,6 +67,16 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
     await requireSession();
     const repo = await portfolioRepo();
     const now = nowIso();
+
+    // Upload portfolio image if provided
+    let imageUrl: string | null = null;
+    if (data.imageDataUrl) {
+      const uploaded = await uploadPortfolioImage(data.imageDataUrl, "image/webp");
+      if (uploaded) {
+        imageUrl = uploaded.publicUrl;
+      }
+    }
+
     const project: PortfolioProject = {
       id: randomUUID(),
       createdAt: now,
@@ -82,6 +95,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       // Visibility control
       isPublic: data.isPublic,
       publishedAt: data.isPublic ? now : null,
+      imageUrl,
       filamentos: data.filamentos,
       custosExtras: data.custosExtras,
       custoKwh: data.custoKwh ?? null,
@@ -100,6 +114,11 @@ export const removePortfolioProject = createServerFn({ method: "POST" })
     await checkMutationRateLimit();
     await requireSession();
     const repo = await portfolioRepo();
+    const project = repo.list.find((p) => p.id === data.id);
+    // Clean up portfolio image from storage
+    if (project?.imageUrl) {
+      await deletePortfolioImage(project.imageUrl);
+    }
     await repo.save(repo.list.filter((project) => project.id !== data.id));
     return { ok: true };
   });
@@ -121,6 +140,8 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       perdaPercent: z.number().min(0).max(100).nullable(),
       // Visibility control
       isPublic: z.boolean(),
+      // Portfolio image (base64 data URL, set to null to remove)
+      imageDataUrl: z.string().max(7_000_000).nullable().optional(),
       // New multi-filament + cost fields
       filamentos: z.array(calculatorFilamentoItemSchema).optional(),
       custosExtras: z.array(calculatorExtraCostSchema).optional(),
@@ -139,6 +160,25 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
     if (!project) return { ok: false as const, reason: "not_found" as const };
 
     const now = nowIso();
+
+    // Handle portfolio image changes
+    let imageUrl = project.imageUrl ?? null;
+    if (data.imageDataUrl === null) {
+      // Explicitly removing image
+      if (project.imageUrl) {
+        await deletePortfolioImage(project.imageUrl);
+      }
+      imageUrl = null;
+    } else if (data.imageDataUrl) {
+      // New image uploaded — delete old one first
+      if (project.imageUrl) {
+        await deletePortfolioImage(project.imageUrl);
+      }
+      const uploaded = await uploadPortfolioImage(data.imageDataUrl, "image/webp");
+      if (uploaded) {
+        imageUrl = uploaded.publicUrl;
+      }
+    }
 
     // Handle publishedAt transition logic (pure function, testable)
     const publishedAt = computePublishedAt(
@@ -164,6 +204,7 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       // Visibility control
       isPublic: data.isPublic,
       publishedAt,
+      imageUrl,
       filamentos: data.filamentos,
       custosExtras: data.custosExtras,
       custoKwh: data.custoKwh ?? null,
