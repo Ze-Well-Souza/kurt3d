@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Order, PortfolioProject } from "../../domain/types";
+import { computePublishedAt } from "../../domain/visibility-utils";
 import { clientsRepo, ordersRepo, portfolioRepo } from "../../server/repositories.server";
 import { nowIso } from "../../server/db.server";
 import { requireSession } from "../../server/require-session.server";
@@ -46,6 +47,8 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       quantidade: z.number().int().min(1).max(100000),
       precoVenda: z.number().min(0).max(1000000),
       perdaPercent: z.number().min(0).max(100).optional(),
+      // Visibility control
+      isPublic: z.boolean().default(false),
       // New multi-filament + cost fields
       filamentos: z.array(calculatorFilamentoItemSchema).optional(),
       custosExtras: z.array(calculatorExtraCostSchema).optional(),
@@ -76,6 +79,9 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       tempoMin: data.tempoMin,
       quantidade: data.quantidade,
       precoVenda: data.precoVenda,
+      // Visibility control
+      isPublic: data.isPublic,
+      publishedAt: data.isPublic ? now : null,
       filamentos: data.filamentos,
       custosExtras: data.custosExtras,
       custoKwh: data.custoKwh ?? null,
@@ -85,7 +91,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       taxaGateway: data.taxaGateway ?? null,
     };
     await repo.save([project, ...repo.list]);
-    return { ok: true };
+    return { ok: true, projectId: project.id };
   });
 
 export const removePortfolioProject = createServerFn({ method: "POST" })
@@ -113,6 +119,8 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       quantidade: z.number().int().min(1),
       precoVenda: z.number().min(0.01),
       perdaPercent: z.number().min(0).max(100).nullable(),
+      // Visibility control
+      isPublic: z.boolean(),
       // New multi-filament + cost fields
       filamentos: z.array(calculatorFilamentoItemSchema).optional(),
       custosExtras: z.array(calculatorExtraCostSchema).optional(),
@@ -130,6 +138,16 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
     const project = portfolio.list.find((item) => item.id === data.id);
     if (!project) return { ok: false as const, reason: "not_found" as const };
 
+    const now = nowIso();
+
+    // Handle publishedAt transition logic (pure function, testable)
+    const publishedAt = computePublishedAt(
+      project.isPublic ?? true,  // legacy: treat missing as public
+      data.isPublic,
+      project.publishedAt,
+      now,
+    );
+
     const updated: PortfolioProject = {
       ...project,
       nome: data.nome,
@@ -143,6 +161,9 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       quantidade: data.quantidade,
       precoVenda: data.precoVenda,
       perdaPercent: data.perdaPercent ?? 0,
+      // Visibility control
+      isPublic: data.isPublic,
+      publishedAt,
       filamentos: data.filamentos,
       custosExtras: data.custosExtras,
       custoKwh: data.custoKwh ?? null,
@@ -150,7 +171,7 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       custoTrabalhoHoras: data.custoTrabalhoHoras ?? null,
       custoTrabalhoValorHora: data.custoTrabalhoValorHora ?? null,
       taxaGateway: data.taxaGateway ?? null,
-      updatedAt: nowIso(),
+      updatedAt: now,
     };
     await portfolio.save(portfolio.list.map((item) => (item.id === project.id ? updated : item)));
     return { ok: true as const };

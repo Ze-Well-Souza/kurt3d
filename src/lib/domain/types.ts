@@ -200,6 +200,9 @@ export type PortfolioProject = {
   quantidade: number;
   precoVenda: number;
   perdaPercent?: number;
+  // Visibility control
+  isPublic: boolean;
+  publishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   // New multi-filament + cost fields

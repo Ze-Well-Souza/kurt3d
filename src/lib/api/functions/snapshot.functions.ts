@@ -27,14 +27,22 @@ import { buildFilamentoLabel, hydrateOrderClientLinks } from "./shared";
 export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(async () => {
   const [portfolio, filamentos, settingsData] = await Promise.all([portfolioRepo(), filamentosRepo(), settingsRepo()]);
 
-  const publicPortfolio = portfolio.list.map((item) => {
-    const filamento = item.filamentoId ? filamentos.list.find((candidate) => candidate.id === item.filamentoId) : null;
-    return {
-      ...item,
-      filamentoMaterial: filamento?.material ?? null,
-      filamentoCor: filamento?.cor ?? null,
-    };
-  });
+  const publicPortfolio = portfolio.list
+    .filter((item) => item.isPublic !== false) // !== false: also includes legacy items without isPublic field
+    .map((item) => {
+      const filamento = item.filamentoId ? filamentos.list.find((candidate) => candidate.id === item.filamentoId) : null;
+      return {
+        ...item,
+        filamentoMaterial: filamento?.material ?? null,
+        filamentoCor: filamento?.cor ?? null,
+      };
+    })
+    .sort((a, b) => {
+      if (!a.publishedAt && !b.publishedAt) return 0;
+      if (!a.publishedAt) return 1;
+      if (!b.publishedAt) return -1;
+      return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+    });
 
   return {
     portfolio: publicPortfolio,

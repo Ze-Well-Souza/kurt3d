@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download } from "lucide-react";
+import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -27,6 +27,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { brl } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
+import { TimeInput } from "@/components/portfolio/TimeInput";
+import { VisibilityBadge } from "@/components/portfolio/VisibilityBadge";
 import {
   addOrder, finalizarDestino, updateOrderStatus, removeOrder,
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
@@ -416,6 +418,72 @@ function CalcPedidos() {
   }
 
   /* ── handlers ── */
+  async function handleProjectAction(action: "save-private" | "save-publish" | "create-order") {
+    try {
+      const totalMinutes = Number(form.tempoMin) || 0;
+      if (totalMinutes < 1) {
+        toast.error("Informe pelo menos 1 minuto de impressão");
+        return;
+      }
+
+      const projectData = {
+        nome: form.nome,
+        categoria: form.categoria,
+        linkModelo: form.linkModelo || undefined,
+        filamentoId: form.filamentoId || undefined,
+        custoRolo: Number(form.custoRolo),
+        pesoRolo: Number(form.pesoRolo),
+        pesoPeca: results.pesoUnitario,
+        tempoMin: results.tempoUnitario,
+        quantidade: Number(form.quantidade),
+        precoVenda: Number(form.precoVenda),
+        perdaPercent: Number(form.perdaPercent) || 0,
+        isPublic: action === "save-publish",
+        filamentos: form.filamentos.filter((f) => f.pesoUsado > 0),
+        custosExtras: form.custosExtras.filter((c) => c.nome.trim() && c.custo > 0),
+        custoKwh: Number(form.custoKwh) || null,
+        custoTrabalhoHoras: Number(form.custoTrabalhoHoras) || null,
+        custoTrabalhoValorHora: Number(form.custoTrabalhoValorHora) || null,
+        taxaGateway: Number(form.taxaGateway) || null,
+      };
+
+      const result = await mutateAddProject.mutateAsync(projectData);
+
+      if (action === "save-private") {
+        toast.success("Projeto salvo como privado");
+        setForm({
+          ...initialForm,
+          pesoRolo: String(settings.defaultPesoRolo),
+          quantidade: String(settings.defaultQuantidade),
+          filamentos: [buildEmptyFilamentoItem()],
+          custosExtras: [],
+        });
+      } else if (action === "save-publish") {
+        toast.success("Projeto publicado no site");
+        setForm({
+          ...initialForm,
+          pesoRolo: String(settings.defaultPesoRolo),
+          quantidade: String(settings.defaultQuantidade),
+          filamentos: [buildEmptyFilamentoItem()],
+          custosExtras: [],
+        });
+      } else if (action === "create-order") {
+        toast.success("Projeto salvo. Criando pedido...");
+        setOrderDialog({
+          open: true,
+          projectId: result.projectId,
+          client: "",
+          clientId: "",
+          quantity: String(form.quantidade),
+        });
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao salvar projeto",
+      );
+    }
+  }
+
   function submitProject(e: React.FormEvent) {
     e.preventDefault();
     const parsed = projectSchema.safeParse({
@@ -655,15 +723,34 @@ function CalcPedidos() {
             </div>
             <div className="grid gap-2"><Label>Cliente</Label><Input value={newOrder.client} onChange={(e) => setNewOrder((s) => ({ ...s, client: e.target.value }))} /></div>
             <div className="grid gap-2"><Label>Projeto</Label><Input value={newOrder.projectName} onChange={(e) => setNewOrder((s) => ({ ...s, projectName: e.target.value }))} /></div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="grid gap-2"><Label>Quantidade</Label><Input type="number" min={1} value={newOrder.quantity} onChange={(e) => setNewOrder((s) => ({ ...s, quantity: e.target.value }))} /></div>
               <div className="grid gap-2">
-                <Label>{newOrder.multiPart ? "Tempo total (calculado)" : "Tempo (min)"}</Label>
+                <Label>{newOrder.multiPart ? "Horas (calc.)" : "Horas"}</Label>
                 <Input
                   type="number"
-                  min={1}
-                  value={newOrder.multiPart ? (newOrderPartsTotals.timeMinutes > 0 ? String(newOrderPartsTotals.timeMinutes) : "") : newOrder.timeMinutes}
-                  onChange={(e) => setNewOrder((s) => ({ ...s, timeMinutes: e.target.value }))}
+                  min={0}
+                  value={newOrder.multiPart ? (newOrderPartsTotals.timeMinutes > 0 ? String(Math.floor(newOrderPartsTotals.timeMinutes / 60)) : "") : String(Math.floor(Number(newOrder.timeMinutes) / 60))}
+                  onChange={(e) => {
+                    const h = Number(e.target.value) || 0;
+                    const m = Number(newOrder.timeMinutes) % 60;
+                    setNewOrder((s) => ({ ...s, timeMinutes: String(h * 60 + m) }));
+                  }}
+                  disabled={newOrder.multiPart}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>{newOrder.multiPart ? "Minutos (calc.)" : "Minutos"}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={newOrder.multiPart ? (newOrderPartsTotals.timeMinutes > 0 ? String(newOrderPartsTotals.timeMinutes % 60) : "") : String(Number(newOrder.timeMinutes) % 60)}
+                  onChange={(e) => {
+                    const m = Math.min(Number(e.target.value) || 0, 59);
+                    const h = Math.floor(Number(newOrder.timeMinutes) / 60);
+                    setNewOrder((s) => ({ ...s, timeMinutes: String(h * 60 + m) }));
+                  }}
                   disabled={newOrder.multiPart}
                 />
               </div>
@@ -1195,10 +1282,11 @@ function CalcPedidos() {
                 custoRolo: Number(fd.get("custoRolo")) || editProject.custoRolo,
                 pesoRolo: Number(fd.get("pesoRolo")) || editProject.pesoRolo,
                 pesoPeca: Number(fd.get("pesoPeca")) || editProject.pesoPeca,
-                tempoMin: Number(fd.get("tempoMin")) || editProject.tempoMin,
+                tempoMin: (Number(fd.get("tempoHours")) * 60 + Number(fd.get("tempoMinutes"))) || editProject.tempoMin,
                 quantidade: Number(fd.get("quantidade")) || editProject.quantidade,
                 precoVenda: Number(fd.get("precoVenda")) || editProject.precoVenda,
                 perdaPercent: Number(fd.get("perdaPercent")) || 0,
+                isPublic: editProject.isPublic ?? false,
               });
               setEditProject(null);
             }}>
@@ -1216,9 +1304,10 @@ function CalcPedidos() {
                 <div className="grid gap-2"><Label>Custo do Rolo (R$)</Label><Input name="custoRolo" type="number" step={0.01} defaultValue={editProject.custoRolo} /></div>
                 <div className="grid gap-2"><Label>Peso do Rolo (g)</Label><Input name="pesoRolo" type="number" defaultValue={editProject.pesoRolo} /></div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-4">
                 <div className="grid gap-2"><Label>Peso Peça (g)</Label><Input name="pesoPeca" type="number" step={0.01} defaultValue={editProject.pesoPeca} /></div>
-                <div className="grid gap-2"><Label>Tempo (min)</Label><Input name="tempoMin" type="number" defaultValue={editProject.tempoMin} /></div>
+                <div className="grid gap-2"><Label>Horas</Label><Input name="tempoHours" type="number" min={0} defaultValue={Math.floor(editProject.tempoMin / 60)} /></div>
+                <div className="grid gap-2"><Label>Minutos</Label><Input name="tempoMinutes" type="number" min={0} max={59} defaultValue={editProject.tempoMin % 60} /></div>
                 <div className="grid gap-2"><Label>Quantidade</Label><Input name="quantidade" type="number" min={1} defaultValue={editProject.quantidade} /></div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -1303,16 +1392,15 @@ function CalcPedidos() {
                   : "Informe o peso medio de UMA unidade pronta. Ex.: um nome medio pesa 6g."
               }
             />
-            <NumberField
-              label={isSlicerMode ? "Tempo do Fatiamento (min)" : "Tempo Medio por Unidade (min)"}
-              value={form.tempoMin}
-              onChange={(v) => setField("tempoMin", v)}
-              placeholder={isSlicerMode ? "105" : "35"}
+            <TimeInput
+              label={isSlicerMode ? "Tempo do Fatiamento" : "Tempo Medio por Unidade"}
               tip={
                 isSlicerMode
                   ? "Copie o tempo total do fatiamento dessa placa. Ex.: 'Tempo total' de 1h45 = 105 minutos."
                   : "Informe o tempo medio para produzir UMA unidade. Se voce ja calculou manualmente, use este modo."
               }
+              totalMinutes={Number(form.tempoMin) || 0}
+              onChange={(minutes) => setField("tempoMin", String(minutes))}
             />
             <NumberField
               label={isSlicerMode ? "Unidades nesse Fatiamento" : "Unidades por Impressao"}
@@ -1600,8 +1688,38 @@ function CalcPedidos() {
             />
           </div>
 
-          <div className="flex justify-end">
-            <Button type="submit" size="lg" className="btn-filament gap-2 px-6"><Plus className="h-4 w-4" /> Salvar Projeto</Button>
+          <div className="flex flex-wrap justify-end gap-3 pt-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="outline" className="gap-2" onClick={() => handleProjectAction("save-private")} disabled={mutateAddProject.isPending}>
+                    {mutateAddProject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                    Salvar Privado
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Salvar projeto sem publicar no site</p></TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="secondary" className="gap-2" onClick={() => handleProjectAction("save-publish")} disabled={mutateAddProject.isPending}>
+                    {mutateAddProject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+                    Salvar e Publicar no Site
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Salvar e exibir no portfólio público</p></TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" size="lg" className="btn-filament gap-2 px-6" onClick={() => handleProjectAction("create-order")} disabled={mutateAddProject.isPending}>
+                    {mutateAddProject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+                    Criar Pedido
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Salvar projeto e criar pedido imediatamente</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </form>
 
@@ -1622,7 +1740,7 @@ function CalcPedidos() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Projeto</TableHead><TableHead>Categoria</TableHead><TableHead>Modelo</TableHead>
+                  <TableHead>Projeto</TableHead><TableHead>Categoria</TableHead><TableHead>Status</TableHead><TableHead>Modelo</TableHead>
                   <TableHead className="text-right">Qtd.</TableHead><TableHead className="text-right">Custo/un.</TableHead>
                   <TableHead className="text-right">Perda</TableHead><TableHead className="text-right">Custo lote</TableHead>
                   <TableHead className="text-right">Receita</TableHead><TableHead className="text-right">Lucro</TableHead>
@@ -1645,8 +1763,47 @@ function CalcPedidos() {
                   });
                   return (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.nome}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {p.nome}
+                          <VisibilityBadge isPublic={p.isPublic ?? true} />
+                        </div>
+                      </TableCell>
                       <TableCell><Badge variant="secondary">{p.categoria}</Badge></TableCell>
+                      <TableCell>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            mutateUpdateProject.mutate({
+                              id: p.id,
+                              nome: p.nome,
+                              categoria: p.categoria,
+                              linkModelo: p.linkModelo ?? null,
+                              filamentoId: p.filamentoId ?? null,
+                              custoRolo: p.custoRolo,
+                              pesoRolo: p.pesoRolo,
+                              pesoPeca: p.pesoPeca,
+                              tempoMin: p.tempoMin,
+                              quantidade: p.quantidade,
+                              precoVenda: p.precoVenda,
+                              perdaPercent: p.perdaPercent ?? null,
+                              isPublic: !(p.isPublic ?? true),
+                              filamentos: p.filamentos,
+                              custosExtras: p.custosExtras,
+                              custoKwh: p.custoKwh ?? null,
+                              custoTrabalhoHoras: p.custoTrabalhoHoras ?? null,
+                              custoTrabalhoValorHora: p.custoTrabalhoValorHora ?? null,
+                              taxaGateway: p.taxaGateway ?? null,
+                            });
+                          }}
+                          aria-label={p.isPublic ? "Tornar privado" : "Tornar público"}
+                          title={p.isPublic ? "Tornar privado" : "Tornar público"}
+                        >
+                          {p.isPublic ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                        </Button>
+                      </TableCell>
                       <TableCell>{p.linkModelo ? (<a href={p.linkModelo} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"><ExternalLink className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ver modelo</span></a>) : (<span className="text-xs text-muted-foreground">—</span>)}</TableCell>
                       <TableCell className="text-right tabular-nums">{p.quantidade}</TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">{brl(r.custoUnidade)}</TableCell>
