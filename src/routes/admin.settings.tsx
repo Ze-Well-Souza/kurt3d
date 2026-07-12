@@ -106,6 +106,10 @@ function SettingsPage() {
       defaultPesoRolo: Number(form.defaultPesoRolo) || DEFAULT_APP_SETTINGS.defaultPesoRolo,
       defaultQuantidade: Number(form.defaultQuantidade) || DEFAULT_APP_SETTINGS.defaultQuantidade,
       whatsappNumero: form.whatsappNumero.trim() || DEFAULT_APP_SETTINGS.whatsappNumero,
+      // Preserve per-printer settings from current settings
+      selectedPrinterPreset: currentSettings.selectedPrinterPreset,
+      printerPrices: currentSettings.printerPrices,
+      printerVidaUtil: currentSettings.printerVidaUtil,
     };
     mutate.mutate(parsed);
   }

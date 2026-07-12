@@ -346,6 +346,10 @@ export type AppSettings = {
   defaultQuantidade: number;
   // Contato
   whatsappNumero: string;
+  // Per-printer persistence
+  selectedPrinterPreset?: string;
+  printerPrices?: Record<string, number>;
+  printerVidaUtil?: Record<string, number>;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -358,6 +362,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   defaultPesoRolo: 1000,
   defaultQuantidade: 10,
   whatsappNumero: "5511999999999",
+  selectedPrinterPreset: "A1",
+  printerPrices: { "A1": 2999, "A1_MINI": 1699 },
+  printerVidaUtil: { "A1": 2000, "A1_MINI": 2000 },
 };
 
 // ═══════════ Extended Types for New Features ═══════════

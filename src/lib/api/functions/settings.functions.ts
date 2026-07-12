@@ -27,6 +27,9 @@ export const saveSettings = createServerFn({ method: "POST" })
       defaultPesoRolo: z.number().min(1).max(100000),
       defaultQuantidade: z.number().int().min(1).max(100000),
       whatsappNumero: z.string().trim().max(30),
+      selectedPrinterPreset: z.string().optional(),
+      printerPrices: z.record(z.string(), z.number()).optional(),
+      printerVidaUtil: z.record(z.string(), z.number()).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -42,6 +45,9 @@ export const saveSettings = createServerFn({ method: "POST" })
       defaultPesoRolo: data.defaultPesoRolo,
       defaultQuantidade: data.defaultQuantidade,
       whatsappNumero: data.whatsappNumero,
+      selectedPrinterPreset: data.selectedPrinterPreset,
+      printerPrices: data.printerPrices,
+      printerVidaUtil: data.printerVidaUtil,
     };
     const repo = await settingsRepo();
     await repo.save(settings);

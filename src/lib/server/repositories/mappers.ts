@@ -642,6 +642,9 @@ export function fromSettingsRow(row: any): AppSettings {
     defaultPesoRolo: row.default_peso_rolo ?? DEFAULT_APP_SETTINGS.defaultPesoRolo,
     defaultQuantidade: row.default_quantidade ?? DEFAULT_APP_SETTINGS.defaultQuantidade,
     whatsappNumero: row.whatsapp_numero ?? DEFAULT_APP_SETTINGS.whatsappNumero,
+    selectedPrinterPreset: row.selected_printer_preset ?? DEFAULT_APP_SETTINGS.selectedPrinterPreset,
+    printerPrices: row.printer_prices ?? DEFAULT_APP_SETTINGS.printerPrices,
+    printerVidaUtil: row.printer_vida_util ?? DEFAULT_APP_SETTINGS.printerVidaUtil,
   };
 }
 
@@ -657,6 +660,9 @@ export function toSettingsRow(row: AppSettings) {
     default_peso_rolo: row.defaultPesoRolo,
     default_quantidade: row.defaultQuantidade,
     whatsapp_numero: row.whatsappNumero,
+    selected_printer_preset: row.selectedPrinterPreset,
+    printer_prices: row.printerPrices,
+    printer_vida_util: row.printerVidaUtil,
   };
 }
 

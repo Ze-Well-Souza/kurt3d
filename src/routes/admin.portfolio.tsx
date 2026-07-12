@@ -33,6 +33,7 @@ import {
   addOrder, finalizarDestino, updateOrderStatus, removeOrder,
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
   updateOrder, updatePortfolioProject, uploadOrderAsset, resolveOrderAssetUrl, updateOrderPartStatus,
+  saveSettings,
 } from "@/lib/api/data.functions";
 import type { Order, OrderPart, OrderPartStatus, Status, Filamento, AppSettings, PortfolioProject, CalculatorFilamentoInput, CalculatorExtraCost } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
@@ -125,7 +126,7 @@ const projectSchema = z.object({
 });
 
 type FormState = {
-  nome: string; categoria: Category; linkModelo: string; filamentoId: string;
+  nome: string; categoria: Category; linkModelo: string;
   custoRolo: string; pesoRolo: string; pesoPeca: string; tempoMin: string;
   quantidade: string; precoVenda: string; perdaPercent: string;
   entryMode: PortfolioCalculatorEntryMode;
@@ -145,7 +146,7 @@ const FALLBACK_QUANTIDADE = 10;
 
 function buildEmptyFilamentoItem(): CalculatorFilamentoInput {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `fil-${Date.now()}-${Math.random()}`;
-  return { id, source: "stock", precoRolo: 0, pesoRolo: 0, pesoUsado: 0 };
+  return { id, source: "manual", marca: "", cor: "", precoRolo: 0, pesoRolo: 0, pesoUsado: 0 };
 }
 
 function buildEmptyExtraCost(): CalculatorExtraCost {
@@ -154,7 +155,7 @@ function buildEmptyExtraCost(): CalculatorExtraCost {
 }
 
 const initialForm: FormState = {
-  nome: "", categoria: "Chaveiro", linkModelo: "", filamentoId: "",
+  nome: "", categoria: "Chaveiro", linkModelo: "",
   custoRolo: String(FALLBACK_CUSTO_ROLO), pesoRolo: String(FALLBACK_PESO_ROLO), pesoPeca: "", tempoMin: "",
   quantidade: String(FALLBACK_QUANTIDADE), precoVenda: "", perdaPercent: "0",
   entryMode: "slicer", unidadesPorImpressao: "1",
@@ -258,6 +259,9 @@ function CalcPedidos() {
     custoRolo: initialForm.custoRolo,
     pesoRolo: String(settings.defaultPesoRolo || FALLBACK_PESO_ROLO),
     quantidade: String(settings.defaultQuantidade || FALLBACK_QUANTIDADE),
+    modeloPreset: (settings.selectedPrinterPreset as BambuPresetId) || initialForm.modeloPreset,
+    precoImpressora: String(settings.printerPrices?.[settings.selectedPrinterPreset || "A1"] ?? initialForm.precoImpressora),
+    vidaUtilHoras: String(settings.printerVidaUtil?.[settings.selectedPrinterPreset || "A1"] ?? initialForm.vidaUtilHoras),
   });
 
   const invalidateOrders = () => qc.invalidateQueries({ queryKey: ["orders"] });
@@ -430,7 +434,6 @@ function CalcPedidos() {
         nome: form.nome,
         categoria: form.categoria,
         linkModelo: form.linkModelo || undefined,
-        filamentoId: form.filamentoId || undefined,
         custoRolo: Number(form.custoRolo),
         pesoRolo: Number(form.pesoRolo),
         pesoPeca: results.pesoUnitario,
@@ -448,6 +451,20 @@ function CalcPedidos() {
       };
 
       const result = await mutateAddProject.mutateAsync(projectData);
+
+      // Persist printer settings for next time
+      const printerPrice = Number(form.precoImpressora) || 0;
+      const printerVida = Number(form.vidaUtilHoras) || 0;
+      if (printerPrice > 0 && printerVida > 0) {
+        saveSettings({
+          data: {
+            ...settings,
+            selectedPrinterPreset: form.modeloPreset,
+            printerPrices: { ...(settings.printerPrices ?? {}), [form.modeloPreset]: printerPrice },
+            printerVidaUtil: { ...(settings.printerVidaUtil ?? {}), [form.modeloPreset]: printerVida },
+          },
+        }).catch(() => {});
+      }
 
       if (action === "save-private") {
         toast.success("Projeto salvo como privado");
@@ -500,7 +517,6 @@ function CalcPedidos() {
     if (!parsed.success) { toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos"); return; }
     mutateAddProject.mutate({
       ...parsed.data,
-      filamentoId: form.filamentoId || undefined,
       filamentos: form.filamentos.filter((f) => f.pesoUsado > 0),
       custosExtras: form.custosExtras.filter((c) => c.nome.trim() && c.custo > 0),
       custoKwh: Number(form.custoKwh) || null,
@@ -1351,8 +1367,17 @@ function CalcPedidos() {
               <Calculator className="h-3.5 w-3.5" /> Impressora e Amortização
             </div>
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-              <Field label="Modelo Bambu Lab" tip="Preset oficial Bambu Lab. Define a wattagem usada no cálculo de energia. Ex.: A1 = 150W, X1-Carbon = 350W.">
-                <Select value={form.modeloPreset} onValueChange={(v) => setField("modeloPreset", v as BambuPresetId)}>
+              <Field label="Modelo Bambu Lab" tip="Preset oficial Bambu Lab. Define a wattagem usada no cálculo de energia. Ex.: A1 + AMS = 150W, A1 Mini = 100W.">
+                <Select value={form.modeloPreset} onValueChange={(v) => {
+                  const presetId = v as BambuPresetId;
+                  const preset = BAMBU_PRESETS.find((m) => m.id === presetId);
+                  setForm((f) => ({
+                    ...f,
+                    modeloPreset: presetId,
+                    precoImpressora: String(settings.printerPrices?.[presetId] ?? preset?.defaultPreco ?? 0),
+                    vidaUtilHoras: String(settings.printerVidaUtil?.[presetId] ?? preset?.defaultVidaUtilHoras ?? 0),
+                  }));
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{BAMBU_PRESETS.map((m) => (<SelectItem key={m.id} value={m.id}>{m.label} — {m.watts}W</SelectItem>))}</SelectContent>
                 </Select>
@@ -1446,9 +1471,6 @@ function CalcPedidos() {
             </p>
             <div className="space-y-3">
               {form.filamentos.map((fil, idx) => {
-                const filFromStock = fil.source === "stock" && fil.filamentoId
-                  ? filamentos.find((f) => f.id === fil.filamentoId)
-                  : undefined;
                 return (
                   <div key={fil.id} className="rounded-xl border border-border bg-background p-3">
                     <div className="mb-2 flex items-center justify-between">
@@ -1463,69 +1485,35 @@ function CalcPedidos() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                    <div className="mb-2 flex items-center gap-3">
-                      <span className="text-[11px] text-muted-foreground">Origem:</span>
-                      <button type="button"
-                        className={cn("rounded-md px-2.5 py-1 text-xs font-medium transition-colors", fil.source === "stock" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}
-                        onClick={() => {
-                          const updated = [...form.filamentos];
-                          updated[idx] = { ...updated[idx], source: "stock", filamentoId: undefined, sku: undefined, marca: undefined, cor: undefined, precoRolo: 0, pesoRolo: 0 };
-                          setField("filamentos", updated);
-                        }}>
-                        Puxar do Estoque
-                      </button>
-                      <button type="button"
-                        className={cn("rounded-md px-2.5 py-1 text-xs font-medium transition-colors", fil.source === "manual" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}
-                        onClick={() => {
-                          const updated = [...form.filamentos];
-                          updated[idx] = { ...updated[idx], source: "manual", filamentoId: undefined };
-                          setField("filamentos", updated);
-                        }}>
-                        Insercao Manual
-                      </button>
-                    </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {fil.source === "stock" ? (
-                        <div className="sm:col-span-2 lg:col-span-2">
-                          <Field label="Filamento (Rolo)" tip="Selecione um rolo do estoque. Preco e peso sao preenchidos automaticamente.">
-                            <Select value={fil.filamentoId ?? ""} onValueChange={(v) => {
-                              const f = filamentos.find((x) => x.id === v);
-                              const updated = [...form.filamentos];
-                              updated[idx] = {
-                                ...updated[idx],
-                                filamentoId: v,
-                                sku: f?.sku ?? null,
-                                marca: f?.marca ?? null,
-                                cor: f?.cor ?? null,
-                                precoRolo: f?.precoPago ?? 0,
-                                pesoRolo: f?.pesoInicial ?? 0,
-                              };
-                              setField("filamentos", updated);
-                            }}>
-                              <SelectTrigger><SelectValue placeholder="Selecione o rolo" /></SelectTrigger>
-                              <SelectContent>{filamentos.map((f: any) => (<SelectItem key={f.id} value={f.id}>[{f.sku}] {f.marca} - {f.cor} (Disponivel {(f.disponivelGrams ?? f.pesoAtual)}g)</SelectItem>))}</SelectContent>
-                            </Select>
-                          </Field>
-                          {filFromStock && (
-                            <p className="mt-1 text-[11px] text-muted-foreground">
-                              Rolo: R$ {filFromStock.precoPago.toFixed(2)} · {filFromStock.pesoInicial}g · R$ {(filFromStock.precoPago / filFromStock.pesoInicial).toFixed(4)}/g
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <>
-                          <NumberField label="Preco do Rolo (R$)" value={String(fil.precoRolo || "")} onChange={(v) => {
+                      <div className="sm:col-span-1">
+                        <Field label="Marca" tip="Ex.: Voolt, Creality, eSun">
+                          <Input value={fil.marca ?? ""} onChange={(e) => {
                             const updated = [...form.filamentos];
-                            updated[idx] = { ...updated[idx], precoRolo: Number(v) || 0 };
+                            updated[idx] = { ...updated[idx], marca: e.target.value };
                             setField("filamentos", updated);
-                          }} placeholder="120,00" />
-                          <NumberField label="Peso do Rolo (g)" value={String(fil.pesoRolo || "")} onChange={(v) => {
+                          }} placeholder="Voolt" />
+                        </Field>
+                      </div>
+                      <div className="sm:col-span-1">
+                        <Field label="Cor" tip="Ex.: Preto, Azul, Arco-Íris">
+                          <Input value={fil.cor ?? ""} onChange={(e) => {
                             const updated = [...form.filamentos];
-                            updated[idx] = { ...updated[idx], pesoRolo: Number(v) || 0 };
+                            updated[idx] = { ...updated[idx], cor: e.target.value };
                             setField("filamentos", updated);
-                          }} placeholder="1000" />
-                        </>
-                      )}
+                          }} placeholder="Preto" />
+                        </Field>
+                      </div>
+                      <NumberField label="Preco do Rolo (R$)" value={String(fil.precoRolo || "")} onChange={(v) => {
+                        const updated = [...form.filamentos];
+                        updated[idx] = { ...updated[idx], precoRolo: Number(v) || 0 };
+                        setField("filamentos", updated);
+                      }} placeholder="120,00" tip="Quanto voce pagou pelo rolo inteiro." />
+                      <NumberField label="Peso do Rolo (g)" value={String(fil.pesoRolo || "")} onChange={(v) => {
+                        const updated = [...form.filamentos];
+                        updated[idx] = { ...updated[idx], pesoRolo: Number(v) || 0 };
+                        setField("filamentos", updated);
+                      }} placeholder="1000" tip="Peso total do rolo (ex.: 1kg = 1000g)." />
                       <NumberField label="Peso Usado na Impressao (g)" value={String(fil.pesoUsado || "")} onChange={(v) => {
                         const updated = [...form.filamentos];
                         updated[idx] = { ...updated[idx], pesoUsado: Number(v) || 0 };

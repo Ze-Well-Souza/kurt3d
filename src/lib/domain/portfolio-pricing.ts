@@ -2,7 +2,8 @@ import type { AppSettings, CalculatorFilamentoInput, CalculatorExtraCost } from 
 import { DEFAULT_APP_SETTINGS } from "./types";
 
 export const BAMBU_PRESETS = [
-  { id: "A1", label: "Bambu Lab A1", watts: 150 },
+  { id: "A1", label: "Bambu Lab A1 + AMS Combo", watts: 150, defaultVidaUtilHoras: 2000, defaultPreco: 2999 },
+  { id: "A1_MINI", label: "Bambu Lab A1 Mini", watts: 100, defaultVidaUtilHoras: 2000, defaultPreco: 1699 },
 ] as const;
 
 export type BambuPresetId = (typeof BAMBU_PRESETS)[number]["id"];
