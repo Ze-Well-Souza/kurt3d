@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2 } from "lucide-react";
+import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2, Printer } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -56,6 +56,7 @@ import { useClients } from "@/lib/hooks/use-clients";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizeText } from "@/lib/utils/normalization";
+import { openPrintQuote, type QuoteInput } from "@/lib/domain/quote-print";
 
 export const Route = createFileRoute("/admin/portfolio")({
   head: () => ({ meta: [{ title: "Calculadora e Pedidos — Kurti 3D" }] }),
@@ -270,7 +271,7 @@ function CalcPedidos() {
   /* ── mutations ── */
   const mutateAddProject = useMutation({ mutationFn: (input: any) => addPortfolioProject({ data: input }), onSuccess: () => invalidatePortfolio() });
   const mutateRemoveProject = useMutation({ mutationFn: (id: string) => removePortfolioProject({ data: { id } }), onSuccess: () => invalidatePortfolio() });
-  const mutateCreateOrder = useMutation({ mutationFn: (input: { portfolioProjectId: string; client: string; clientId?: string; quantity: number }) => createOrderFromPortfolio({ data: input }), onSuccess: () => invalidateOrders() });
+  const mutateCreateOrder = useMutation({ mutationFn: (input: { portfolioProjectId: string; client: string; clientId?: string; quantity: number }) => createOrderFromPortfolio({ data: input }), onSuccess: () => { invalidateOrders(); toast.success("Pedido criado na fila."); }, onError: (error) => toast.error(error instanceof Error ? error.message : "Não foi possível criar o pedido.") });
   const mutateStatus = useMutation({ mutationFn: (input: { orderId: string; status: "todo" | "printing" | "done" }) => updateOrderStatus({ data: input }), onSuccess: () => invalidateOrders() });
   const mutateAddOrder = useMutation({ mutationFn: (input: any) => addOrder({ data: input }), onSuccess: () => invalidateOrders() });
   const mutateFinalizar = useMutation({ mutationFn: (input: any) => finalizarDestino({ data: input }), onSuccess: () => invalidateOrders() });
@@ -422,6 +423,28 @@ function CalcPedidos() {
   }
 
   /* ── handlers ── */
+  function handlePrintQuote(clientName?: string) {
+    const effectivePrice = numeric.precoVenda > 0 ? numeric.precoVenda : results.precoSugerido;
+    const totalTime = results.tempoUnitario * numeric.quantidade;
+    const input: QuoteInput = {
+      clientName: clientName ?? "",
+      items: [{
+        name: form.nome.trim() || "Projeto 3D",
+        category: form.categoria,
+        quantity: numeric.quantidade,
+        unitPrice: effectivePrice,
+        total: effectivePrice * numeric.quantidade,
+        timeMinutes: results.tempoUnitario,
+        gramsPerUnit: results.pesoUnitario,
+      }],
+      validityDays: 7,
+      observations: form.linkModelo?.trim() ? `Modelo de referência: ${form.linkModelo.trim()}` : undefined,
+      studioNome: settings.studioNome || "Kurti 3D",
+      whatsappNumero: settings.whatsappNumero || "",
+    };
+    openPrintQuote(input);
+  }
+
   async function handleProjectAction(action: "save-private" | "save-publish" | "create-order") {
     try {
       const totalMinutes = Number(form.tempoMin) || 0;
@@ -429,25 +452,36 @@ function CalcPedidos() {
         toast.error("Informe pelo menos 1 minuto de impressão");
         return;
       }
+      if (!form.nome.trim()) {
+        toast.error("Informe o nome do projeto");
+        return;
+      }
+      if (results.pesoUnitario < 0.1) {
+        toast.error("O peso da peça deve ser pelo menos 0.1g. Preencha o Peso do Fatiamento ou os pesos usados nos filamentos.");
+        return;
+      }
+
+      const effectiveCustoRolo = numeric.custoRolo > 0 ? numeric.custoRolo : FALLBACK_CUSTO_ROLO;
+      const effectivePesoRolo = numeric.pesoRolo > 0 ? numeric.pesoRolo : FALLBACK_PESO_ROLO;
 
       const projectData = {
-        nome: form.nome,
+        nome: form.nome.trim(),
         categoria: form.categoria,
         linkModelo: form.linkModelo || undefined,
-        custoRolo: Number(form.custoRolo),
-        pesoRolo: Number(form.pesoRolo),
+        custoRolo: effectiveCustoRolo,
+        pesoRolo: effectivePesoRolo,
         pesoPeca: results.pesoUnitario,
         tempoMin: results.tempoUnitario,
-        quantidade: Number(form.quantidade),
-        precoVenda: Number(form.precoVenda),
-        perdaPercent: Number(form.perdaPercent) || 0,
+        quantidade: numeric.quantidade,
+        precoVenda: numeric.precoVenda,
+        perdaPercent: numeric.perdaPercent,
         isPublic: action === "save-publish",
         filamentos: form.filamentos.filter((f) => f.pesoUsado > 0),
         custosExtras: form.custosExtras.filter((c) => c.nome.trim() && c.custo > 0),
-        custoKwh: Number(form.custoKwh) || null,
-        custoTrabalhoHoras: Number(form.custoTrabalhoHoras) || null,
-        custoTrabalhoValorHora: Number(form.custoTrabalhoValorHora) || null,
-        taxaGateway: Number(form.taxaGateway) || null,
+        custoKwh: numeric.custoKwhOverride > 0 ? numeric.custoKwhOverride : null,
+        custoTrabalhoHoras: numeric.custoTrabalhoHoras > 0 ? numeric.custoTrabalhoHoras : null,
+        custoTrabalhoValorHora: numeric.custoTrabalhoValorHora > 0 ? numeric.custoTrabalhoValorHora : null,
+        taxaGateway: numeric.taxaGateway > 0 ? numeric.taxaGateway : null,
       };
 
       const result = await mutateAddProject.mutateAsync(projectData);
@@ -664,17 +698,25 @@ function CalcPedidos() {
       <Dialog open={orderDialog.open} onOpenChange={(open) => setOrderDialog((s) => ({ ...s, open }))}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>Criar pedido</DialogTitle></DialogHeader>
-          <form className="grid gap-4" onSubmit={(e) => {
+          <form className="grid gap-4" onSubmit={async (e) => {
             e.preventDefault();
             const selectedClient = clients.find((client) => client.id === orderDialog.clientId);
-            mutateCreateOrder.mutate({
-              portfolioProjectId: orderDialog.projectId,
-              client: (selectedClient?.nome ?? orderDialog.client.trim()) || "Cliente",
-              clientId: selectedClient?.id,
-              quantity: Number(orderDialog.quantity) || 1,
-            });
-            setOrderDialog((s) => ({ ...s, open: false }));
-            toast.success("Pedido criado na fila.");
+            try {
+              const result = await mutateCreateOrder.mutateAsync({
+                portfolioProjectId: orderDialog.projectId,
+                client: (selectedClient?.nome ?? orderDialog.client.trim()) || "Cliente",
+                clientId: selectedClient?.id,
+                quantity: Number(orderDialog.quantity) || 1,
+              });
+              if (!result.ok) {
+                toast.error("Projeto nao encontrado. Salve-o novamente.");
+                return;
+              }
+              setOrderDialog((s) => ({ ...s, open: false }));
+              setActiveTab("orders");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Erro ao criar o pedido.");
+            }
           }}>
             <div className="grid gap-2">
               <Label>Cliente Cadastrado</Label>
@@ -702,8 +744,39 @@ function CalcPedidos() {
             <div className="grid gap-2"><Label>Cliente</Label><Input value={orderDialog.client} onChange={(e) => setOrderDialog((s) => ({ ...s, client: e.target.value }))} /></div>
             <div className="grid gap-2"><Label>Quantidade</Label><Input type="number" min={1} value={orderDialog.quantity} onChange={(e) => setOrderDialog((s) => ({ ...s, quantity: e.target.value }))} /></div>
             <DialogFooter>
+              <Button type="button" variant="ghost" className="gap-2" onClick={() => {
+                const project = projects.find((p) => p.id === orderDialog.projectId);
+                if (!project) {
+                  toast.error("Projeto nao encontrado.");
+                  return;
+                }
+                const effectivePrice = project.precoVenda > 0 ? project.precoVenda : 0;
+                const input: QuoteInput = {
+                  clientName: orderDialog.client.trim() || "",
+                  items: [{
+                    name: project.nome,
+                    category: project.categoria,
+                    quantity: Number(orderDialog.quantity) || 1,
+                    unitPrice: effectivePrice,
+                    total: effectivePrice * (Number(orderDialog.quantity) || 1),
+                    timeMinutes: project.tempoMin,
+                    gramsPerUnit: project.pesoPeca,
+                  }],
+                  validityDays: 7,
+                  observations: project.linkModelo?.trim() ? `Modelo de referencia: ${project.linkModelo.trim()}` : undefined,
+                  studioNome: settings.studioNome || "Kurti 3D",
+                  whatsappNumero: settings.whatsappNumero || "",
+                };
+                openPrintQuote(input);
+              }}>
+                <Printer className="h-4 w-4" />
+                Imprimir Orçamento
+              </Button>
+              <div className="flex-1" />
               <Button type="button" variant="outline" onClick={() => setOrderDialog((s) => ({ ...s, open: false }))}>Cancelar</Button>
-              <Button type="submit" className="btn-filament">Criar</Button>
+              <Button type="submit" className="btn-filament" disabled={mutateCreateOrder.isPending}>
+                {mutateCreateOrder.isPending ? "Criando..." : "Criar"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1706,6 +1779,16 @@ function CalcPedidos() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent><p>Salvar projeto e criar pedido imediatamente</p></TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="outline" size="lg" className="gap-2 px-6" onClick={() => handlePrintQuote()}>
+                    <Printer className="h-4 w-4" />
+                    Imprimir Orçamento
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Gerar orçamento em PDF para enviar ao cliente</p></TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
