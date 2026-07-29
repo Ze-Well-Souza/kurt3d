@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as KeepAliveRouteImport } from './routes/keep-alive'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AcompanharRouteImport } from './routes/acompanhar'
 import { Route as IndexRouteImport } from './routes/index'
@@ -28,6 +29,11 @@ import { Route as AdminCalendarRouteImport } from './routes/admin.calendar'
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KeepAliveRoute = KeepAliveRouteImport.update({
+  id: '/keep-alive',
+  path: '/keep-alive',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/acompanhar': typeof AcompanharRoute
   '/admin': typeof AdminRouteWithChildren
+  '/keep-alive': typeof KeepAliveRoute
   '/login': typeof LoginRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/acompanhar': typeof AcompanharRoute
+  '/keep-alive': typeof KeepAliveRoute
   '/login': typeof LoginRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/acompanhar': typeof AcompanharRoute
   '/admin': typeof AdminRouteWithChildren
+  '/keep-alive': typeof KeepAliveRoute
   '/login': typeof LoginRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/'
     | '/acompanhar'
     | '/admin'
+    | '/keep-alive'
     | '/login'
     | '/admin/calendar'
     | '/admin/clients'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/acompanhar'
+    | '/keep-alive'
     | '/login'
     | '/admin/calendar'
     | '/admin/clients'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/'
     | '/acompanhar'
     | '/admin'
+    | '/keep-alive'
     | '/login'
     | '/admin/calendar'
     | '/admin/clients'
@@ -209,6 +221,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AcompanharRoute: typeof AcompanharRoute
   AdminRoute: typeof AdminRouteWithChildren
+  KeepAliveRoute: typeof KeepAliveRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -219,6 +232,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/keep-alive': {
+      id: '/keep-alive'
+      path: '/keep-alive'
+      fullPath: '/keep-alive'
+      preLoaderRoute: typeof KeepAliveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -356,6 +376,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AcompanharRoute: AcompanharRoute,
   AdminRoute: AdminRouteWithChildren,
+  KeepAliveRoute: KeepAliveRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
