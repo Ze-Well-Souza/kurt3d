@@ -205,6 +205,7 @@ export type PortfolioProject = {
   isPublic: boolean;
   publishedAt?: string | null;
   imageUrl?: string | null;
+  imageUrls?: string[] | null;
   createdAt: string;
   updatedAt: string;
   // New multi-filament + cost fields
@@ -217,7 +218,11 @@ export type PortfolioProject = {
   taxaGateway?: number | null;
 };
 
-export type PublicPortfolioProject = PortfolioProject & {
+// Projeção pública do portfólio: apenas o que a landing page exibe (sem custos/preços).
+export type PublicPortfolioProject = Pick<
+  PortfolioProject,
+  "id" | "nome" | "categoria" | "imageUrl" | "imageUrls" | "publishedAt"
+> & {
   filamentoMaterial?: string | null;
   filamentoCor?: string | null;
 };

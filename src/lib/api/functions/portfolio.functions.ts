@@ -35,6 +35,15 @@ const calculatorExtraCostSchema = z.object({
   quantidade: z.number().min(0),
 });
 
+// Galeria pública: até 10 imagens por projeto.
+const MAX_PORTFOLIO_IMAGES = 10;
+
+function collectProjectImages(project: PortfolioProject): string[] {
+  const urls = [...(project.imageUrls ?? [])];
+  if (project.imageUrl && !urls.includes(project.imageUrl)) urls.push(project.imageUrl);
+  return urls;
+}
+
 export const addPortfolioProject = createServerFn({ method: "POST" })
   .validator(
     z.object({
@@ -51,8 +60,8 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       perdaPercent: z.number().min(0).max(100).optional(),
       // Visibility control
       isPublic: z.boolean().default(false),
-      // Portfolio image (base64 data URL)
-      imageDataUrl: z.string().max(7_000_000).optional(),
+      // Imagens do portfólio (base64 data URLs)
+      imageDataUrls: z.array(z.string().max(7_000_000)).max(MAX_PORTFOLIO_IMAGES).optional(),
       // New multi-filament + cost fields
       filamentos: z.array(calculatorFilamentoItemSchema).optional(),
       custosExtras: z.array(calculatorExtraCostSchema).optional(),
@@ -69,13 +78,11 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
     const repo = await portfolioRepo();
     const now = nowIso();
 
-    // Upload portfolio image if provided
-    let imageUrl: string | null = null;
-    if (data.imageDataUrl) {
-      const uploaded = await uploadPortfolioImage(data.imageDataUrl, "image/webp");
-      if (uploaded) {
-        imageUrl = uploaded.publicUrl;
-      }
+    // Upload portfolio images if provided
+    const imageUrls: string[] = [];
+    for (const dataUrl of data.imageDataUrls ?? []) {
+      const uploaded = await uploadPortfolioImage(dataUrl, "image/webp");
+      if (uploaded) imageUrls.push(uploaded.publicUrl);
     }
 
     const project: PortfolioProject = {
@@ -96,7 +103,8 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       // Visibility control
       isPublic: data.isPublic,
       publishedAt: data.isPublic ? now : null,
-      imageUrl,
+      imageUrl: imageUrls[0] ?? null,
+      imageUrls,
       filamentos: data.filamentos,
       custosExtras: data.custosExtras,
       custoKwh: data.custoKwh ?? null,
@@ -116,9 +124,9 @@ export const removePortfolioProject = createServerFn({ method: "POST" })
     await requireSession();
     const repo = await portfolioRepo();
     const project = repo.list.find((p) => p.id === data.id);
-    // Clean up portfolio image from storage
-    if (project?.imageUrl) {
-      await deletePortfolioImage(project.imageUrl);
+    // Clean up portfolio images from storage
+    for (const url of project ? collectProjectImages(project) : []) {
+      await deletePortfolioImage(url);
     }
     await repo.save(repo.list.filter((project) => project.id !== data.id));
     return { ok: true };
@@ -141,8 +149,8 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       perdaPercent: z.number().min(0).max(100).nullable(),
       // Visibility control
       isPublic: z.boolean(),
-      // Portfolio image (base64 data URL, set to null to remove)
-      imageDataUrl: z.string().max(7_000_000).nullable().optional(),
+      // Imagens do portfólio: lista final (URLs existentes + novas em base64 data URL)
+      imageUrls: z.array(z.string().max(7_000_000)).max(MAX_PORTFOLIO_IMAGES).optional(),
       // New multi-filament + cost fields
       filamentos: z.array(calculatorFilamentoItemSchema).optional(),
       custosExtras: z.array(calculatorExtraCostSchema).optional(),
@@ -163,22 +171,23 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
     const now = nowIso();
 
     // Handle portfolio image changes
-    let imageUrl = project.imageUrl ?? null;
-    if (data.imageDataUrl === null) {
-      // Explicitly removing image
-      if (project.imageUrl) {
-        await deletePortfolioImage(project.imageUrl);
+    let imageUrls = collectProjectImages(project);
+    if (data.imageUrls) {
+      const next: string[] = [];
+      for (const entry of data.imageUrls) {
+        if (entry.startsWith("data:")) {
+          // Nova imagem enviada em base64
+          const uploaded = await uploadPortfolioImage(entry, "image/webp");
+          if (uploaded) next.push(uploaded.publicUrl);
+        } else {
+          next.push(entry);
+        }
       }
-      imageUrl = null;
-    } else if (data.imageDataUrl) {
-      // New image uploaded — delete old one first
-      if (project.imageUrl) {
-        await deletePortfolioImage(project.imageUrl);
+      // Remove do storage as imagens que sairam da lista
+      for (const url of imageUrls) {
+        if (!next.includes(url)) await deletePortfolioImage(url);
       }
-      const uploaded = await uploadPortfolioImage(data.imageDataUrl, "image/webp");
-      if (uploaded) {
-        imageUrl = uploaded.publicUrl;
-      }
+      imageUrls = next;
     }
 
     // Handle publishedAt transition logic (pure function, testable)
@@ -205,7 +214,8 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       // Visibility control
       isPublic: data.isPublic,
       publishedAt,
-      imageUrl,
+      imageUrl: imageUrls[0] ?? null,
+      imageUrls,
       filamentos: data.filamentos,
       custosExtras: data.custosExtras,
       custoKwh: data.custoKwh ?? null,

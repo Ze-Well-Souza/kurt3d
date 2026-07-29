@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2, Printer } from "lucide-react";
+import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2, Printer, ImagePlus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -216,6 +216,94 @@ function fileToBase64(file: File) {
   });
 }
 
+/* ── Imagens do projeto (galeria "Nossos trabalhos") ── */
+const MAX_PROJECT_IMAGES = 10;
+
+async function compressImageToWebpDataUrl(file: File) {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+    image.src = dataUrl;
+  });
+  // Reduz para no máximo 1600px no maior lado e converte para webp (limite de 5MB no upload).
+  const maxSide = 1600;
+  const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Não foi possível processar a imagem.");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/webp", 0.82);
+}
+
+function ProjectImagesPicker({ images, onChange }: { images: string[]; onChange: (next: string[]) => void }) {
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const remaining = MAX_PROJECT_IMAGES - images.length;
+    if (remaining <= 0) {
+      toast.error(`Máximo de ${MAX_PROJECT_IMAGES} imagens por projeto.`);
+      return;
+    }
+    const selected = Array.from(files).filter((file) => file.type.startsWith("image/")).slice(0, remaining);
+    if (files.length > remaining) toast.warning(`Máximo de ${MAX_PROJECT_IMAGES} imagens — algumas foram ignoradas.`);
+    try {
+      const converted: string[] = [];
+      for (const file of selected) {
+        converted.push(await compressImageToWebpDataUrl(file));
+      }
+      if (converted.length > 0) onChange([...images, ...converted]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao processar imagem.");
+    }
+  }
+  return (
+    <div className="space-y-2">
+      {images.length > 0 && (
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+          {images.map((src, index) => (
+            <div key={`${index}-${src.slice(-24)}`} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/30">
+              <img src={src} alt={`Imagem ${index + 1} do projeto`} className="h-full w-full object-cover" />
+              {index === 0 && (
+                <span className="absolute left-1 top-1 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-medium">Capa</span>
+              )}
+              <button
+                type="button"
+                aria-label={`Remover imagem ${index + 1}`}
+                onClick={() => onChange(images.filter((_, i) => i !== index))}
+                className="absolute right-1 top-1 rounded-full bg-background/90 p-1 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <label className={cn(
+        "flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted/40",
+        images.length >= MAX_PROJECT_IMAGES && "pointer-events-none opacity-50",
+      )}>
+        <ImagePlus className="h-4 w-4" />
+        Adicionar imagens ({images.length}/{MAX_PROJECT_IMAGES})
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }}
+        />
+      </label>
+    </div>
+  );
+}
+
 function validateOrderAssetFile(file: File) {
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (!extension || !["stl", "3mf"].includes(extension)) {
@@ -356,6 +444,8 @@ function CalcPedidos() {
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; orderId: string; reason: string }>({ open: false, orderId: "", reason: "" });
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editProject, setEditProject] = useState<PortfolioProject | null>(null);
+  const [editImages, setEditImages] = useState<string[]>([]);
+  const [projectImages, setProjectImages] = useState<string[]>([]);
   const [projectSearch, setProjectSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
   const [updatingPartId, setUpdatingPartId] = useState<string | null>(null);
@@ -364,6 +454,11 @@ function CalcPedidos() {
     setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", filamentoIds: [], gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
     setNewOrderAsset(null);
     setNewOrderParts([buildEmptyOrderPart()]);
+  }
+
+  function openEditProject(project: PortfolioProject) {
+    setEditImages(project.imageUrls?.length ? project.imageUrls : project.imageUrl ? [project.imageUrl] : []);
+    setEditProject(project);
   }
 
   async function openProjectReference(reference?: string | null) {
@@ -483,6 +578,7 @@ function CalcPedidos() {
         custoTrabalhoHoras: numeric.custoTrabalhoHoras > 0 ? numeric.custoTrabalhoHoras : null,
         custoTrabalhoValorHora: numeric.custoTrabalhoValorHora > 0 ? numeric.custoTrabalhoValorHora : null,
         taxaGateway: numeric.taxaGateway > 0 ? numeric.taxaGateway : null,
+        imageDataUrls: projectImages,
       };
 
       const result = await mutateAddProject.mutateAsync(projectData);
@@ -503,6 +599,7 @@ function CalcPedidos() {
 
       if (action === "save-private") {
         toast.success("Projeto salvo como privado");
+        setProjectImages([]);
         setForm({
           ...initialForm,
           pesoRolo: String(settings.defaultPesoRolo),
@@ -512,6 +609,7 @@ function CalcPedidos() {
         });
       } else if (action === "save-publish") {
         toast.success("Projeto publicado no site");
+        setProjectImages([]);
         setForm({
           ...initialForm,
           pesoRolo: String(settings.defaultPesoRolo),
@@ -558,7 +656,9 @@ function CalcPedidos() {
       custoTrabalhoHoras: Number(form.custoTrabalhoHoras) || null,
       custoTrabalhoValorHora: Number(form.custoTrabalhoValorHora) || null,
       taxaGateway: Number(form.taxaGateway) || null,
+      imageDataUrls: projectImages,
     });
+    setProjectImages([]);
     setForm({
       ...initialForm,
       pesoRolo: String(settings.defaultPesoRolo),
@@ -1377,6 +1477,7 @@ function CalcPedidos() {
                 precoVenda: Number(fd.get("precoVenda")) || editProject.precoVenda,
                 perdaPercent: Number(fd.get("perdaPercent")) || 0,
                 isPublic: editProject.isPublic ?? false,
+                imageUrls: editImages,
               });
               setEditProject(null);
             }}>
@@ -1403,6 +1504,10 @@ function CalcPedidos() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2"><Label>Preço Venda (R$)</Label><Input name="precoVenda" type="number" step={0.01} defaultValue={editProject.precoVenda} /></div>
                 <div className="grid gap-2"><Label>% Desperdício</Label><Input name="perdaPercent" type="number" step={1} defaultValue={editProject.perdaPercent ?? 0} /></div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Imagens do site (galeria "Nossos trabalhos")</Label>
+                <ProjectImagesPicker images={editImages} onChange={setEditImages} />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEditProject(null)}>Cancelar</Button>
@@ -1433,6 +1538,9 @@ function CalcPedidos() {
               </Select>
             </Field>
             <Field label="Link do Modelo (MakerWorld/STL)" tip="URL do modelo 3D (MakerWorld, Printables, Thingiverse). Opcional — facilita reimprimir depois." className="md:col-span-2"><Input value={form.linkModelo} onChange={(e) => setField("linkModelo", e.target.value)} placeholder="https://makerworld.com/en/models/..." type="url" /></Field>
+            <Field label="Fotos do Projeto (site)" tip='Até 10 fotos exibidas na galeria "Nossos trabalhos" do site. A primeira é a capa do card.' className="md:col-span-2 lg:col-span-4">
+              <ProjectImagesPicker images={projectImages} onChange={setProjectImages} />
+            </Field>
           </div>
 
           {/* ── Bloco 2: Impressora (preset Bambu Lab) ── */}
@@ -1886,7 +1994,7 @@ function CalcPedidos() {
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="outline" onClick={() => setOrderDialog({ open: true, projectId: p.id, client: "", clientId: "", quantity: String(p.quantidade ?? 1) })}>Criar pedido</Button>
-                          <Button size="icon" variant="ghost" onClick={() => setEditProject(p)} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => openEditProject(p)} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
                           <Button size="icon" variant="ghost" onClick={() => mutateRemoveProject.mutate(p.id)} aria-label="Excluir"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </TableCell>

@@ -32,8 +32,14 @@ export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(asyn
     .filter((item) => item.isPublic !== false) // !== false: also includes legacy items without isPublic field
     .map((item) => {
       const filamento = item.filamentoId ? filamentos.list.find((candidate) => candidate.id === item.filamentoId) : null;
+      // Projeção pública: nunca expor custos/preços internos do portfólio.
       return {
-        ...item,
+        id: item.id,
+        nome: item.nome,
+        categoria: item.categoria,
+        imageUrl: item.imageUrl ?? null,
+        imageUrls: item.imageUrls ?? [],
+        publishedAt: item.publishedAt ?? null,
         filamentoMaterial: filamento?.material ?? null,
         filamentoCor: filamento?.cor ?? null,
       };
@@ -47,7 +53,10 @@ export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(asyn
 
   return {
     portfolio: publicPortfolio,
-    settings: settingsData.settings,
+    // Público só precisa do WhatsApp para o CTA de contato.
+    settings: {
+      whatsappNumero: settingsData.settings?.whatsappNumero ?? "",
+    },
   };
 });
 
