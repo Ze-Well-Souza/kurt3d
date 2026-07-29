@@ -9,7 +9,8 @@ export function buildFilamentoLabel(filamento: Filamento) {
 export function allowedStatusTransition(from: Status, to: Status) {
   const allowed: Record<Status, Status[]> = {
     todo: ["printing"],
-    printing: ["todo", "done"],
+    printing: ["todo", "acabamento", "done"],
+    acabamento: ["done"],
     done: [],
     vendido: [],
     presente: [],

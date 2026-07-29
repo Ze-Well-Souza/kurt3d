@@ -16,6 +16,7 @@ import { DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
 import { calcCostFromInputs } from "@/lib/domain/cost";
 import { usePublicSnapshot } from "@/lib/hooks/use-public-snapshot";
 import heroImg from "@/assets/hero-printer.jpg";
+import instagramQr from "@/assets/instagram-qr-card.png";
 import work1 from "@/assets/work-1.jpg";
 import work2 from "@/assets/work-2.jpg";
 import work3 from "@/assets/work-3.jpg";
@@ -753,16 +754,29 @@ function Contact() {
 }
 
 function Footer() {
+  const contentQ = useQuery({ queryKey: ["siteContent"], queryFn: () => getSiteContent() });
+  const c = contentQ.data ?? DEFAULT_SITE_CONTENT;
+
   return (
     <footer>
       <div className="filament-divider" />
-      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 py-8 md:flex-row">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-6 py-8 md:flex-row">
         <p className="text-xs text-muted-foreground">
           © {new Date().getFullYear()} Kurti 3D — Sociedade Zé &amp; Kurt. Todos os direitos reservados.
         </p>
         <div className="flex items-center gap-4">
-          <SocialIcons />
-          <p className="text-xs text-muted-foreground">Feito com filamento multicor.</p>
+          <a
+            href={c.instagramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Siga a Kurti 3D no Instagram"
+            className="block overflow-hidden rounded-xl border border-border bg-white p-1.5 shadow-sm transition-transform hover:scale-105"
+          >
+            <img src={instagramQr} alt="QR code do Instagram @kurti3d" className="h-28 w-auto" loading="lazy" />
+          </a>
+          <p className="max-w-[10rem] text-xs text-muted-foreground">
+            Aponte a câmera e siga a gente no Instagram. Feito com filamento multicor.
+          </p>
         </div>
       </div>
     </footer>

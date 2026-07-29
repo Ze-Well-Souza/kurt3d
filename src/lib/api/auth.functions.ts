@@ -8,6 +8,7 @@ import {
   deleteAdminUser,
   ensureSessionPassword,
   getAuthSetupState,
+  getUserRole,
   listAdminUsers,
   setupAdminUser,
   validateLogin,
@@ -54,13 +55,23 @@ async function requireSession() {
   return session.data.userId;
 }
 
+// Apenas o super admin pode gerenciar perfis de acesso (criar/remover usuários).
+async function requireSuperAdmin() {
+  const userId = await requireSession();
+  const role = await getUserRole(userId);
+  if (role !== "super_admin") throw new Error("forbidden");
+  return userId;
+}
+
 export const authStatus = createServerFn({ method: "GET" }).handler(async () => {
   const setup = await getAuthSetupState();
   const session = await getSession();
+  const role = session.data.userId ? await getUserRole(session.data.userId) : null;
   return {
     setupRequired: !setup.hasAdmin,
     loggedIn: !!session.data.userId,
     username: session.data.username ?? null,
+    role,
   };
 });
 
@@ -126,10 +137,12 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 export const requireAuth = createServerFn({ method: "GET" }).handler(async () => {
   const setup = await getAuthSetupState();
   const session = await getSession();
+  const role = session.data.userId ? await getUserRole(session.data.userId) : null;
   return {
     setupRequired: !setup.hasAdmin,
     userId: session.data.userId ?? null,
     username: session.data.username ?? null,
+    role,
   };
 });
 
@@ -157,7 +170,7 @@ export const createUser = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    await requireSession();
+    await requireSuperAdmin();
     assertPasswordPolicy(data.password);
     const created = await createAdminUser(data);
     return { ok: true, id: created.id };
@@ -166,7 +179,7 @@ export const createUser = createServerFn({ method: "POST" })
 export const deleteUser = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data }) => {
-    const userId = await requireSession();
+    const userId = await requireSuperAdmin();
     if (data.userId === userId) throw new Error("cannot_delete_self");
     await deleteAdminUser(data.userId);
     return { ok: true };

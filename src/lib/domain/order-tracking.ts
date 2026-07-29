@@ -3,6 +3,7 @@ import type { Order, Status } from "./types";
 const STATUS_LABELS: Record<Status, string> = {
   todo: "A Fazer",
   printing: "Imprimindo",
+  acabamento: "Acabamento",
   done: "Concluido",
   vendido: "Entregue",
   presente: "Entregue",
@@ -12,6 +13,7 @@ const STATUS_LABELS: Record<Status, string> = {
 const STATUS_DESCRIPTIONS: Record<Status, string> = {
   todo: "Pedido confirmado e aguardando producao.",
   printing: "Pedido em producao na impressora.",
+  acabamento: "Impressao concluida, pedido em acabamento e pos-processamento.",
   done: "Pedido concluido e pronto para retirada ou envio.",
   vendido: "Pedido entregue ao cliente.",
   presente: "Pedido finalizado como presente.",
@@ -36,7 +38,7 @@ export function getOrderStatusDescription(status: Status) {
 
 export function getOrderTrackingStep(status: Status) {
   if (status === "todo") return 1;
-  if (status === "printing") return 2;
+  if (status === "printing" || status === "acabamento") return 2;
   return 3;
 }
 

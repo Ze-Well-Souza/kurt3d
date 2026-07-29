@@ -14,11 +14,13 @@ import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
 export const listCalendarEvents = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await productionCalendarRepo();
   return repo.list;
 });
 
 export const listBudgetQuotes = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await budgetQuotesRepo();
   return repo.list;
 });

@@ -23,6 +23,7 @@ import {
 } from "../../server/repositories.server";
 
 export const listFilamentoPayments = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const [payments, installments] = await Promise.all([
     filamentoPaymentsRepo(),
     filamentoInstallmentsRepo(),
@@ -34,6 +35,7 @@ export const listFilamentoPayments = createServerFn({ method: "GET" }).handler(a
 });
 
 export const listInsumoPayments = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const [payments, installments] = await Promise.all([
     insumoPaymentsRepo(),
     insumoInstallmentsRepo(),
@@ -45,11 +47,13 @@ export const listInsumoPayments = createServerFn({ method: "GET" }).handler(asyn
 });
 
 export const listFilamentoPaymentEvents = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await filamentoPaymentEventsRepo();
   return repo.list;
 });
 
 export const listInsumoPaymentEvents = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await insumoPaymentEventsRepo();
   return repo.list;
 });

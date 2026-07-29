@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, Plus, Pencil, Trash2, CheckCircle2, XCircle, Clock,
-  Send, Ban, ArrowRightLeft, Percent, Hash, DollarSign,
+  Send, Ban, ArrowRightLeft, Percent, Hash, DollarSign, Printer, MessageCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ import {
 } from "@/lib/api/data.functions";
 import { useBudgetQuotes } from "@/lib/hooks/use-budget-quotes";
 import { useOrders } from "@/lib/hooks/use-orders";
+import { useSettings } from "@/lib/hooks/use-settings";
+import { openPrintQuote, openQuoteWhatsApp, type QuoteInput } from "@/lib/domain/quote-print";
 import { normalizeText } from "@/lib/utils/normalization";
 import type { BudgetQuote, BudgetQuoteItem, BudgetQuoteStatus } from "@/lib/domain/types";
 
@@ -70,10 +72,35 @@ function emptyItem(): BudgetQuoteItem {
   };
 }
 
+/** Converte um orçamento salvo para o formato usado no PDF/WhatsApp. */
+function quoteToShareInput(
+  quote: BudgetQuote,
+  settings: { studioNome?: string; whatsappNumero?: string } | undefined,
+): QuoteInput {
+  return {
+    clientName: quote.clientName,
+    items: quote.items.map((item) => ({
+      name: item.description,
+      category: "",
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      total: item.subtotal,
+      timeMinutes: item.timeMinutes ?? 0,
+      gramsPerUnit: item.materialGrams ?? 0,
+    })),
+    validityDays: quote.validityDays,
+    observations: quote.notes ?? undefined,
+    discountPercent: quote.discountPercent ?? undefined,
+    studioNome: settings?.studioNome ?? "Kurti 3D",
+    whatsappNumero: settings?.whatsappNumero ?? "",
+  };
+}
+
 function OrcamentosPage() {
   const qc = useQueryClient();
   const { data: quotesData } = useBudgetQuotes();
   const { data: ordersData } = useOrders();
+  const { data: settingsData } = useSettings();
   const quotes = quotesData ?? [];
   const orders = ordersData ?? [];
   const [search, setSearch] = useState("");
@@ -432,6 +459,22 @@ function OrcamentosPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-1">
+                    <Button
+                      size="sm" variant="ghost"
+                      onClick={() => openQuoteWhatsApp(quoteToShareInput(quote, settingsData), quote.clientContact)}
+                      className="gap-1 text-xs text-green-700"
+                      title="Enviar orçamento por WhatsApp"
+                    >
+                      <MessageCircle className="h-3 w-3" /> WhatsApp
+                    </Button>
+                    <Button
+                      size="sm" variant="ghost"
+                      onClick={() => openPrintQuote(quoteToShareInput(quote, settingsData))}
+                      className="gap-1 text-xs"
+                      title="Gerar PDF do orçamento (imprimir/salvar)"
+                    >
+                      <Printer className="h-3 w-3" /> PDF
+                    </Button>
                     {quote.status !== "converted" && (
                       <>
                         <Button

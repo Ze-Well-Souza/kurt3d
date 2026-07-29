@@ -9,6 +9,7 @@ import { requireSession } from "../../server/require-session.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
 export const listInsumos = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await insumosRepo();
   return repo.list;
 });

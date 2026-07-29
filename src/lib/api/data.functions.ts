@@ -7,6 +7,7 @@ export * from "./functions/settings.functions";
 export * from "./functions/leads.functions";
 export * from "./functions/clients.functions";
 export * from "./functions/expenses.functions";
+export * from "./functions/cash-flow.functions";
 export * from "./functions/payments.functions";
 export * from "./functions/extended.functions";
 export * from "./functions/cleanup.functions";

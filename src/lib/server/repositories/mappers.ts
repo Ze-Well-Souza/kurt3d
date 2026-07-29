@@ -17,6 +17,8 @@ import type {
   Lead,
   Order,
   OrderPart,
+  OrderPayment,
+  OrderPaymentMetodo,
   PortfolioProject,
   SiteContent,
   Venda,
@@ -190,6 +192,7 @@ export function fromOrderRow(row: any): Order {
     formaPagamento: row.forma_pagamento ?? null,
     dataPagamento: row.data_pagamento ?? null,
     clientId: row.client_id ?? null,
+    printer: row.printer ?? null,
   };
 }
 
@@ -215,6 +218,7 @@ export function toOrderRow(row: Order) {
     forma_pagamento: row.formaPagamento ?? null,
     data_pagamento: row.dataPagamento ?? null,
     client_id: row.clientId ?? null,
+    printer: row.printer ?? null,
   };
 }
 
@@ -573,6 +577,32 @@ export function toExpenseRow(row: Expense) {
     data: row.data,
     descricao: row.descricao,
     categoria: row.categoria ?? null,
+  };
+}
+
+export function fromOrderPaymentRow(row: any): OrderPayment {
+  return {
+    id: row.id,
+    orderId: row.order_id,
+    valor: row.valor,
+    metodo: (row.metodo ?? "Pix") as OrderPaymentMetodo,
+    data: row.data,
+    observacao: row.observacao ?? null,
+    registradoPor: row.registrado_por ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+export function toOrderPaymentRow(row: OrderPayment) {
+  return {
+    id: row.id,
+    order_id: row.orderId,
+    valor: row.valor,
+    metodo: row.metodo,
+    data: row.data,
+    observacao: row.observacao ?? null,
+    registrado_por: row.registradoPor ?? null,
+    created_at: row.createdAt,
   };
 }
 

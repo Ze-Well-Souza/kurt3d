@@ -32,6 +32,7 @@ import {
 } from "./shared";
 
 export const listOrders = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const [orders, orderParts, clients] = await Promise.all([
     ordersRepo(),
     orderPartsRepo(),
@@ -80,6 +81,7 @@ export const addOrder = createServerFn({ method: "POST" })
       formaPagamento: z.string().trim().max(100).optional(),
       dataPagamento: z.string().max(30).optional(),
       clientId: z.string().min(1).optional(),
+      printer: z.string().trim().max(100).optional(),
       parts: z.array(orderPartInputSchema).max(50).optional(),
     }),
   )
@@ -125,6 +127,7 @@ export const addOrder = createServerFn({ method: "POST" })
       formaPagamento: data.formaPagamento ?? null,
       dataPagamento: data.dataPagamento ?? null,
       clientId: resolveClientId(clientsData.list, data.client, data.clientId),
+      printer: data.printer ?? null,
       parts: normalizedParts,
     };
     await repo.save([order, ...repo.list]);
@@ -166,7 +169,7 @@ export const removeOrder = createServerFn({ method: "POST" })
   });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator(z.object({ orderId: z.string().min(1), status: z.enum(["todo", "printing", "done"]) }))
+  .validator(z.object({ orderId: z.string().min(1), status: z.enum(["todo", "printing", "acabamento", "done"]) }))
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
@@ -203,7 +206,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
         }
       }
 
-      if (order.status === "printing" && data.status === "done") {
+      if (order.status === "printing" && (data.status === "done" || data.status === "acabamento")) {
         const toConsume = Math.min(currentReserved, grams);
         if (toConsume > 0) {
           const filamento = filamentos.list.find((item) => item.id === filamentId);
@@ -366,6 +369,7 @@ export const uploadOrderAsset = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
+    await requireSession();
     const reference = await uploadOrderAssetToStorage(data);
     return { ok: true as const, reference };
   });
@@ -374,6 +378,7 @@ export const resolveOrderAssetUrl = createServerFn({ method: "POST" })
   .validator(z.object({ reference: z.string().trim().min(1).max(1000) }))
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
+    await requireSession();
     const url = await createOrderAssetSignedUrl(data.reference);
     return { ok: true as const, url };
   });
@@ -407,6 +412,7 @@ export const updateOrder = createServerFn({ method: "POST" })
       formaPagamento: z.string().max(100).nullable(),
       dataPagamento: z.string().max(30).nullable(),
       clientId: z.string().min(1).nullable(),
+      printer: z.string().trim().max(100).nullable().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -437,6 +443,7 @@ export const updateOrder = createServerFn({ method: "POST" })
       formaPagamento: data.formaPagamento ?? null,
       dataPagamento: data.dataPagamento ?? null,
       clientId: resolveClientId(clientsData.list, data.client, data.clientId),
+      printer: data.printer !== undefined ? data.printer : (order.printer ?? null),
       updatedAt: nowIso(),
     };
     await orders.save(orders.list.map((item) => (item.id === order.id ? updated : item)));

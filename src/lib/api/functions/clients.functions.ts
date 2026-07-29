@@ -9,6 +9,7 @@ import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
 export const listClients = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await clientsRepo();
   return repo.list;
 });

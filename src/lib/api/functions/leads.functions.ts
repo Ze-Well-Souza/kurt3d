@@ -17,6 +17,7 @@ import {
 } from "./shared";
 
 export const listLeads = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await leadsRepo();
   return repo.list;
 });

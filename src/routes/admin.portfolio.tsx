@@ -91,6 +91,7 @@ const PAYMENT_METHODS = ["PIX","Cartão de Crédito","Cartão de Débito","Dinhe
 const COLUMNS: { id: Status; title: string; hint: string }[] = [
   { id: "todo", title: "A Fazer", hint: "Pedidos confirmados aguardando impressão" },
   { id: "printing", title: "Imprimindo", hint: "Em produção nas impressoras Bambu Lab" },
+  { id: "acabamento", title: "Acabamento", hint: "Impressos, em pós-processamento e acabamento" },
   { id: "done", title: "Concluído", hint: "Prontos para retirada ou envio" },
 ];
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
@@ -272,7 +273,7 @@ function CalcPedidos() {
   const mutateAddProject = useMutation({ mutationFn: (input: any) => addPortfolioProject({ data: input }), onSuccess: () => invalidatePortfolio() });
   const mutateRemoveProject = useMutation({ mutationFn: (id: string) => removePortfolioProject({ data: { id } }), onSuccess: () => invalidatePortfolio() });
   const mutateCreateOrder = useMutation({ mutationFn: (input: { portfolioProjectId: string; client: string; clientId?: string; quantity: number }) => createOrderFromPortfolio({ data: input }), onSuccess: () => { invalidateOrders(); toast.success("Pedido criado na fila."); }, onError: (error) => toast.error(error instanceof Error ? error.message : "Não foi possível criar o pedido.") });
-  const mutateStatus = useMutation({ mutationFn: (input: { orderId: string; status: "todo" | "printing" | "done" }) => updateOrderStatus({ data: input }), onSuccess: () => invalidateOrders() });
+  const mutateStatus = useMutation({ mutationFn: (input: { orderId: string; status: "todo" | "printing" | "acabamento" | "done" }) => updateOrderStatus({ data: input }), onSuccess: () => invalidateOrders() });
   const mutateAddOrder = useMutation({ mutationFn: (input: any) => addOrder({ data: input }), onSuccess: () => invalidateOrders() });
   const mutateFinalizar = useMutation({ mutationFn: (input: any) => finalizarDestino({ data: input }), onSuccess: () => invalidateOrders() });
   const mutateRemoveOrder = useMutation({ mutationFn: (input: { orderId: string; reason: string }) => removeOrder({ data: input }), onSuccess: () => { invalidateOrders(); toast.success("Pedido excluído."); } });
@@ -383,7 +384,7 @@ function CalcPedidos() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const grouped = useMemo(() => {
-    const g: Record<Status, Order[]> = { todo: [], printing: [], done: [], vendido: [], presente: [], falha: [] };
+    const g: Record<Status, Order[]> = { todo: [], printing: [], acabamento: [], done: [], vendido: [], presente: [], falha: [] };
     const searchLower = normalizeText(orderSearch);
     for (const o of orders) {
       if (searchLower && !normalizeText(o.projectName).includes(searchLower) && !normalizeText(o.client).includes(searchLower)) continue;
@@ -1909,8 +1910,8 @@ function CalcPedidos() {
           <SearchInput value={orderSearch} onChange={setOrderSearch} placeholder="Buscar pedido..." />
           <Button onClick={() => setShowNewOrder(true)} className="btn-filament gap-2"><Plus className="h-4 w-4" />Novo pedido</Button>
         </div>
-        <DndContext sensors={sensors} onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={(e: DragEndEvent) => { setActiveId(null); const { active, over } = e; if (!over) return; const st = String(over.id); if (!["todo","printing","done"].includes(st)) return; mutateStatus.mutate({ orderId: String(active.id), status: st as "todo" | "printing" | "done" }); }}>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <DndContext sensors={sensors} onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))} onDragEnd={(e: DragEndEvent) => { setActiveId(null); const { active, over } = e; if (!over) return; const st = String(over.id); if (!(["todo","printing","acabamento","done"] as string[]).includes(st)) return; mutateStatus.mutate({ orderId: String(active.id), status: st as "todo" | "printing" | "acabamento" | "done" }); }}>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {COLUMNS.map((col) => (
               <KanbanColumn key={col.id} id={col.id} title={col.title} hint={col.hint} orders={grouped[col.id]}
                 onFinalizar={async (args) => mutateFinalizar.mutateAsync(args)} filamentos={filamentos}

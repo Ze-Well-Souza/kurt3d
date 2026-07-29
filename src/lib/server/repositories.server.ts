@@ -11,6 +11,7 @@ export { insumoInstallmentsRepo } from "./repositories/insumo-installments.repo"
 export { insumoPaymentEventsRepo } from "./repositories/insumo-payment-events.repo";
 export { ordersRepo } from "./repositories/orders.repo";
 export { orderPartsRepo } from "./repositories/order-parts.repo";
+export { orderPaymentsRepo } from "./repositories/order-payments.repo";
 export { portfolioRepo } from "./repositories/portfolio.repo";
 export { insumosRepo } from "./repositories/insumos.repo";
 export { vendasRepo } from "./repositories/vendas.repo";

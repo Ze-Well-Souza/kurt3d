@@ -7,6 +7,7 @@ import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
 export const listExpenses = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await expensesRepo();
   return repo.list;
 });

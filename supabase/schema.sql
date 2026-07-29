@@ -82,8 +82,12 @@ create table if not exists public.orders (
   preco_venda double precision null,
   forma_pagamento text null,
   data_pagamento date null,
-  client_id text null
+  client_id text null,
+  printer text null
 );
+
+-- Compatibilidade com bancos criados antes da coluna de impressora.
+alter table public.orders add column if not exists printer text null;
 
 create table if not exists public.order_parts (
   id text primary key,
@@ -170,6 +174,21 @@ create table if not exists public.expenses (
   descricao text not null,
   categoria text null
 );
+
+-- Fluxo de caixa: pagamentos recebidos (Pix/Dinheiro/etc.) vinculados a pedidos.
+create table if not exists public.order_payments (
+  id text primary key,
+  order_id text not null references public.orders(id) on delete cascade,
+  valor double precision not null,
+  metodo text not null default 'Pix',
+  data date not null,
+  observacao text null,
+  registrado_por text null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_order_payments_data on public.order_payments(data desc);
+create index if not exists idx_order_payments_order on public.order_payments(order_id);
 
 create table if not exists public.leads (
   id text primary key,

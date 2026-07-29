@@ -21,6 +21,7 @@ export type QuoteInput = {
   items: QuoteItem[];
   validityDays?: number;
   observations?: string;
+  discountPercent?: number;
   studioNome: string;
   whatsappNumero: string;
 };
@@ -99,7 +100,23 @@ export function buildQuoteHtml(input: QuoteInput): string {
     })
     .join("");
 
-  const grandTotal = input.items.reduce((sum, i) => sum + i.total, 0);
+  const subtotal = input.items.reduce((sum, i) => sum + i.total, 0);
+  const discountPercent = input.discountPercent ?? 0;
+  const discountValue = subtotal * (discountPercent / 100);
+  const grandTotal = subtotal - discountValue;
+
+  const discountRows =
+    discountPercent > 0
+      ? `
+      <tr>
+        <td colspan="4" style="text-align:right;color:#888">Subtotal</td>
+        <td class="price">${brl(subtotal)}</td>
+      </tr>
+      <tr>
+        <td colspan="4" style="text-align:right;color:#2e7d32">Desconto (${discountPercent}%)</td>
+        <td class="price" style="color:#2e7d32">-${brl(discountValue)}</td>
+      </tr>`
+      : "";
 
   const observationsBlock = input.observations
     ? `<div class="observations"><strong>Observações:</strong><br>${escapeHtml(input.observations)}</div>`
@@ -261,6 +278,7 @@ export function buildQuoteHtml(input: QuoteInput): string {
     </thead>
     <tbody>
       ${itemsHtml}
+      ${discountRows}
       <tr class="total-row">
         <td colspan="4" class="total-label">TOTAL DO ORÇAMENTO</td>
         <td class="price">${brl(grandTotal)}</td>
@@ -315,4 +333,54 @@ export function openPrintQuote(input: QuoteInput) {
   }
   // Cleanup blob after window loads
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
+ * Builds a plain-text quote summary suitable for sending via WhatsApp.
+ */
+export function buildQuoteWhatsAppMessage(input: QuoteInput): string {
+  const subtotal = input.items.reduce((sum, i) => sum + i.total, 0);
+  const discountPercent = input.discountPercent ?? 0;
+  const discountValue = subtotal * (discountPercent / 100);
+  const total = subtotal - discountValue;
+  const validUntil = new Date(Date.now() + (input.validityDays ?? 7) * 86_400_000);
+
+  const lines: string[] = [];
+  lines.push(`*Orçamento — ${input.studioNome}*`);
+  if (input.clientName.trim()) lines.push(`Cliente: ${input.clientName.trim()}`);
+  lines.push("");
+  for (const item of input.items) {
+    const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+    lines.push(`• ${item.name}${qty} — ${brl(item.total)}`);
+  }
+  if (discountPercent > 0) {
+    lines.push("");
+    lines.push(`Subtotal: ${brl(subtotal)}`);
+    lines.push(`Desconto: ${discountPercent}% (-${brl(discountValue)})`);
+  }
+  lines.push("");
+  lines.push(`*Total: ${brl(total)}*`);
+  lines.push(`Válido até ${formatDate(validUntil)}`);
+  if (input.observations?.trim()) {
+    lines.push("");
+    lines.push(`Obs.: ${input.observations.trim()}`);
+  }
+  lines.push("");
+  lines.push("Aceitamos: PIX · Cartão de Crédito · Cartão de Débito · Dinheiro");
+  lines.push(`Qualquer dúvida, é só chamar! — ${input.studioNome}`);
+  return lines.join("\n");
+}
+
+/**
+ * Opens WhatsApp with the quote message pre-filled.
+ * If the client's phone is provided, opens the chat directly;
+ * otherwise opens WhatsApp's contact picker.
+ */
+export function openQuoteWhatsApp(input: QuoteInput, clientPhone?: string | null) {
+  const message = buildQuoteWhatsAppMessage(input);
+  const digits = (clientPhone ?? "").replace(/\D/g, "");
+  const base = digits
+    ? `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}`
+    : "https://wa.me/";
+  window.open(`${base}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
 }

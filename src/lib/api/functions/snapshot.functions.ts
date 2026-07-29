@@ -22,6 +22,7 @@ import {
   productionCalendarRepo,
   budgetQuotesRepo,
 } from "../../server/repositories.server";
+import { requireSession } from "../../server/require-session.server";
 import { buildFilamentoLabel, hydrateOrderClientLinks } from "./shared";
 
 export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(async () => {
@@ -51,6 +52,7 @@ export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(asyn
 });
 
 export const listSnapshot = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const [
     orders,
     orderParts,

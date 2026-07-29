@@ -55,6 +55,12 @@ export async function getAuthSetupState() {
   return { hasAdmin: repo.list.length > 0 };
 }
 
+export async function getUserRole(userId: string): Promise<string | null> {
+  const repo = await usersRepo();
+  const user = repo.list.find((u) => u.id === userId);
+  return user?.role ?? null;
+}
+
 export async function setupAdminUser(input: { username: string; password: string; phone?: string; nome?: string }) {
   const repo = await usersRepo();
   if (repo.list.length > 0) {
@@ -69,7 +75,8 @@ export async function setupAdminUser(input: { username: string; password: string
     passwordHash,
     phone: input.phone ?? null,
     nome: input.nome ?? null,
-    role: "admin",
+    // O primeiro usuário (setup) é o dono do sistema: super admin.
+    role: "super_admin",
     createdAt: now,
     updatedAt: now,
   };
@@ -139,6 +146,9 @@ export async function createAdminUser(input: { username: string; password: strin
 export async function deleteAdminUser(userId: string) {
   const repo = await usersRepo();
   if (repo.list.length <= 1) throw new Error("cannot_delete_last_user");
+  const target = repo.list.find((u) => u.id === userId);
+  if (!target) throw new Error("user_not_found");
+  if (target.role === "super_admin") throw new Error("cannot_delete_super_admin");
   repo.list = repo.list.filter((u) => u.id !== userId);
   await repo.save(repo.list);
 }

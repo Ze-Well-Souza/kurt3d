@@ -9,6 +9,7 @@ import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { buildFilamentoLabel } from "./shared";
 
 export const listFilamentos = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const [filamentos, inv, history] = await Promise.all([
     filamentosRepo(),
     inventoryRepo(),

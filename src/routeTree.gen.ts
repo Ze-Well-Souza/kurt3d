@@ -21,6 +21,7 @@ import { Route as AdminPortfolioRouteImport } from './routes/admin.portfolio'
 import { Route as AdminOrcamentosRouteImport } from './routes/admin.orcamentos'
 import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
 import { Route as AdminFinancesRouteImport } from './routes/admin.finances'
+import { Route as AdminFilaRouteImport } from './routes/admin.fila'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
 import { Route as AdminCalendarRouteImport } from './routes/admin.calendar'
 
@@ -84,6 +85,11 @@ const AdminFinancesRoute = AdminFinancesRouteImport.update({
   path: '/finances',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFilaRoute = AdminFilaRouteImport.update({
+  id: '/fila',
+  path: '/fila',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminClientsRoute = AdminClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
+  '/admin/fila': typeof AdminFilaRoute
   '/admin/finances': typeof AdminFinancesRoute
   '/admin/leads': typeof AdminLeadsRoute
   '/admin/orcamentos': typeof AdminOrcamentosRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
+  '/admin/fila': typeof AdminFilaRoute
   '/admin/finances': typeof AdminFinancesRoute
   '/admin/leads': typeof AdminLeadsRoute
   '/admin/orcamentos': typeof AdminOrcamentosRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
+  '/admin/fila': typeof AdminFilaRoute
   '/admin/finances': typeof AdminFinancesRoute
   '/admin/leads': typeof AdminLeadsRoute
   '/admin/orcamentos': typeof AdminOrcamentosRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/calendar'
     | '/admin/clients'
+    | '/admin/fila'
     | '/admin/finances'
     | '/admin/leads'
     | '/admin/orcamentos'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/calendar'
     | '/admin/clients'
+    | '/admin/fila'
     | '/admin/finances'
     | '/admin/leads'
     | '/admin/orcamentos'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/calendar'
     | '/admin/clients'
+    | '/admin/fila'
     | '/admin/finances'
     | '/admin/leads'
     | '/admin/orcamentos'
@@ -286,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFinancesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/fila': {
+      id: '/admin/fila'
+      path: '/fila'
+      fullPath: '/admin/fila'
+      preLoaderRoute: typeof AdminFilaRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/clients': {
       id: '/admin/clients'
       path: '/clients'
@@ -306,6 +325,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminCalendarRoute: typeof AdminCalendarRoute
   AdminClientsRoute: typeof AdminClientsRoute
+  AdminFilaRoute: typeof AdminFilaRoute
   AdminFinancesRoute: typeof AdminFinancesRoute
   AdminLeadsRoute: typeof AdminLeadsRoute
   AdminOrcamentosRoute: typeof AdminOrcamentosRoute
@@ -319,6 +339,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCalendarRoute: AdminCalendarRoute,
   AdminClientsRoute: AdminClientsRoute,
+  AdminFilaRoute: AdminFilaRoute,
   AdminFinancesRoute: AdminFinancesRoute,
   AdminLeadsRoute: AdminLeadsRoute,
   AdminOrcamentosRoute: AdminOrcamentosRoute,

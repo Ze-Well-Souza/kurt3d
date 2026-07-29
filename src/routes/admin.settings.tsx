@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { saveSettings, runStorageCleanup } from "@/lib/api/data.functions";
-import { changePassword, listUsers, createUser, deleteUser, getSiteContent, saveSiteContent } from "@/lib/api/auth.functions";
+import { changePassword, listUsers, createUser, deleteUser, getSiteContent, saveSiteContent, requireAuth } from "@/lib/api/auth.functions";
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
@@ -165,6 +165,21 @@ function SettingsPage() {
         <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2.5 text-sm text-yellow-700">
           <Info className="h-4 w-4 shrink-0" />
           <span>Existem alterações não salvas.</span>
+        </div>
+      )}
+
+      {/* Barra flutuante: permite salvar de qualquer ponto da página */}
+      {hasChanges && (
+        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <div className="flex items-center gap-3 rounded-full border border-border bg-card px-4 py-2.5 shadow-lg">
+            <span className="hidden text-sm text-muted-foreground sm:inline">Alterações não salvas</span>
+            <Button variant="outline" size="sm" className="gap-2" onClick={resetToCurrent}>
+              <RotateCcw className="h-4 w-4" /> Descartar
+            </Button>
+            <Button size="sm" className="btn-filament gap-2" onClick={handleSubmit} disabled={mutate.isPending}>
+              <Save className="h-4 w-4" /> {mutate.isPending ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -336,6 +351,8 @@ function ChangePasswordCard() {
 function UserManagementCard() {
   const qc = useQueryClient();
   const usersQ = useQuery({ queryKey: ["adminUsers"], queryFn: () => listUsers() });
+  const authQ = useQuery({ queryKey: ["authRole"], queryFn: () => requireAuth() });
+  const isSuperAdmin = authQ.data?.role === "super_admin";
   const [showDialog, setShowDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "" });
@@ -374,11 +391,17 @@ function UserManagementCard() {
               <Users className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-display text-base font-semibold tracking-tight">Usuários Admin</h2>
             </div>
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowDialog(true)}>
-              <Plus className="h-4 w-4" /> Novo Usuário
-            </Button>
+            {isSuperAdmin && (
+              <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowDialog(true)}>
+                <Plus className="h-4 w-4" /> Novo Usuário
+              </Button>
+            )}
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">Gerencie os administradores com acesso ao painel.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {isSuperAdmin
+              ? "Gerencie os administradores com acesso ao painel."
+              : "Somente o super admin pode criar ou remover usuários."}
+          </p>
         </div>
         <div className="p-6">
           {users.length === 0 ? (
@@ -389,11 +412,13 @@ function UserManagementCard() {
                 <div key={u.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
                   <div>
                     <p className="font-medium">{u.nome ?? u.username}</p>
-                    <p className="text-xs text-muted-foreground">{u.phone ?? u.username} · {u.role}</p>
+                    <p className="text-xs text-muted-foreground">{u.phone ?? u.username} · {u.role === "super_admin" ? "Super Admin" : "Admin"}</p>
                   </div>
-                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isSuperAdmin && u.role !== "super_admin" && (
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

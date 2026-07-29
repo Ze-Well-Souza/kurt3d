@@ -1,4 +1,4 @@
-export type Status = "todo" | "printing" | "done" | "vendido" | "presente" | "falha";
+export type Status = "todo" | "printing" | "acabamento" | "done" | "vendido" | "presente" | "falha";
 
 export type OrderDestino = "Kurtido e Vendido" | "Dado de Presente" | "Falha de Impressão";
 
@@ -44,6 +44,7 @@ export type Order = {
   formaPagamento?: string | null;
   dataPagamento?: string | null;
   clientId?: string | null;
+  printer?: string | null;
   parts?: OrderPart[];
 };
 
@@ -242,6 +243,26 @@ export type Expense = {
   data: string;
   descricao: string;
   categoria?: string | null;
+};
+
+/** Métodos aceitos para pagamentos recebidos de clientes (fluxo de caixa). */
+export type OrderPaymentMetodo = "Pix" | "Dinheiro" | "Cartão" | "Transferência" | "Outro";
+
+/**
+ * Pagamento recebido de um cliente, vinculado a um pedido.
+ * Um pedido pode ter vários pagamentos (ex.: sinal + saldo na entrega).
+ */
+export type OrderPayment = {
+  id: string;
+  orderId: string;
+  valor: number;
+  metodo: OrderPaymentMetodo;
+  /** Data do recebimento no formato YYYY-MM-DD. */
+  data: string;
+  observacao?: string | null;
+  /** Quem registrou o pagamento (auditoria entre os sócios). */
+  registradoPor?: string | null;
+  createdAt: string;
 };
 
 export type LeadImagem = {

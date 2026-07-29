@@ -11,6 +11,7 @@ import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { uploadPortfolioImage, deletePortfolioImage } from "../../server/portfolio-image-upload.server";
 
 export const listPortfolio = createServerFn({ method: "GET" }).handler(async () => {
+  await requireSession();
   const repo = await portfolioRepo();
   return repo.list;
 });
