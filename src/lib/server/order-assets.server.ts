@@ -71,6 +71,8 @@ export async function uploadOrderAssetToStorage(input: {
     .upload(path, bytes, {
       contentType: input.contentType || "application/octet-stream",
       upsert: false,
+      // Caminho contém UUID (imutável): cache de 1 ano no CDN reduz egress do Storage.
+      cacheControl: "31536000",
     });
 
   if (error) {

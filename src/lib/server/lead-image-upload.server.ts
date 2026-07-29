@@ -37,6 +37,8 @@ export async function uploadBase64ToStorage(
     const { error } = await supabase.storage.from(BUCKET).upload(storagePath, buffer, {
       contentType: mimeType,
       upsert: false,
+      // Nome é UUID (imutável): cache de 1 ano no CDN reduz egress do Storage.
+      cacheControl: "31536000",
     });
 
     if (error) {

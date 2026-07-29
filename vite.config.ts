@@ -12,4 +12,7 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Fora do sandbox Lovable o plugin nitro é pulado por padrão, o que geraria um
+  // output genérico que a Vercel não executa. Preset explícito para produção na Vercel.
+  nitro: { preset: "vercel" },
 });

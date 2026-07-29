@@ -420,7 +420,7 @@ function FilterGroup({
 
 type ContactImage = { file: File; preview: string };
 
-const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB per image
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15MB por foto original (é comprimida antes do envio)
 const MAX_IMAGES = 6;
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -430,6 +430,38 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+// Comprime a foto do cliente para WebP antes de enviar: mantém o request dentro
+// do limite da Vercel (~4,5MB com até 6 fotos) e reduz o egress do Supabase Storage.
+async function compressContactImage(file: File): Promise<string> {
+  const dataUrl = await fileToDataUrl(file);
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+    image.src = dataUrl;
+  });
+  const MAX_DATA_URL_CHARS = 400_000; // ~290KB binário por foto
+  const attempts = [
+    { maxSide: 1280, quality: 0.8 },
+    { maxSide: 1280, quality: 0.65 },
+    { maxSide: 1024, quality: 0.6 },
+    { maxSide: 800, quality: 0.55 },
+  ];
+  let result = dataUrl;
+  for (const { maxSide, quality } of attempts) {
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    result = canvas.toDataURL("image/webp", quality);
+    if (result.length <= MAX_DATA_URL_CHARS) return result;
+  }
+  return result;
 }
 
 function Contact() {
@@ -453,11 +485,16 @@ function Contact() {
         continue;
       }
       if (f.size > MAX_IMAGE_SIZE) {
-        toast.error(`"${f.name}" ultrapassa o limite de 2 MB.`);
+        toast.error(`"${f.name}" ultrapassa o limite de 15 MB.`);
         continue;
       }
-      const preview = await fileToDataUrl(f);
-      setImages((prev) => [...prev, { file: f, preview }]);
+      // Comprime já na seleção: o preview leve também é o payload enviado.
+      try {
+        const preview = await compressContactImage(f);
+        setImages((prev) => [...prev, { file: f, preview }]);
+      } catch {
+        toast.error(`Não foi possível processar "${f.name}".`);
+      }
     }
   };
 
@@ -477,13 +514,11 @@ function Contact() {
     const whatsapp = formData.get("whatsapp") as string;
     const mensagem = formData.get("project") as string;
 
-    const imgList = await Promise.all(
-      images.map(async (img) => ({
-        nome: img.file.name,
-        tipo: img.file.type || "image/jpeg",
-        dataUrl: await fileToDataUrl(img.file),
-      })),
-    );
+    const imgList = images.map((img) => ({
+      nome: img.file.name,
+      tipo: "image/webp",
+      dataUrl: img.preview,
+    }));
 
     setLoading(true);
     try {

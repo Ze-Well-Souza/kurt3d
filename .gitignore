@@ -314,3 +314,7 @@ Icon?
 *.VC.db-shm
 *.VC.VC.opendb-sh......
 .env
+
+# Vercel build output e cache local do TanStack
+.vercel/
+.tanstack/

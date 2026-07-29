@@ -408,3 +408,14 @@ create table if not exists public.budget_quotes (
 
 create index if not exists idx_budget_quotes_status on public.budget_quotes(status);
 create index if not exists idx_budget_quotes_expires on public.budget_quotes(expires_at);
+
+-- Rate limit de login persistente (acesso apenas via service role)
+create table if not exists public.login_rate_limits (
+  key text primary key,
+  count integer not null default 0,
+  window_started_at timestamptz not null default now(),
+  blocked_until timestamptz null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.login_rate_limits enable row level security;

@@ -14,7 +14,8 @@ import {
   validateLogin,
 } from "../server/auth.server";
 import { logger } from "../server/logger.server";
-import { clearRateLimit, getClientIp, inspectRateLimit, recordRateLimitFailure } from "../server/rate-limit.server";
+import { getClientIp } from "../server/rate-limit.server";
+import { clearLoginRateLimit, inspectLoginRateLimit, recordLoginFailure } from "../server/login-rate-limit.server";
 import { isSecureRequest } from "../server/request-security.server";
 import { siteContentRepo } from "../server/repositories.server";
 import { siteContentSchema } from "../domain/site-content-schema";
@@ -96,12 +97,8 @@ export const login = createServerFn({ method: "POST" })
   .validator(z.object({ phone: z.string().min(1).max(20), password: z.string().min(1).max(200) }))
   .handler(async ({ data }) => {
     const rateLimitKey = buildLoginRateLimitKey(data.phone);
-    const rateLimitState = inspectRateLimit({
-      key: rateLimitKey,
-      limit: 5,
-      windowMs: 15 * 60 * 1000,
-      blockMs: 15 * 60 * 1000,
-    });
+    // Persistido no Supabase: sobrevive entre instâncias serverless da Vercel.
+    const rateLimitState = await inspectLoginRateLimit({ key: rateLimitKey });
     if (!rateLimitState.allowed) {
       logger.warn("auth.login.rate_limited", { ip: getClientIp(getRequest()), retryAfterMs: rateLimitState.retryAfterMs });
       return { ok: false as const, reason: "rate_limited" as const };
@@ -109,7 +106,7 @@ export const login = createServerFn({ method: "POST" })
 
     const user = await validateLogin(data);
     if (!user) {
-      const failureState = recordRateLimitFailure({
+      const failureState = await recordLoginFailure({
         key: rateLimitKey,
         limit: 5,
         windowMs: 15 * 60 * 1000,
@@ -122,7 +119,7 @@ export const login = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "invalid_credentials" as const };
     }
 
-    clearRateLimit(rateLimitKey);
+    await clearLoginRateLimit(rateLimitKey);
     const session = await getSession();
     await session.update({ userId: user.id, username: user.username });
     return { ok: true as const };

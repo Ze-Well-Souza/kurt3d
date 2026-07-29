@@ -232,16 +232,30 @@ async function compressImageToWebpDataUrl(file: File) {
     image.onerror = () => reject(new Error("Não foi possível ler a imagem."));
     image.src = dataUrl;
   });
-  // Reduz para no máximo 1600px no maior lado e converte para webp (limite de 5MB no upload).
-  const maxSide = 1600;
-  const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(img.width * scale));
-  canvas.height = Math.max(1, Math.round(img.height * scale));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Não foi possível processar a imagem.");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/webp", 0.82);
+  // Comprime para WebP com teto de tamanho por foto: 10 fotos precisam caber no
+  // limite de request da Vercel (~4,5MB) e fotos menores reduzem o egress do
+  // Supabase Storage. Reduz qualidade/resolução até ficar abaixo do teto.
+  const MAX_DATA_URL_CHARS = 400_000; // ~290KB binário por foto
+  const attempts = [
+    { maxSide: 1600, quality: 0.82 },
+    { maxSide: 1600, quality: 0.7 },
+    { maxSide: 1280, quality: 0.65 },
+    { maxSide: 1024, quality: 0.6 },
+    { maxSide: 800, quality: 0.55 },
+  ];
+  let result = "";
+  for (const { maxSide, quality } of attempts) {
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Não foi possível processar a imagem.");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    result = canvas.toDataURL("image/webp", quality);
+    if (result.length <= MAX_DATA_URL_CHARS) return result;
+  }
+  return result;
 }
 
 function ProjectImagesPicker({ images, onChange }: { images: string[]; onChange: (next: string[]) => void }) {
