@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TrocarSenhaRouteImport } from './routes/trocar-senha'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as KeepAliveRouteImport } from './routes/keep-alive'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -26,6 +27,11 @@ import { Route as AdminFilaRouteImport } from './routes/admin.fila'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
 import { Route as AdminCalendarRouteImport } from './routes/admin.calendar'
 
+const TrocarSenhaRoute = TrocarSenhaRouteImport.update({
+  id: '/trocar-senha',
+  path: '/trocar-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/keep-alive': typeof KeepAliveRoute
   '/login': typeof LoginRoute
+  '/trocar-senha': typeof TrocarSenhaRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/fila': typeof AdminFilaRoute
@@ -130,6 +137,7 @@ export interface FileRoutesByTo {
   '/acompanhar': typeof AcompanharRoute
   '/keep-alive': typeof KeepAliveRoute
   '/login': typeof LoginRoute
+  '/trocar-senha': typeof TrocarSenhaRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/fila': typeof AdminFilaRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/keep-alive': typeof KeepAliveRoute
   '/login': typeof LoginRoute
+  '/trocar-senha': typeof TrocarSenhaRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/fila': typeof AdminFilaRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/keep-alive'
     | '/login'
+    | '/trocar-senha'
     | '/admin/calendar'
     | '/admin/clients'
     | '/admin/fila'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/acompanhar'
     | '/keep-alive'
     | '/login'
+    | '/trocar-senha'
     | '/admin/calendar'
     | '/admin/clients'
     | '/admin/fila'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/keep-alive'
     | '/login'
+    | '/trocar-senha'
     | '/admin/calendar'
     | '/admin/clients'
     | '/admin/fila'
@@ -223,10 +235,18 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   KeepAliveRoute: typeof KeepAliveRoute
   LoginRoute: typeof LoginRoute
+  TrocarSenhaRoute: typeof TrocarSenhaRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trocar-senha': {
+      id: '/trocar-senha'
+      path: '/trocar-senha'
+      fullPath: '/trocar-senha'
+      preLoaderRoute: typeof TrocarSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -378,6 +398,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   KeepAliveRoute: KeepAliveRoute,
   LoginRoute: LoginRoute,
+  TrocarSenhaRoute: TrocarSenhaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

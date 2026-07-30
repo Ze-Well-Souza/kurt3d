@@ -8,6 +8,7 @@ import {
   deleteAdminUser,
   ensureSessionPassword,
   getAuthSetupState,
+  getUserAuthInfo,
   getUserRole,
   listAdminUsers,
   setupAdminUser,
@@ -67,12 +68,13 @@ async function requireSuperAdmin() {
 export const authStatus = createServerFn({ method: "GET" }).handler(async () => {
   const setup = await getAuthSetupState();
   const session = await getSession();
-  const role = session.data.userId ? await getUserRole(session.data.userId) : null;
+  const info = session.data.userId ? await getUserAuthInfo(session.data.userId) : null;
   return {
     setupRequired: !setup.hasAdmin,
     loggedIn: !!session.data.userId,
     username: session.data.username ?? null,
-    role,
+    role: info?.role ?? null,
+    mustChangePassword: info?.mustChangePassword ?? false,
   };
 });
 
@@ -134,12 +136,13 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 export const requireAuth = createServerFn({ method: "GET" }).handler(async () => {
   const setup = await getAuthSetupState();
   const session = await getSession();
-  const role = session.data.userId ? await getUserRole(session.data.userId) : null;
+  const info = session.data.userId ? await getUserAuthInfo(session.data.userId) : null;
   return {
     setupRequired: !setup.hasAdmin,
     userId: session.data.userId ?? null,
     username: session.data.username ?? null,
-    role,
+    role: info?.role ?? null,
+    mustChangePassword: info?.mustChangePassword ?? false,
   };
 });
 

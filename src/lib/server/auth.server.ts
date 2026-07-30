@@ -61,6 +61,17 @@ export async function getUserRole(userId: string): Promise<string | null> {
   return user?.role ?? null;
 }
 
+// Estado de acesso usado pelos guards de rota: papel + se a senha ainda é
+// provisória (exige troca obrigatória antes de liberar o painel).
+export async function getUserAuthInfo(
+  userId: string,
+): Promise<{ role: string | null; mustChangePassword: boolean } | null> {
+  const repo = await usersRepo();
+  const user = repo.list.find((u) => u.id === userId);
+  if (!user) return null;
+  return { role: user.role ?? null, mustChangePassword: user.mustChangePassword ?? false };
+}
+
 export async function setupAdminUser(input: { username: string; password: string; phone?: string; nome?: string }) {
   const repo = await usersRepo();
   if (repo.list.length > 0) {
@@ -77,6 +88,8 @@ export async function setupAdminUser(input: { username: string; password: string
     nome: input.nome ?? null,
     // O primeiro usuário (setup) é o dono do sistema: super admin.
     role: "super_admin",
+    // Ele escolhe a própria senha no setup — não precisa trocar depois.
+    mustChangePassword: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -102,6 +115,8 @@ export async function changeUserPassword(userId: string, newPassword: string) {
   if (!user) throw new Error("user_not_found");
   assertPasswordPolicy(newPassword);
   user.passwordHash = await hashPassword(newPassword);
+  // Ao definir a senha pessoal, deixa de ser provisória: libera o painel.
+  user.mustChangePassword = false;
   user.updatedAt = nowIso();
   await repo.save(repo.list);
 }
@@ -135,6 +150,8 @@ export async function createAdminUser(input: { username: string; password: strin
     phone: input.phone ?? null,
     nome: input.nome ?? null,
     role: "admin",
+    // Senha cadastrada pelo super admin é provisória: troca obrigatória no 1º acesso.
+    mustChangePassword: true,
     createdAt: now,
     updatedAt: now,
   };

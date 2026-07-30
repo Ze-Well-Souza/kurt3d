@@ -444,8 +444,9 @@ function UserManagementCard() {
               <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="nome_usuario" />
             </div>
             <div className="space-y-1.5">
-              <Label>Senha</Label>
+              <Label>Senha provisória</Label>
               <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8+ caracteres, maiuscula, minuscula e numero" />
+              <p className="text-xs text-muted-foreground">No primeiro acesso, o usuário será obrigado a trocar esta senha por uma pessoal.</p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>

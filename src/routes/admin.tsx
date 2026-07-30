@@ -9,6 +9,8 @@ export const Route = createFileRoute("/admin")({
     const auth = await requireAuth();
     if (auth.setupRequired) throw redirect({ to: "/login" });
     if (!auth.userId) throw redirect({ to: "/login" });
+    // Senha ainda provisória: trava na tela de troca até definir a senha pessoal.
+    if (auth.mustChangePassword) throw redirect({ to: "/trocar-senha" });
     return auth;
   },
   component: AdminLayout,

@@ -5,6 +5,7 @@ create table if not exists public.users (
   phone text null,
   nome text null,
   role text not null default 'admin',
+  must_change_password boolean not null default false,
   created_at timestamptz not null,
   updated_at timestamptz not null
 );
