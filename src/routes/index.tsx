@@ -76,7 +76,7 @@ function Nav() {
         <div className="flex items-center gap-2">
           <SocialIcons className="hidden md:flex" />
           <Link to="/admin">
-            <Button variant="ghost" size="sm">Admin</Button>
+            <Button variant="ghost" size="sm">Painel</Button>
           </Link>
           <a href="#contact" className="btn-filament inline-flex h-10 items-center px-5 text-sm font-semibold">
             Faça seu Orçamento
