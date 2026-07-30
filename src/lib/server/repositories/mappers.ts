@@ -256,7 +256,7 @@ export function toOrderPartRow(row: OrderPart) {
   };
 }
 
-function safeParseJsonArray(value: unknown): any[] {
+export function safeParseJsonArray(value: unknown): any[] {
   if (Array.isArray(value)) return value;
   if (typeof value === "string" && value) {
     try {

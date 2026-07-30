@@ -318,3 +318,6 @@ Icon?
 # Vercel build output e cache local do TanStack
 .vercel/
 .tanstack/
+
+# Cache do gerenciador Python do Windows (artefato acidental)
+Python/

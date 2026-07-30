@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { computeReservedByFilament } from "../../domain/inventory";
+import { DEFAULT_APP_SETTINGS } from "../../domain/types";
 import {
   clientsRepo,
   expensesRepo,
@@ -22,26 +23,54 @@ import {
   productionCalendarRepo,
   budgetQuotesRepo,
 } from "../../server/repositories.server";
+import { safeParseJsonArray } from "../../server/repositories/mappers";
+import { unwrapResult } from "../../server/repositories/shared";
+import { getSupabaseAdminClient } from "../../server/supabase.server";
 import { requireSession } from "../../server/require-session.server";
 import { buildFilamentoLabel, hydrateOrderClientLinks } from "./shared";
 
 export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(async () => {
-  const [portfolio, filamentos, settingsData] = await Promise.all([portfolioRepo(), filamentosRepo(), settingsRepo()]);
+  // Rota pública de maior tráfego: filtro e projeção acontecem no SQL para
+  // baixar do Supabase apenas os projetos públicos e as colunas exibidas no
+  // site — nunca custos/preços internos nem projetos privados (economiza egress).
+  const supabase = getSupabaseAdminClient();
+  const [portfolioRows, filamentoRows, settingsRows] = await Promise.all([
+    supabase
+      .from("portfolio_projects")
+      .select("id, nome, categoria, image_url, image_urls, published_at, filamento_id")
+      .eq("is_public", true),
+    supabase.from("filamentos").select("id, material, cor"),
+    supabase.from("app_settings").select("whatsapp_numero").eq("id", "main").limit(1),
+  ]).then(([portfolio, filamentos, settings]) => [
+    unwrapResult(portfolio, {
+      table: "portfolio_projects",
+      operation: "listPublic",
+      query: "select(public cols).eq(is_public, true)",
+    }) as any[],
+    unwrapResult(filamentos, {
+      table: "filamentos",
+      operation: "listPublicLookup",
+      query: "select(id, material, cor)",
+    }) as any[],
+    unwrapResult(settings, {
+      table: "app_settings",
+      operation: "getPublicSettings",
+      query: "select(whatsapp_numero).eq(id, main).limit(1)",
+    }) as any[],
+  ]);
 
-  const publicPortfolio = portfolio.list
-    .filter((item) => item.isPublic !== false) // !== false: also includes legacy items without isPublic field
-    .map((item) => {
-      const filamento = item.filamentoId ? filamentos.list.find((candidate) => candidate.id === item.filamentoId) : null;
-      // Projeção pública: nunca expor custos/preços internos do portfólio.
+  const publicPortfolio = portfolioRows
+    .map((row) => {
+      const filamento = row.filamento_id ? filamentoRows.find((candidate) => candidate.id === row.filamento_id) : null;
       return {
-        id: item.id,
-        nome: item.nome,
-        categoria: item.categoria,
-        imageUrl: item.imageUrl ?? null,
-        imageUrls: item.imageUrls ?? [],
-        publishedAt: item.publishedAt ?? null,
-        filamentoMaterial: filamento?.material ?? null,
-        filamentoCor: filamento?.cor ?? null,
+        id: row.id as string,
+        nome: row.nome as string,
+        categoria: row.categoria as string,
+        imageUrl: (row.image_url ?? null) as string | null,
+        imageUrls: safeParseJsonArray(row.image_urls).filter((v): v is string => typeof v === "string"),
+        publishedAt: (row.published_at ?? null) as string | null,
+        filamentoMaterial: (filamento?.material ?? null) as string | null,
+        filamentoCor: (filamento?.cor ?? null) as string | null,
       };
     })
     .sort((a, b) => {
@@ -55,7 +84,7 @@ export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(asyn
     portfolio: publicPortfolio,
     // Público só precisa do WhatsApp para o CTA de contato.
     settings: {
-      whatsappNumero: settingsData.settings?.whatsappNumero ?? "",
+      whatsappNumero: settingsRows[0]?.whatsapp_numero ?? DEFAULT_APP_SETTINGS.whatsappNumero ?? "",
     },
   };
 });

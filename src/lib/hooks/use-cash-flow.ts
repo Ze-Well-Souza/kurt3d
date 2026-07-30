@@ -9,8 +9,8 @@ export function useOrderPayments() {
   return useQuery({
     queryKey: ["order-payments"],
     queryFn: () => listOrderPayments(),
-    staleTime: 5_000,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
@@ -21,8 +21,8 @@ export function useWeeklyCashFlow(semanas?: number) {
   return useQuery({
     queryKey: ["cash-flow", "weekly", semanas ?? 4],
     queryFn: () => getWeeklyCashFlow({ data: semanas ? { semanas } : undefined }),
-    staleTime: 5_000,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
@@ -33,8 +33,8 @@ export function useDailyCashFlow(dataIso?: string) {
   return useQuery({
     queryKey: ["cash-flow", "daily", dataIso ?? "hoje"],
     queryFn: () => getDailyCashFlow({ data: dataIso ? { data: dataIso } : undefined }),
-    staleTime: 5_000,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });

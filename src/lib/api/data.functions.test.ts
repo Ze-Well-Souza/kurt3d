@@ -67,6 +67,7 @@ let insumosRepoMock: InsumoRepoMock;
 let insumoPaymentsRepoMock: InsumoPaymentRepoMock;
 let insumoInstallmentsRepoMock: InsumoInstallmentRepoMock;
 let leadsRepoMock: LeadRepoMock;
+let supabaseMockRows: Record<string, any[]> = {};
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
@@ -110,6 +111,31 @@ vi.mock("../server/repositories.server", () => ({
 
 vi.mock("../server/require-session.server", () => ({
   requireSession: vi.fn(async () => "test-user-id"),
+}));
+
+// Mock do client Supabase para funções que consultam o banco direto (sem repo),
+// como a listPublicSnapshot — aplica o filtro .eq() em memória para o teste
+// validar que a projeção pública acontece no SQL.
+vi.mock("../server/supabase.server", () => ({
+  getSupabaseAdminClient: () => ({
+    from: (table: string) => {
+      let rows = [...(supabaseMockRows[table] ?? [])];
+      const builder: any = {
+        select: () => builder,
+        eq: (column: string, value: unknown) => {
+          rows = rows.filter((row) => row[column] === value);
+          return builder;
+        },
+        limit: (count: number) => {
+          rows = rows.slice(0, count);
+          return builder;
+        },
+        order: () => builder,
+        then: (resolve: any, reject: any) => Promise.resolve({ data: rows, error: null }).then(resolve, reject),
+      };
+      return builder;
+    },
+  }),
 }));
 
 vi.mock("../server/mutation-guard.server", () => ({
@@ -391,32 +417,32 @@ describe("client linking", () => {
   });
 
   it("retorna apenas dados publicos no snapshot da landing", async () => {
-    portfolioRepoMock.list = [
-      {
-        id: "project-1",
-        nome: "Projeto Publico",
-        categoria: "Chaveiro",
-        custoRolo: 100,
-        pesoRolo: 1000,
-        pesoPeca: 10,
-        tempoMin: 20,
-        quantidade: 1,
-        precoVenda: 15,
-        createdAt: "2026-06-26T10:00:00.000Z",
-        updatedAt: "2026-06-26T10:00:00.000Z",
-      },
-    ];
-    clientsRepoMock.list = [
-      {
-        id: "client-1",
-        nome: "Cliente Sigiloso",
-        whatsapp: "(11) 99999-9999",
-        email: "privado@example.com",
-        notas: "nao deve sair",
-        createdAt: "2026-06-26T10:00:00.000Z",
-        updatedAt: "2026-06-26T10:00:00.000Z",
-      },
-    ];
+    supabaseMockRows = {
+      portfolio_projects: [
+        {
+          id: "project-1",
+          nome: "Projeto Publico",
+          categoria: "Chaveiro",
+          image_url: null,
+          image_urls: null,
+          published_at: null,
+          filamento_id: null,
+          is_public: true,
+        },
+        {
+          id: "project-2",
+          nome: "Projeto Privado",
+          categoria: "Miniatura",
+          image_url: null,
+          image_urls: null,
+          published_at: null,
+          filamento_id: null,
+          is_public: false,
+        },
+      ],
+      filamentos: [],
+      app_settings: [],
+    };
 
     const { listPublicSnapshot } = await import("./data.functions");
 
@@ -431,6 +457,9 @@ describe("client linking", () => {
       ],
       settings: {},
     });
+    expect(snapshot.portfolio).toHaveLength(1);
+    expect(snapshot.portfolio[0]).not.toHaveProperty("precoVenda");
+    expect(snapshot.portfolio[0]).not.toHaveProperty("custoRolo");
     expect("clients" in snapshot).toBe(false);
     expect("orders" in snapshot).toBe(false);
     expect("expenses" in snapshot).toBe(false);
