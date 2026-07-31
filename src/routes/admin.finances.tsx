@@ -22,6 +22,16 @@ import { brl } from "@/lib/utils";
 import { SearchInput } from "@/components/SearchInput";
 import { addManualExpense, removeExpense, payInstallment, payInsumoInstallment, settleInsumoPayment, settlePayment } from "@/lib/api/data.functions";
 import { formatIsoDatePtBr, parseIsoDateLocal, todayIso } from "@/lib/domain/installments";
+import {
+  buildScheduleEntries,
+  computeInstallmentKpis,
+  getInstallmentPaidAmount,
+  getInstallmentRemainingAmount,
+  getPaymentProgress,
+  getScheduleCounts,
+  isPartialInstallment,
+  type InstallmentViewFilter,
+} from "@/lib/domain/finance-schedule";
 import type {
   Filamento,
   FilamentoHistory,
@@ -48,15 +58,6 @@ export const Route = createFileRoute("/admin/finances")({
 
 const EXPENSE_CATEGORIES = ["Aluguel","Internet","Manutenção","Energia","Perda de Material","Transporte","Marketing","Outros"] as const;
 
-const getInstallmentPaidAmount = (installment: { valor: number; valorPago: number | null }) =>
-  Math.min(installment.valorPago ?? 0, installment.valor);
-
-const getInstallmentRemainingAmount = (installment: { valor: number; valorPago: number | null }) =>
-  Math.max(installment.valor - getInstallmentPaidAmount(installment), 0);
-
-const isPartialInstallment = (installment: { pago: boolean; valor: number; valorPago: number | null }) =>
-  !installment.pago && getInstallmentPaidAmount(installment) > 0;
-
 const getEventSignedAmount = (event: { tipo: "pagamento" | "estorno"; valor: number }) =>
   event.tipo === "estorno" ? -event.valor : event.valor;
 
@@ -73,7 +74,6 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 type FinancePeriodPreset = "all" | "month" | "quarter";
-type InstallmentViewFilter = "pending" | "paid" | "all";
 type PaymentHistorySourceFilter = "all" | "filamento" | "insumo";
 type PaymentHistoryTypeFilter = "all" | "pagamento" | "estorno";
 
@@ -407,39 +407,13 @@ function Finances() {
   // Installment (parcelas) KPIs
   const installmentKpis = useMemo(() => {
     const today = todayIso();
-    let pendente = 0;
-    let vencendoNoMes = 0;
-    let atrasadas = 0;
-    for (const inst of referenceMonthInstallments) {
-      if (!inst.pago) {
-        const remainingAmount = getInstallmentRemainingAmount(inst);
-        pendente += remainingAmount;
-        if (inst.vencimento < today) {
-          atrasadas++;
-        } else {
-          vencendoNoMes += remainingAmount;
-        }
-      }
-    }
-    const installmentIdsWithEventThisMonth = new Set(
-      allPaymentEvents
-        .filter((event) => event.dataPagamento.slice(0, 7) === installmentKpiMonthAnchor)
-        .map((event) => event.installmentId),
-    );
-    const paidFallbackNoMes = allInstallments
-      .filter(
-        (inst) =>
-          !!inst.dataPagamento &&
-          inst.dataPagamento.slice(0, 7) === installmentKpiMonthAnchor &&
-          getInstallmentPaidAmount(inst) > 0 &&
-          !installmentIdsWithEventThisMonth.has(inst.id),
-      )
-      .reduce((sum, inst) => sum + getInstallmentPaidAmount(inst), 0);
-    const paidFromEventsNoMes = allPaymentEvents
-      .filter((event) => event.dataPagamento.slice(0, 7) === installmentKpiMonthAnchor)
-      .reduce((sum, event) => sum + getEventSignedAmount(event), 0);
-    const pagoNoMes = paidFromEventsNoMes + paidFallbackNoMes;
-    return { pendente, pagoNoMes, vencendoNoMes, atrasadas };
+    return computeInstallmentKpis({
+      allInstallments,
+      referenceMonthInstallments,
+      allPaymentEvents,
+      installmentKpiMonthAnchor,
+      today,
+    });
   }, [referenceMonthInstallments, allPaymentEvents, allInstallments, installmentKpiMonthAnchor]);
 
   const installmentKpiAvailableMonths = useMemo(() => {
@@ -462,70 +436,35 @@ function Finances() {
       ? installmentKpiAvailableMonths[installmentKpiMonthIndex + 1]
       : null;
 
-  const filamentoPaymentProgress = useMemo(() => {
-    const grouped = new Map<string, { totalInstallments: number; paidInstallments: number; totalAmount: number; paidAmount: number }>();
-    for (const installment of filamentoInstallments) {
-      const current = grouped.get(installment.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
-      current.totalInstallments += 1;
-      current.totalAmount += installment.valor;
-      current.paidAmount += getInstallmentPaidAmount(installment);
-      if (installment.pago) current.paidInstallments += 1;
-      grouped.set(installment.paymentId, current);
-    }
-    return grouped;
-  }, [filamentoInstallments]);
+  const filamentoPaymentProgress = useMemo(
+    () => getPaymentProgress(filamentoInstallments),
+    [filamentoInstallments],
+  );
 
-  const insumoPaymentProgress = useMemo(() => {
-    const grouped = new Map<string, { totalInstallments: number; paidInstallments: number; totalAmount: number; paidAmount: number }>();
-    for (const installment of insumoInstallments) {
-      const current = grouped.get(installment.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
-      current.totalInstallments += 1;
-      current.totalAmount += installment.valor;
-      current.paidAmount += getInstallmentPaidAmount(installment);
-      if (installment.pago) current.paidInstallments += 1;
-      grouped.set(installment.paymentId, current);
-    }
-    return grouped;
-  }, [insumoInstallments]);
+  const insumoPaymentProgress = useMemo(
+    () => getPaymentProgress(insumoInstallments),
+    [insumoInstallments],
+  );
 
   const scheduleEntries = useMemo(() => {
     const today = todayIso();
-    const filamentEntries = referenceMonthFilamentoInstallments
-      .map((i) => {
-        const payment = filamentoPayments.find((p) => p.id === i.paymentId) ?? null;
-        const label = payment
-          ? filamentos.filter((f) => f.batchId === payment.batchId).map((f) => f.sku).join(", ")
-          : "";
-        const progress = filamentoPaymentProgress.get(i.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
-        return { kind: "filamento" as const, inst: i, payment, label, overdue: !i.pago && i.vencimento <= today, progress };
-      });
-    const insumoEntries = referenceMonthInsumoInstallments
-      .map((i) => {
-        const payment = insumoPayments.find((p) => p.id === i.paymentId) ?? null;
-        const insumo = payment ? insumos.find((item) => item.id === payment.insumoId) : null;
-        const progress = insumoPaymentProgress.get(i.paymentId) ?? { totalInstallments: 0, paidInstallments: 0, totalAmount: 0, paidAmount: 0 };
-        return { kind: "insumo" as const, inst: i, payment, label: insumo?.nome ?? "", overdue: !i.pago && i.vencimento <= today, progress };
-      });
-    const allEntries = [...filamentEntries, ...insumoEntries];
-    const visibleEntries = allEntries.filter(({ inst }) => {
-      if (installmentViewFilter === "pending") return !inst.pago;
-      if (installmentViewFilter === "paid") return inst.pago;
-      return true;
-    });
-    return visibleEntries.sort((a, b) => {
-      if (installmentViewFilter === "paid") {
-        return (b.inst.dataPagamento ?? b.inst.vencimento).localeCompare(a.inst.dataPagamento ?? a.inst.vencimento);
-      }
-      if (installmentViewFilter === "all" && a.inst.pago !== b.inst.pago) {
-        return a.inst.pago ? 1 : -1;
-      }
-      const aDate = a.inst.pago ? a.inst.dataPagamento ?? a.inst.vencimento : a.inst.vencimento;
-      const bDate = b.inst.pago ? b.inst.dataPagamento ?? b.inst.vencimento : b.inst.vencimento;
-      return aDate.localeCompare(bDate);
+    return buildScheduleEntries({
+      filamentoInstallments,
+      insumoInstallments,
+      installmentKpiMonthAnchor,
+      filamentoPayments,
+      filamentos,
+      insumoPayments,
+      insumos,
+      filamentoPaymentProgress,
+      insumoPaymentProgress,
+      installmentViewFilter,
+      today,
     });
   }, [
-    referenceMonthFilamentoInstallments,
-    referenceMonthInsumoInstallments,
+    filamentoInstallments,
+    insumoInstallments,
+    installmentKpiMonthAnchor,
     filamentoPayments,
     filamentos,
     insumoPayments,
@@ -536,13 +475,12 @@ function Finances() {
   ]);
 
   const scheduleCounts = useMemo(
-    () => ({
-      pending: referenceMonthInstallments.filter((item) => !item.pago).length,
-      paid: referenceMonthInstallments.filter((item) => item.pago).length,
-      partial: referenceMonthInstallments.filter((item) => isPartialInstallment(item)).length,
-      total: referenceMonthInstallments.length,
+    () =>
+      getScheduleCounts({
+      allInstallments,
+      installmentKpiMonthAnchor,
     }),
-    [referenceMonthInstallments],
+    [allInstallments, installmentKpiMonthAnchor],
   );
 
   const selectedFinanceInstallment = useMemo(() => {
