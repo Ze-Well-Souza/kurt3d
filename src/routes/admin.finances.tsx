@@ -10,8 +10,7 @@ import {
   Trash2,
   AlertCircle,
   BookOpen,
-  LayoutList,
-  Table as TableIcon,
+
   CreditCard,
   Banknote,
   CalendarClock,
@@ -175,7 +174,6 @@ function Finances() {
 
   const [search, setSearch] = useState("");
   const [showExpense, setShowExpense] = useState(false);
-  const [stockView, setStockView] = useState<"list" | "table">("table");
   const [installmentViewFilter, setInstallmentViewFilter] =
     useState<InstallmentViewFilter>("pending");
   const [purchaseBrandFilter, setPurchaseBrandFilter] = useState("all");
@@ -514,52 +512,9 @@ function Finances() {
       .filter((expense) => expense.financialClass === "investimento")
       .reduce((s, e) => s + e.valor, 0);
     const lucro = receita - custo - despesasOperacionais;
-    const depreciacaoAcumulada = periodFilteredVendas.reduce((s, v) => s + v.depreciacao, 0);
-    return { receita, custo, lucro, depreciacaoAcumulada, despesasOperacionais, investimentos };
+    return { receita, custo, lucro, despesasOperacionais, investimentos };
   }, [classifiedExpenses, periodFilteredVendas, insumoPayments]);
 
-  // Stock summary with full cost accounting per filament
-  const stockSummary = useMemo(() => {
-    return filamentos.map((f) => {
-      const used = f.pesoInicial - f.pesoAtual;
-      const custoPorGrama = f.pesoInicial > 0 ? f.precoPago / f.pesoInicial : 0;
-      const valorConsumido = used * custoPorGrama;
-      const valorRestante = f.pesoAtual * custoPorGrama;
-      return {
-        id: f.id,
-        sku: f.sku,
-        marca: f.marca,
-        cor: f.cor,
-        material: f.material,
-        nome: f.label ?? `[${f.sku}] ${f.marca} ${f.cor}`,
-        pesoInicial: f.pesoInicial,
-        pesoAtual: f.pesoAtual,
-        precoPago: f.precoPago,
-        dataCompra: f.dataCompra,
-        linkProduto: f.linkProduto ?? null,
-        used,
-        remaining: f.pesoAtual,
-        percent: f.pesoInicial > 0 ? (used / f.pesoInicial) * 100 : 0,
-        custoPorGrama,
-        valorConsumido,
-        valorRestante,
-      };
-    });
-  }, [filamentos]);
-
-  // Aggregated filament KPIs
-  const filamentTotals = useMemo(() => {
-    return stockSummary.reduce(
-      (acc, s) => ({
-        investido: acc.investido + s.precoPago,
-        consumido: acc.consumido + s.valorConsumido,
-        restante: acc.restante + s.valorRestante,
-        gramasConsumidos: acc.gramasConsumidos + s.used,
-        gramasRestantes: acc.gramasRestantes + s.remaining,
-      }),
-      { investido: 0, consumido: 0, restante: 0, gramasConsumidos: 0, gramasRestantes: 0 },
-    );
-  }, [stockSummary]);
 
   const despesasManuais = classifiedExpenses
     .filter((e) => e.source === "manual")
@@ -1276,34 +1231,6 @@ function Finances() {
         />
       </div>
 
-      {/* Filament Investment KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          icon={<Package className="h-4 w-4" />}
-          label="Investido em Filamentos"
-          value={brl(filamentTotals.investido)}
-          color="var(--filament-cyan)"
-        />
-        <KpiCard
-          icon={<TrendingUp className="h-4 w-4" />}
-          label="Filamento em Estoque"
-          value={brl(filamentTotals.restante)}
-          color="var(--filament-green)"
-        />
-        <KpiCard
-          icon={<Wrench className="h-4 w-4" />}
-          label="Filamento Consumido"
-          value={brl(filamentTotals.consumido)}
-          color="var(--filament-yellow)"
-        />
-        <KpiCard
-          icon={<Package className="h-4 w-4" />}
-          label="Estoque Físico Restante"
-          value={`${filamentTotals.gramasRestantes.toFixed(0)} g`}
-          color="var(--filament-pink)"
-        />
-      </div>
-
       {/* Purchase Analysis — Collapsible */}
       <Accordion
         type="single"
@@ -1521,186 +1448,6 @@ function Finances() {
           value={`${String(installmentKpis.atrasadas)} · ${brl(installmentKpis.atrasadasValor)}`}
           color={installmentKpis.atrasadas > 0 ? "var(--filament-magenta)" : "var(--filament-cyan)"}
         />
-      </div>
-
-      {/* Depreciation Reserve + Filament Stock (with list/table toggle) */}
-      <div className="filament-top rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-display text-lg font-semibold">Fundo de Reserva de Depreciação</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Valor acumulado para manutenções e peças da Bambu Lab A1. Esse dinheiro é separado de
-              cada venda para garantir a longevidade das impressoras.
-            </p>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Acumulado</div>
-            <div className="font-display text-3xl font-bold filament-text">
-              {brl(totals.depreciacaoAcumulada)}
-            </div>
-          </div>
-        </div>
-
-        {/* Filament Stock with list/table toggle */}
-        {stockSummary.length > 0 && (
-          <div className="mt-6 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Estoque de Filamentos</h3>
-                <p className="text-xs text-muted-foreground">
-                  {stockSummary.length} rolo(s) · {brl(filamentTotals.investido)} investidos ·{" "}
-                  {brl(filamentTotals.consumido)} consumidos
-                </p>
-              </div>
-              <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
-                <Button
-                  size="sm"
-                  variant={stockView === "list" ? "default" : "ghost"}
-                  className="h-7 gap-1.5 px-3 text-xs"
-                  onClick={() => setStockView("list")}
-                >
-                  <LayoutList className="h-3.5 w-3.5" />
-                  Lista
-                </Button>
-                <Button
-                  size="sm"
-                  variant={stockView === "table" ? "default" : "ghost"}
-                  className="h-7 gap-1.5 px-3 text-xs"
-                  onClick={() => setStockView("table")}
-                >
-                  <TableIcon className="h-3.5 w-3.5" />
-                  Tabela
-                </Button>
-              </div>
-            </div>
-
-            {stockView === "list" ? (
-              <div className="space-y-3">
-                {stockSummary.map((s) => (
-                  <div key={s.id} className="rounded-xl border border-border bg-card/60 p-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold">{s.nome}</span>
-                      <Badge variant="secondary" className="font-mono text-[10px]">
-                        {s.sku}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 space-y-1">
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${Math.min(100, s.percent)}%`,
-                            background:
-                              s.percent > 80
-                                ? "var(--filament-magenta)"
-                                : s.percent > 50
-                                  ? "var(--filament-yellow)"
-                                  : "var(--filament-green)",
-                          }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>
-                          {s.remaining}g restantes ({s.percent.toFixed(0)}% usado)
-                        </span>
-                        <span className="tabular-nums">
-                          {s.used.toFixed(0)}g × {brl(s.custoPorGrama)}/g ={" "}
-                          <strong className="text-foreground">{brl(s.valorConsumido)}</strong>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
-                      <StatChip label="Investido" value={brl(s.precoPago)} />
-                      <StatChip label="Consumido" value={brl(s.valorConsumido)} />
-                      <StatChip label="Em estoque" value={brl(s.valorRestante)} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Marca / Cor</TableHead>
-                      <TableHead>Material</TableHead>
-                      <TableHead className="text-right">Peso Inicial</TableHead>
-                      <TableHead className="text-right">Peso Atual</TableHead>
-                      <TableHead className="text-right">% Usado</TableHead>
-                      <TableHead className="text-right">Custo/g</TableHead>
-                      <TableHead className="text-right">Investido</TableHead>
-                      <TableHead className="text-right">Consumido</TableHead>
-                      <TableHead className="text-right">Em Estoque</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {stockSummary.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-mono text-xs">{s.sku}</TableCell>
-                        <TableCell className="font-medium">
-                          {s.marca} — {s.cor}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {s.material}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {s.pesoInicial}g
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">
-                          {s.pesoAtual}g
-                        </TableCell>
-                        <TableCell
-                          className="text-right tabular-nums"
-                          style={{
-                            color:
-                              s.percent > 80
-                                ? "var(--filament-magenta)"
-                                : s.percent > 50
-                                  ? "var(--filament-yellow)"
-                                  : "var(--filament-green)",
-                          }}
-                        >
-                          {s.percent.toFixed(0)}%
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {brl(s.custoPorGrama)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {brl(s.precoPago)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {brl(s.valorConsumido)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold filament-text">
-                          {brl(s.valorRestante)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <tfoot>
-                    <TableRow className="bg-muted/40">
-                      <TableCell colSpan={7} className="text-right text-xs font-semibold">
-                        Totais ({stockSummary.length} rolos)
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-bold">
-                        {brl(filamentTotals.investido)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-bold text-muted-foreground">
-                        {brl(filamentTotals.consumido)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-bold filament-text">
-                        {brl(filamentTotals.restante)}
-                      </TableCell>
-                    </TableRow>
-                  </tfoot>
-                </Table>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Installments Schedule */}

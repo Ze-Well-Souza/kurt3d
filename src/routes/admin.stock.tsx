@@ -597,6 +597,15 @@ function Stock() {
   const totalInsumos = insumos.reduce((sum, i) => sum + i.precoTotal, 0);
   const totalInvestido = totalFilamentos + totalInsumos;
   const percentualGeral = totalInicial > 0 ? (totalGramas / totalInicial) * 100 : 0;
+  const totalConsumido = filamentos.reduce((sum, f) => {
+    const custoPorGrama = f.pesoInicial > 0 ? f.precoPago / f.pesoInicial : 0;
+    const used = f.pesoInicial - f.pesoAtual;
+    return sum + used * custoPorGrama;
+  }, 0);
+  const totalEmEstoque = filamentos.reduce((sum, f) => {
+    const custoPorGrama = f.pesoInicial > 0 ? f.precoPago / f.pesoInicial : 0;
+    return sum + f.pesoAtual * custoPorGrama;
+  }, 0);
 
   // ── Filtered lists ──
   const filteredFilamentos = useMemo(() => {
@@ -682,6 +691,18 @@ function Stock() {
               Total investido
             </div>
             <div className="font-display text-xl font-bold">{brl(totalInvestido)}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              Consumido
+            </div>
+            <div className="font-display text-xl font-bold text-muted-foreground">{brl(totalConsumido)}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              Em Estoque
+            </div>
+            <div className="font-display text-xl font-bold filament-text">{brl(totalEmEstoque)}</div>
           </div>
         </div>
         <div className="flex w-full xl:w-auto xl:justify-end">
@@ -798,6 +819,8 @@ function Stock() {
                   <TableHead className="text-center">Nível</TableHead>
                   <TableHead className="text-right">Custo/g</TableHead>
                   <TableHead className="text-right">Investido</TableHead>
+                  <TableHead className="text-right">Consumido</TableHead>
+                  <TableHead className="text-right">Em Estoque</TableHead>
                   <TableHead>Data Compra</TableHead>
                   <TableHead>Entrega</TableHead>
                   <TableHead>Data p/ Pagto</TableHead>
@@ -891,6 +914,12 @@ function Stock() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums font-semibold">
                         {brl(f.precoPago)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {brl((f.pesoInicial - f.pesoAtual) * custoPorGrama)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold filament-text">
+                        {brl(f.pesoAtual * custoPorGrama)}
                       </TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">
                         {formatIsoDatePtBr(f.dataCompra)}
@@ -1081,8 +1110,24 @@ function Stock() {
                         {percent.toFixed(0)}%
                       </span>
                       {f.reservedGrams ? <span>{f.reservedGrams}g reservado(s)</span> : null}
-                      <span>Custo/g: {brl(custoPorGrama)}</span>
+                      <span className="tabular-nums">Custo/g: {brl(custoPorGrama)}</span>
                     </div>
+                  </div>
+
+                  {/* Financial breakdown */}
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
+                    <span className="rounded-lg border border-border bg-muted/30 px-2 py-1 text-center">
+                      <span className="text-muted-foreground">Investido </span>
+                      <span className="font-semibold">{brl(f.precoPago)}</span>
+                    </span>
+                    <span className="rounded-lg border border-border bg-muted/30 px-2 py-1 text-center">
+                      <span className="text-muted-foreground">Consumido </span>
+                      <span className="font-semibold">{brl((f.pesoInicial - f.pesoAtual) * custoPorGrama)}</span>
+                    </span>
+                    <span className="rounded-lg border border-border bg-muted/30 px-2 py-1 text-center">
+                      <span className="text-muted-foreground">Em estoque </span>
+                      <span className="font-semibold filament-text">{brl(f.pesoAtual * custoPorGrama)}</span>
+                    </span>
                   </div>
 
                   {/* Quality badge (if set) */}
