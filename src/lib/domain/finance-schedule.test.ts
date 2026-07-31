@@ -8,6 +8,8 @@ import type {
   InsumoPaymentInstallment,
 } from "./types";
 import {
+  buildCurrentMonthInstallmentBreakdown,
+  buildInstallmentAuditByMonth,
   buildScheduleEntries,
   computeInstallmentKpis,
   getPaymentProgress,
@@ -152,7 +154,14 @@ function buildFixture(): Fixture {
       observacao: null,
     },
   ];
-  return { filamentos, insumos, filamentoPayments, insumoPayments, filamentoInstallments, insumoInstallments };
+  return {
+    filamentos,
+    insumos,
+    filamentoPayments,
+    insumoPayments,
+    filamentoInstallments,
+    insumoInstallments,
+  };
 }
 
 describe("Cenário 1: vencimentos em 01/08 aparecem na listagem", () => {
@@ -284,7 +293,9 @@ describe("Cenário 3: parcelamentos pendentes do mês anterior aparecem corretam
   it("KPI de parcelas pendentes e atrasadas computa pendências de qualquer mês", () => {
     const f = buildFixture();
     const allInstallments = [...f.filamentoInstallments, ...f.insumoInstallments];
-    const referenceMonthInstallments = allInstallments.filter((i) => i.vencimento.slice(0, 7) === "2026-07");
+    const referenceMonthInstallments = allInstallments.filter(
+      (i) => i.vencimento.slice(0, 7) === "2026-07",
+    );
     const kpis = computeInstallmentKpis({
       allInstallments,
       referenceMonthInstallments,
@@ -425,7 +436,9 @@ describe("Não regressão: KPI Pagas do mês usa eventos + fallback legacy", () 
   it("soma pagamentos via evento + legado no mês de referência", () => {
     const f = buildFixture();
     const allInstallments = [...f.filamentoInstallments, ...f.insumoInstallments];
-    const referenceMonthInstallments = allInstallments.filter((i) => i.vencimento.slice(0, 7) === "2026-07");
+    const referenceMonthInstallments = allInstallments.filter(
+      (i) => i.vencimento.slice(0, 7) === "2026-07",
+    );
     const allPaymentEvents = [
       {
         id: "evt-01",
@@ -446,5 +459,113 @@ describe("Não regressão: KPI Pagas do mês usa eventos + fallback legacy", () 
       today: "2026-07-31",
     });
     expect(kpis.pagoNoMes).toBeCloseTo(55 + 47.5, 2);
+  });
+});
+
+describe("Cobertura nova: KPI atrasadasValor + Auditoria por mês + DataCompra + Breakdown mês", () => {
+  it("KPI atrasadasValor soma apenas saldo remanescente de parcelas atrasadas", () => {
+    const f = buildFixture();
+    const allInstallments = [...f.filamentoInstallments, ...f.insumoInstallments];
+    const referenceMonthInstallments = allInstallments.filter(
+      (i) => i.vencimento.slice(0, 7) === "2026-07",
+    );
+    const kpis = computeInstallmentKpis({
+      allInstallments,
+      referenceMonthInstallments,
+      allPaymentEvents: [],
+      installmentKpiMonthAnchor: "2026-07",
+      today: "2026-07-31",
+    });
+    expect(kpis.atrasadas).toBe(1);
+    expect(kpis.atrasadasValor).toBeCloseTo(45, 2);
+  });
+
+  it("Auditoria por mês separa corretamente 2026-06, 07 e 08 com total/pago/pendente", () => {
+    const f = buildFixture();
+    const allInstallments = [...f.filamentoInstallments, ...f.insumoInstallments];
+    const rows = buildInstallmentAuditByMonth({ allInstallments });
+    expect(rows.map((r) => r.dueMonth)).toStrictEqual(["2026-06", "2026-07", "2026-08"]);
+    const jun = rows.find((r) => r.dueMonth === "2026-06")!;
+    const jul = rows.find((r) => r.dueMonth === "2026-07")!;
+    const ago = rows.find((r) => r.dueMonth === "2026-08")!;
+    expect(jun).toMatchObject({
+      countTotal: 1,
+      countPaid: 0,
+      countPending: 1,
+      countPartial: 1,
+    });
+    expect(jun.valorTotal).toBeCloseTo(55);
+    expect(jun.valorPago).toBeCloseTo(10);
+    expect(jun.valorPendente).toBeCloseTo(45);
+    expect(jul).toMatchObject({ countTotal: 2, countPaid: 2, countPending: 0 });
+    expect(jul.valorTotal).toBeCloseTo(47.5 + 55);
+    expect(jul.valorPago).toBeCloseTo(47.5 + 55);
+    expect(ago).toMatchObject({ countTotal: 2, countPaid: 0, countPending: 2 });
+    expect(ago.valorTotal).toBeCloseTo(47.5 + 25);
+    expect(ago.valorPendente).toBeCloseTo(47.5 + 25);
+  });
+
+  it("ScheduleEntry.dataCompra preenchida: filamento usa lote, insumo usa insumo.dataCompra, fallback dataParaPagamento", () => {
+    const f = buildFixture();
+    const entries = buildScheduleEntries({
+      filamentoInstallments: f.filamentoInstallments,
+      insumoInstallments: f.insumoInstallments,
+      installmentKpiMonthAnchor: "2026-07",
+      filamentoPayments: f.filamentoPayments,
+      filamentos: f.filamentos,
+      insumoPayments: f.insumoPayments,
+      insumos: f.insumos,
+      filamentoPaymentProgress: getPaymentProgress(f.filamentoInstallments),
+      insumoPaymentProgress: getPaymentProgress(f.insumoInstallments),
+      installmentViewFilter: "all",
+      today: "2026-07-31",
+    });
+    const filPendente = entries.find((e) => e.inst.id === "inst-fil-01-02")!;
+    const insJulho = entries.find((e) => e.inst.id === "inst-ins-02-02")!;
+    const insAgo = entries.find((e) => e.inst.id === "inst-ins-01-01")!;
+    expect(filPendente.dataCompra).toBe("2026-07-01");
+    expect(insJulho.dataCompra).toBe("2026-06-20");
+    expect(insAgo.dataCompra).toBe("2026-07-01");
+  });
+
+  it("Breakdown do mês (08/2026) mostra Total devido / Já pago / A pagar + lista com DataCompra", () => {
+    const f = buildFixture();
+    const entries = buildScheduleEntries({
+      filamentoInstallments: f.filamentoInstallments,
+      insumoInstallments: f.insumoInstallments,
+      installmentKpiMonthAnchor: "2026-08",
+      filamentoPayments: f.filamentoPayments,
+      filamentos: f.filamentos,
+      insumoPayments: f.insumoPayments,
+      insumos: f.insumos,
+      filamentoPaymentProgress: getPaymentProgress(f.filamentoInstallments),
+      insumoPaymentProgress: getPaymentProgress(f.insumoInstallments),
+      installmentViewFilter: "pending",
+      today: "2026-07-31",
+    });
+    const breakdown = buildCurrentMonthInstallmentBreakdown({
+      entries,
+      dueMonth: "2026-08",
+    });
+    expect(breakdown.dueMonth).toBe("2026-08");
+    expect(breakdown.valorTotalDevido).toBeCloseTo(47.5 + 25);
+    expect(breakdown.valorJaPago).toBe(0);
+    expect(breakdown.valorApagarNoMes).toBeCloseTo(47.5 + 25);
+    expect(breakdown.vencimentos.map((v) => v.id)).toStrictEqual([
+      "inst-fil-01-02",
+      "inst-ins-01-01",
+    ]);
+    expect(breakdown.vencimentos[0].dataCompra).toBe("2026-07-01");
+    expect(breakdown.vencimentos[1].dataCompra).toBe("2026-07-01");
+  });
+
+  it("Auditoria com filterMonths retorna apenas meses pedidos", () => {
+    const f = buildFixture();
+    const allInstallments = [...f.filamentoInstallments, ...f.insumoInstallments];
+    const rows = buildInstallmentAuditByMonth({
+      allInstallments,
+      filterMonths: ["2026-07", "2026-08"],
+    });
+    expect(rows.map((r) => r.dueMonth)).toStrictEqual(["2026-07", "2026-08"]);
   });
 });
