@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive } from "lucide-react";
+import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive, Eye, EyeOff, Copy, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -348,6 +348,104 @@ function ChangePasswordCard() {
   );
 }
 
+// Monta a URL do WhatsApp com a mensagem ja preenchida (numero brasileiro: +55).
+function buildWhatsAppUrl(phone: string, message: string) {
+  const digits = phone.replace(/\D/g, "");
+  const withCountry = digits.length <= 11 ? `55${digits}` : digits;
+  return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`;
+}
+
+// Mensagem pronta para enviar ao novo admin com os dados de acesso.
+function buildCredentialsMessage(
+  creds: { nome: string; phone: string; username: string; password: string },
+  loginUrl: string,
+) {
+  const login = creds.phone || creds.username;
+  return (
+    `Ola ${creds.nome || "admin"}! Seu acesso ao painel da Kurti 3D foi criado.\n\n` +
+    `Acesse: ${loginUrl}\n` +
+    `Login: ${login}\n` +
+    `Senha provisoria: ${creds.password}\n\n` +
+    `No primeiro acesso o sistema vai pedir para voce criar uma senha pessoal.`
+  );
+}
+
+// Gera uma senha provisoria forte que atende a politica (maiuscula, minuscula, numero).
+function generateProvisionalPassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const all = upper + lower + digits;
+  const bytes = new Uint32Array(10);
+  crypto.getRandomValues(bytes);
+  const pick = (set: string, n: number) => set[n % set.length];
+  const chars = [pick(upper, bytes[0]), pick(lower, bytes[1]), pick(digits, bytes[2])];
+  for (let i = 3; i < 10; i++) chars.push(pick(all, bytes[i]));
+  // Embaralha para nao deixar as classes sempre nas mesmas posicoes.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = bytes[i] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
+// Tela mostrada apos criar o usuario: exibe as credenciais uma unica vez e permite
+// copiar a mensagem pronta ou enviar direto pelo WhatsApp.
+function CreatedUserShare({
+  creds,
+  onClose,
+}: {
+  creds: { nome: string; phone: string; username: string; password: string };
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const loginUrl = typeof window !== "undefined" ? `${window.location.origin}/login` : "/login";
+  const message = buildCredentialsMessage(creds, loginUrl);
+  const login = creds.phone || creds.username;
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      toast.success("Mensagem copiada.");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Nao foi possivel copiar. Copie manualmente os dados acima.");
+    }
+  }
+
+  return (
+    <>
+      <DialogHeader><DialogTitle>Usuario criado — envie o acesso</DialogTitle></DialogHeader>
+      <div className="space-y-4">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+          Esta e a unica vez que a senha provisoria aparece. Copie ou envie agora — depois nao e possivel ve-la novamente.
+        </div>
+        <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 text-sm">
+          <div className="flex justify-between gap-2"><span className="text-muted-foreground">Nome</span><span className="font-medium">{creds.nome}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-muted-foreground">Login</span><span className="font-medium">{login}</span></div>
+          <div className="flex justify-between gap-2"><span className="text-muted-foreground">Senha provisoria</span><span className="font-mono font-semibold">{creds.password}</span></div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button type="button" variant="outline" className="flex-1 gap-2" onClick={copyMessage}>
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {copied ? "Copiado" : "Copiar mensagem"}
+          </Button>
+          {creds.phone ? (
+            <a href={buildWhatsAppUrl(creds.phone, message)} target="_blank" rel="noopener noreferrer" className="flex-1">
+              <Button type="button" className="w-full gap-2 bg-[#25D366] text-white hover:bg-[#1ebe5b]">
+                <MessageCircle className="h-4 w-4" /> Enviar no WhatsApp
+              </Button>
+            </a>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onClose}>Concluir</Button>
+        </DialogFooter>
+      </div>
+    </>
+  );
+}
+
 function UserManagementCard() {
   const qc = useQueryClient();
   const usersQ = useQuery({ queryKey: ["adminUsers"], queryFn: () => listUsers() });
@@ -356,6 +454,10 @@ function UserManagementCard() {
   const [showDialog, setShowDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  // Credenciais recem-criadas para compartilhar (so vivem em memoria, uma vez):
+  // a senha provisoria nao fica salva em texto puro no banco.
+  const [createdCreds, setCreatedCreds] = useState<{ nome: string; phone: string; username: string; password: string } | null>(null);
   const handleCreateUserError = useToastErrorHandler({ fallbackMessage: "Erro ao criar usuário." });
   const handleDeleteUserError = useToastErrorHandler({ fallbackMessage: "Erro ao remover usuário." });
 
@@ -364,8 +466,10 @@ function UserManagementCard() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["adminUsers"] });
       toast.success("Usuário criado.");
+      // Guarda as credenciais para a tela de compartilhamento antes de limpar o form.
+      setCreatedCreds({ ...form });
       setForm({ nome: "", phone: "", username: "", password: "" });
-      setShowDialog(false);
+      setShowPassword(false);
     },
     onError: handleCreateUserError,
   });
@@ -427,32 +531,75 @@ function UserManagementCard() {
       </Card>
 
       {/* Create user dialog */}
-      <Dialog open={showDialog} onOpenChange={(o) => !o && setShowDialog(false)}>
+      <Dialog
+        open={showDialog}
+        onOpenChange={(o) => {
+          if (!o) {
+            setShowDialog(false);
+            setCreatedCreds(null);
+            setShowPassword(false);
+            setForm({ nome: "", phone: "", username: "", password: "" });
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Novo Usuário Admin</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); const passwordMessage = getPasswordPolicyMessage(form.password); if (passwordMessage) { toast.error(passwordMessage); return; } mutateCreate.mutate(); }} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Nome</Label>
-              <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Nome do usuário" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Telefone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="11967428594" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Usuário (login alternativo)</Label>
-              <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="nome_usuario" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Senha provisória</Label>
-              <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="8+ caracteres, maiuscula, minuscula e numero" />
-              <p className="text-xs text-muted-foreground">No primeiro acesso, o usuário será obrigado a trocar esta senha por uma pessoal.</p>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
-              <Button type="submit" className="btn-filament" disabled={mutateCreate.isPending}>{mutateCreate.isPending ? "Criando..." : "Criar"}</Button>
-            </DialogFooter>
-          </form>
+          {createdCreds ? (
+            <CreatedUserShare
+              creds={createdCreds}
+              onClose={() => {
+                setShowDialog(false);
+                setCreatedCreds(null);
+              }}
+            />
+          ) : (
+            <>
+              <DialogHeader><DialogTitle>Novo Usuário Admin</DialogTitle></DialogHeader>
+              <form onSubmit={(e) => { e.preventDefault(); const passwordMessage = getPasswordPolicyMessage(form.password); if (passwordMessage) { toast.error(passwordMessage); return; } mutateCreate.mutate(); }} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Nome</Label>
+                  <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Nome do usuário" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Telefone</Label>
+                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="11967428594" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Usuário (login alternativo)</Label>
+                  <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="nome_usuario" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Senha provisória</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        placeholder="8+ caracteres, maiuscula, minuscula e numero"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={() => { setForm((f) => ({ ...f, password: generateProvisionalPassword() })); setShowPassword(true); }}>
+                      Gerar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">No primeiro acesso, o usuário será obrigado a trocar esta senha por uma pessoal.</p>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancelar</Button>
+                  <Button type="submit" className="btn-filament" disabled={mutateCreate.isPending}>{mutateCreate.isPending ? "Criando..." : "Criar"}</Button>
+                </DialogFooter>
+              </form>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
