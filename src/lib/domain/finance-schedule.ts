@@ -372,3 +372,64 @@ export function buildCurrentMonthInstallmentBreakdown(params: {
     vencimentos,
   };
 }
+
+export type TotalApagarNoMes = {
+  dueMonth: string;
+  total: number;
+  filamentos: number;
+  insumos: number;
+  impressora: number;
+};
+
+/**
+ * Calcula o total a pagar no mês de referência, separado por categoria.
+ * Considera apenas parcelas pendentes com vencimento dentro do mês.
+ */
+export function computeTotalApagarNoMes(params: {
+  allInstallments: (FilamentoPaymentInstallment | InsumoPaymentInstallment)[];
+  insumoPayments: InsumoPayment[];
+  insumos: Insumo[];
+  dueMonth: string;
+}): TotalApagarNoMes {
+  const { allInstallments, insumoPayments, insumos, dueMonth } = params;
+
+  let filamentos = 0;
+  let insumosTotal = 0;
+  let impressora = 0;
+
+  const insumoClassificacao = new Map<string, string>();
+  for (const ip of insumoPayments) {
+    const insumo = insumos.find((i) => i.id === ip.insumoId);
+    if (insumo) {
+      insumoClassificacao.set(ip.id, insumo.classificacaoFinanceira);
+    }
+  }
+
+  for (const inst of allInstallments) {
+    if (inst.pago) continue;
+    if (inst.vencimento.slice(0, 7) !== dueMonth) continue;
+
+    const remaining = getInstallmentRemainingAmount(inst);
+    if (remaining <= 0) continue;
+
+    // Distingue filamento vs insumo pelo paymentId (IDs de pagamentos de insumos são conhecidos)
+    if ("paymentId" in inst && insumoClassificacao.has(inst.paymentId)) {
+      const classification = insumoClassificacao.get(inst.paymentId);
+      if (classification === "investimento") {
+        impressora += remaining;
+      } else {
+        insumosTotal += remaining;
+      }
+    } else {
+      filamentos += remaining;
+    }
+  }
+
+  return {
+    dueMonth,
+    total: filamentos + insumosTotal + impressora,
+    filamentos,
+    insumos: insumosTotal,
+    impressora,
+  };
+}

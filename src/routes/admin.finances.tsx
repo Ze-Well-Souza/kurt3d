@@ -74,6 +74,7 @@ import {
   buildInstallmentAuditByMonth,
   buildScheduleEntries,
   computeInstallmentKpis,
+  computeTotalApagarNoMes,
   getInstallmentPaidAmount,
   getInstallmentRemainingAmount,
   getPaymentProgress,
@@ -81,6 +82,7 @@ import {
   isPartialInstallment,
   type InstallmentAuditMonthRow,
   type InstallmentViewFilter,
+  type TotalApagarNoMes,
 } from "@/lib/domain/finance-schedule";
 import type {
   Filamento,
@@ -495,8 +497,18 @@ function Finances() {
   const totals = useMemo(() => {
     const receita = periodFilteredVendas.reduce((s, v) => s + v.valor, 0);
     const custo = periodFilteredVendas.reduce((s, v) => s + v.custo, 0);
+
+    // Exclui despesas de insumos que já têm parcelamento (evita dupla contagem com fluxo de caixa)
+    const insumoIdsComParcelamento = new Set(
+      insumoPayments.map((p) => p.insumoId),
+    );
     const despesasOperacionais = classifiedExpenses
-      .filter((expense) => expense.financialClass === "operacional")
+      .filter((expense) => {
+        if (expense.financialClass !== "operacional") return false;
+        // Exclui insumos que possuem parcelamento próprio
+        if (expense.source === "insumo" && insumoIdsComParcelamento.has(expense.refId)) return false;
+        return true;
+      })
       .reduce((s, e) => s + e.valor, 0);
     const investimentos = classifiedExpenses
       .filter((expense) => expense.financialClass === "investimento")
@@ -504,7 +516,7 @@ function Finances() {
     const lucro = receita - custo - despesasOperacionais;
     const depreciacaoAcumulada = periodFilteredVendas.reduce((s, v) => s + v.depreciacao, 0);
     return { receita, custo, lucro, depreciacaoAcumulada, despesasOperacionais, investimentos };
-  }, [classifiedExpenses, periodFilteredVendas]);
+  }, [classifiedExpenses, periodFilteredVendas, insumoPayments]);
 
   // Stock summary with full cost accounting per filament
   const stockSummary = useMemo(() => {
@@ -653,6 +665,15 @@ function Finances() {
       dueMonth: installmentKpiMonthAnchor,
     });
   }, [scheduleEntries, installmentKpiMonthAnchor]);
+
+  const totalApagarNoMes = useMemo(() => {
+    return computeTotalApagarNoMes({
+      allInstallments,
+      insumoPayments,
+      insumos,
+      dueMonth: installmentKpiMonthAnchor,
+    });
+  }, [allInstallments, insumoPayments, insumos, installmentKpiMonthAnchor]);
 
   const selectedFinanceInstallment = useMemo(() => {
     if (!payDialog) return null;
@@ -986,6 +1007,37 @@ function Finances() {
         </p>
       </div>
 
+      {/* ═══ Hero: TOTAL A PAGAR ESTE MÊS ═══ */}
+      <Card className="overflow-hidden border-2 border-amber-500/40 bg-gradient-to-br from-amber-50/50 to-card">
+        <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-amber-600" />
+              <span className="text-sm font-semibold uppercase tracking-wider text-amber-700">
+                Total a pagar em {formatMonthYearLabel(installmentKpiMonthAnchor)}
+              </span>
+            </div>
+            <div className="mt-2 font-display text-4xl font-bold tabular-nums text-amber-600">
+              {brl(totalApagarNoMes.total)}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Filamentos</div>
+              <div className="mt-1 font-display text-lg font-bold tabular-nums">{brl(totalApagarNoMes.filamentos)}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Insumos</div>
+              <div className="mt-1 font-display text-lg font-bold tabular-nums">{brl(totalApagarNoMes.insumos)}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Impressora</div>
+              <div className="mt-1 font-display text-lg font-bold tabular-nums">{brl(totalApagarNoMes.impressora)}</div>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <div className="filament-top flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-border bg-card p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-2">
@@ -1252,122 +1304,151 @@ function Finances() {
         />
       </div>
 
-      <div className="filament-top rounded-2xl border border-border bg-card p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="font-display text-lg font-semibold">Análise de Compra de Filamentos</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Média do preço pago por rolo para comprovar se as compras estão abaixo da meta de R$
-              100,00.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Marca</Label>
-              <Select value={purchaseBrandFilter} onValueChange={setPurchaseBrandFilter}>
-                <SelectTrigger className="min-w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as marcas</SelectItem>
-                  {purchaseBrands.map((brand) => (
-                    <SelectItem key={brand} value={brand}>
-                      {brand}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Purchase Analysis — Collapsible */}
+      <Accordion
+        type="single"
+        collapsible
+        className="filament-top rounded-2xl border border-border bg-card px-6"
+      >
+        <AccordionItem value="purchase" className="border-0">
+          <AccordionTrigger className="py-4 hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Tags className="h-5 w-5" style={{ color: "var(--filament-cyan)" }} />
+              <span className="font-display text-base font-semibold">
+                Análise de Compra de Filamentos
+              </span>
+              <Badge variant="secondary" className="ml-2 text-[10px]">
+                {purchaseAnalysis.count} compras · média{" "}
+                {purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.average) : "—"}
+              </Badge>
             </div>
-            <div className="grid gap-2">
-              <Label>Material</Label>
-              <Select value={purchaseMaterialFilter} onValueChange={setPurchaseMaterialFilter}>
-                <SelectTrigger className="min-w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os materiais</SelectItem>
-                  {purchaseMaterials.map((material) => (
-                    <SelectItem key={material} value={material}>
-                      {material}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          </AccordionTrigger>
+          <AccordionContent className="pb-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  Média do preço pago por rolo para comprovar se as compras estão abaixo da meta de
+                  R$ 100,00.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label>Marca</Label>
+                  <Select value={purchaseBrandFilter} onValueChange={setPurchaseBrandFilter}>
+                    <SelectTrigger className="min-w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as marcas</SelectItem>
+                      {purchaseBrands.map((brand) => (
+                        <SelectItem key={brand} value={brand}>
+                          {brand}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Material</Label>
+                  <Select
+                    value={purchaseMaterialFilter}
+                    onValueChange={setPurchaseMaterialFilter}
+                  >
+                    <SelectTrigger className="min-w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os materiais</SelectItem>
+                      {purchaseMaterials.map((material) => (
+                        <SelectItem key={material} value={material}>
+                          {material}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard
-            icon={<Tags className="h-4 w-4" />}
-            label="Preço Médio por Rolo"
-            value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.average) : "—"}
-            color={
-              purchaseAnalysis.count === 0
-                ? "var(--muted-foreground)"
-                : purchaseAnalysis.average <= purchaseAnalysis.target
-                  ? "var(--filament-green)"
-                  : "var(--filament-magenta)"
-            }
-          />
-          <KpiCard
-            icon={<TrendingUp className="h-4 w-4" />}
-            label="Diferença da Meta"
-            value={
-              purchaseAnalysis.count > 0
-                ? `${purchaseAnalysis.delta <= 0 ? "-" : "+"}${brl(Math.abs(purchaseAnalysis.delta))}`
-                : "—"
-            }
-            color={
-              purchaseAnalysis.count === 0
-                ? "var(--muted-foreground)"
-                : purchaseAnalysis.delta <= 0
-                  ? "var(--filament-green)"
-                  : "var(--filament-magenta)"
-            }
-          />
-          <KpiCard
-            icon={<DollarSign className="h-4 w-4" />}
-            label="Menor Preço"
-            value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.min) : "—"}
-            color="var(--filament-cyan)"
-          />
-          <KpiCard
-            icon={<AlertCircle className="h-4 w-4" />}
-            label="Maior Preço"
-            value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.max) : "—"}
-            color="var(--filament-yellow)"
-          />
-          <KpiCard
-            icon={<Package className="h-4 w-4" />}
-            label="Compras Analisadas"
-            value={String(purchaseAnalysis.count)}
-            color="var(--filament-pink)"
-          />
-        </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <KpiCard
+                icon={<Tags className="h-4 w-4" />}
+                label="Preço Médio por Rolo"
+                value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.average) : "—"}
+                color={
+                  purchaseAnalysis.count === 0
+                    ? "var(--muted-foreground)"
+                    : purchaseAnalysis.average <= purchaseAnalysis.target
+                      ? "var(--filament-green)"
+                      : "var(--filament-magenta)"
+                }
+              />
+              <KpiCard
+                icon={<TrendingUp className="h-4 w-4" />}
+                label="Diferença da Meta"
+                value={
+                  purchaseAnalysis.count > 0
+                    ? `${purchaseAnalysis.delta <= 0 ? "-" : "+"}${brl(Math.abs(purchaseAnalysis.delta))}`
+                    : "—"
+                }
+                color={
+                  purchaseAnalysis.count === 0
+                    ? "var(--muted-foreground)"
+                    : purchaseAnalysis.delta <= 0
+                      ? "var(--filament-green)"
+                      : "var(--filament-magenta)"
+                }
+              />
+              <KpiCard
+                icon={<DollarSign className="h-4 w-4" />}
+                label="Menor Preço"
+                value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.min) : "—"}
+                color="var(--filament-cyan)"
+              />
+              <KpiCard
+                icon={<AlertCircle className="h-4 w-4" />}
+                label="Maior Preço"
+                value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.max) : "—"}
+                color="var(--filament-yellow)"
+              />
+              <KpiCard
+                icon={<Package className="h-4 w-4" />}
+                label="Compras Analisadas"
+                value={String(purchaseAnalysis.count)}
+                color="var(--filament-pink)"
+              />
+            </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-          <Badge
-            variant="outline"
-            className={
-              purchaseAnalysis.count === 0
-                ? "text-muted-foreground"
-                : purchaseAnalysis.delta <= 0
-                  ? "border-green-500/30 bg-green-50 text-green-700"
-                  : "border-red-500/30 bg-red-50 text-red-700"
-            }
-          >
-            {purchaseAnalysis.count === 0
-              ? "Nenhuma compra encontrada no filtro atual"
-              : purchaseAnalysis.delta <= 0
-                ? `Média ${brl(Math.abs(purchaseAnalysis.delta))} abaixo da meta de R$ 100,00`
-                : `Média ${brl(Math.abs(purchaseAnalysis.delta))} acima da meta de R$ 100,00`}
-          </Badge>
-          <Badge variant="secondary">{purchaseAnalysis.belowTargetCount} abaixo de R$ 100</Badge>
-          <Badge variant="secondary">{purchaseAnalysis.atTargetCount} exatamente em R$ 100</Badge>
-          <Badge variant="secondary">{purchaseAnalysis.aboveTargetCount} acima de R$ 100</Badge>
-        </div>
-      </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              <Badge
+                variant="outline"
+                className={
+                  purchaseAnalysis.count === 0
+                    ? "text-muted-foreground"
+                    : purchaseAnalysis.delta <= 0
+                      ? "border-green-500/30 bg-green-50 text-green-700"
+                      : "border-red-500/30 bg-red-50 text-red-700"
+                }
+              >
+                {purchaseAnalysis.count === 0
+                  ? "Nenhuma compra encontrada no filtro atual"
+                  : purchaseAnalysis.delta <= 0
+                    ? `Média ${brl(Math.abs(purchaseAnalysis.delta))} abaixo da meta de R$ 100,00`
+                    : `Média ${brl(Math.abs(purchaseAnalysis.delta))} acima da meta de R$ 100,00`}
+              </Badge>
+              <Badge variant="secondary">
+                {purchaseAnalysis.belowTargetCount} abaixo de R$ 100
+              </Badge>
+              <Badge variant="secondary">
+                {purchaseAnalysis.atTargetCount} exatamente em R$ 100
+              </Badge>
+              <Badge variant="secondary">
+                {purchaseAnalysis.aboveTargetCount} acima de R$ 100
+              </Badge>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* Installments (Parcelas) KPIs */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
@@ -1417,10 +1498,10 @@ function Finances() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          icon={<CreditCard className="h-4 w-4" />}
-          label={`Total Pendente (Todos os meses)`}
-          value={brl(installmentKpis.pendente)}
-          color="var(--filament-magenta)"
+          icon={<CalendarClock className="h-4 w-4" />}
+          label={`A Pagar em ${formatMonthYearLabel(installmentKpiMonthAnchor)}`}
+          value={brl(totalApagarNoMes.total)}
+          color={totalApagarNoMes.total > 0 ? "var(--filament-yellow)" : "var(--filament-green)"}
         />
         <KpiCard
           icon={<Banknote className="h-4 w-4" />}
@@ -1861,15 +1942,15 @@ function Finances() {
                                 ? `Quitado ${totalInstallments}/${totalInstallments}`
                                 : progress.paidAmount > 0
                                   ? `Pago ${progress.paidInstallments}/${totalInstallments}${isPartialInstallment(inst) ? ` + parcial ${brl(getInstallmentPaidAmount(inst))}` : ""}`
-                                  : payment?.formaPagamento === "a_vista"
-                                    ? "Em aberto"
-                                    : `Em aberto 0/${totalInstallments}`}
+                                  : totalInstallments > 1
+                                    ? `Em aberto 0/${totalInstallments}`
+                                    : "Em aberto"}
                             </Badge>
                           </div>
                           <div className="mt-1 text-[10px] text-muted-foreground">
-                            {payment?.formaPagamento === "parcelado"
+                            {payment && payment.parcelas > 1
                               ? `Parcela ${inst.numero}/${totalInstallments} · Total ${brl(totalPlanAmount)}`
-                              : `Pagamento unico · Total ${brl(totalPlanAmount)}`}
+                              : `Pagamento único · Total ${brl(totalPlanAmount)}`}
                           </div>
                         </TableCell>
                         <TableCell className="tabular-nums text-xs text-muted-foreground">
@@ -1919,7 +2000,7 @@ function Finances() {
                           )}
                         </TableCell>
                         <TableCell className="text-center">
-                          {payment?.formaPagamento === "a_vista" ? (
+                          {!payment || payment.parcelas <= 1 ? (
                             <Badge
                               variant="outline"
                               className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]"
@@ -2193,7 +2274,7 @@ function Finances() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {row.formaPagamento === "a_vista" ? (
+                      {row.formaPagamento === "a_vista" || row.numero === 1 ? (
                         <Badge
                           variant="outline"
                           className="gap-1 border-green-600/30 bg-green-50 text-green-700 text-[10px]"
