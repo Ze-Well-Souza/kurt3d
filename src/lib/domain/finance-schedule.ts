@@ -375,10 +375,19 @@ export function buildCurrentMonthInstallmentBreakdown(params: {
 
 export type TotalApagarNoMes = {
   dueMonth: string;
+  /** Total pendente a pagar no mês (apenas parcelas não pagas) */
   total: number;
   filamentos: number;
   insumos: number;
   impressora: number;
+  /** Total vencido no mês (inclui parcelas já pagas) */
+  totalDue: number;
+  /** Total já pago das parcelas com vencimento neste mês */
+  totalPaid: number;
+  /** Total vencido no mês por categoria (inclui parcelas pagas e pendentes) */
+  filamentosDue: number;
+  insumosDue: number;
+  impressoraDue: number;
 };
 
 /**
@@ -396,6 +405,11 @@ export function computeTotalApagarNoMes(params: {
   let filamentos = 0;
   let insumosTotal = 0;
   let impressora = 0;
+  let totalDue = 0;
+  let totalPaid = 0;
+  let filamentosDue = 0;
+  let insumosDue = 0;
+  let impressoraDue = 0;
 
   const insumoClassificacao = new Map<string, string>();
   for (const ip of insumoPayments) {
@@ -406,8 +420,26 @@ export function computeTotalApagarNoMes(params: {
   }
 
   for (const inst of allInstallments) {
-    if (inst.pago) continue;
     if (inst.vencimento.slice(0, 7) !== dueMonth) continue;
+
+    const valor = inst.valor;
+    const paid = getInstallmentPaidAmount(inst);
+    totalDue += valor;
+    totalPaid += paid;
+
+    // Track total due by category (includes paid and pending)
+    if ("paymentId" in inst && insumoClassificacao.has(inst.paymentId)) {
+      const classification = insumoClassificacao.get(inst.paymentId);
+      if (classification === "investimento") {
+        impressoraDue += valor;
+      } else {
+        insumosDue += valor;
+      }
+    } else {
+      filamentosDue += valor;
+    }
+
+    if (inst.pago) continue;
 
     const remaining = getInstallmentRemainingAmount(inst);
     if (remaining <= 0) continue;
@@ -431,5 +463,10 @@ export function computeTotalApagarNoMes(params: {
     filamentos,
     insumos: insumosTotal,
     impressora,
+    totalDue,
+    totalPaid,
+    filamentosDue,
+    insumosDue,
+    impressoraDue,
   };
 }

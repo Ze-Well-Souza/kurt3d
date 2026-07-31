@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+﻿import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Wrench,
@@ -311,29 +311,32 @@ function Finances() {
     return `${quarter}º trimestre de ${year}`;
   }, [periodAnchor, periodPreset]);
 
-  const isDateInSelectedPeriod = (dateIso?: string | null) => {
-    if (!dateIso) return periodPreset === "all";
-    if (periodPreset === "all") return true;
-    const [anchorYear, anchorMonth] = periodAnchor.split("-").map(Number);
-    const [dateYear, dateMonth] = dateIso.slice(0, 7).split("-").map(Number);
-    if (!anchorYear || !anchorMonth || !dateYear || !dateMonth) return false;
-    if (periodPreset === "month") {
-      return anchorYear === dateYear && anchorMonth === dateMonth;
-    }
-    return (
-      anchorYear === dateYear &&
-      Math.floor((anchorMonth - 1) / 3) === Math.floor((dateMonth - 1) / 3)
-    );
-  };
+  const isDateInSelectedPeriod = useCallback(
+    (dateIso?: string | null) => {
+      if (!dateIso) return periodPreset === "all";
+      if (periodPreset === "all") return true;
+      const [anchorYear, anchorMonth] = periodAnchor.split("-").map(Number);
+      const [dateYear, dateMonth] = dateIso.slice(0, 7).split("-").map(Number);
+      if (!anchorYear || !anchorMonth || !dateYear || !dateMonth) return false;
+      if (periodPreset === "month") {
+        return anchorYear === dateYear && anchorMonth === dateMonth;
+      }
+      return (
+        anchorYear === dateYear &&
+        Math.floor((anchorMonth - 1) / 3) === Math.floor((dateMonth - 1) / 3)
+      );
+    },
+    [periodAnchor, periodPreset],
+  );
 
   const periodFilteredVendas = useMemo(
     () => vendas.filter((v) => isDateInSelectedPeriod(v.data)),
-    [vendas, periodAnchor, periodPreset],
+    [vendas, isDateInSelectedPeriod],
   );
 
   const filteredExpenses = useMemo(
     () => expenses.filter((expense) => isDateInSelectedPeriod(expense.data)),
-    [expenses, periodAnchor, periodPreset],
+    [expenses, isDateInSelectedPeriod],
   );
 
   const insumoById = useMemo(() => new Map(insumos.map((item) => [item.id, item])), [insumos]);
@@ -382,7 +385,7 @@ function Finances() {
           return false;
         return true;
       }),
-    [allFilamentPurchases, periodAnchor, periodPreset, purchaseBrandFilter, purchaseMaterialFilter],
+    [allFilamentPurchases, isDateInSelectedPeriod, purchaseBrandFilter, purchaseMaterialFilter],
   );
 
   const purchaseAnalysis = useMemo(() => {
@@ -425,7 +428,7 @@ function Finances() {
             : installment.vencimento,
         ),
       ),
-    [filamentoInstallments, periodAnchor, periodPreset],
+    [filamentoInstallments, isDateInSelectedPeriod],
   );
   const filteredInsumoInstallments = useMemo(
     () =>
@@ -436,7 +439,7 @@ function Finances() {
             : installment.vencimento,
         ),
       ),
-    [insumoInstallments, periodAnchor, periodPreset],
+    [insumoInstallments, isDateInSelectedPeriod],
   );
   const allInstallments = useMemo(
     () => [...filamentoInstallments, ...insumoInstallments],
@@ -489,7 +492,7 @@ function Finances() {
           const byDate = b.dataPagamento.localeCompare(a.dataPagamento);
           return byDate !== 0 ? byDate : b.createdAt.localeCompare(a.createdAt);
         }),
-    [allPaymentEvents, periodAnchor, periodPreset],
+    [allPaymentEvents, isDateInSelectedPeriod],
   );
 
   const totals = useMemo(() => {
@@ -630,6 +633,17 @@ function Finances() {
     });
   }, [allInstallments, insumoPayments, insumos, installmentKpiMonthAnchor]);
 
+  const heroCardState = useMemo(() => {
+    const { total, totalDue, totalPaid } = totalApagarNoMes;
+    if (total > 0) {
+      return { kind: "pending" as const, displayValue: total, color: "amber" as const };
+    }
+    if (totalDue > 0) {
+      return { kind: "paid" as const, displayValue: totalDue, color: "green" as const };
+    }
+    return { kind: "empty" as const, displayValue: 0, color: "neutral" as const };
+  }, [totalApagarNoMes]);
+
   const selectedFinanceInstallment = useMemo(() => {
     if (!payDialog) return null;
     const list = payDialog.kind === "filamento" ? filamentoInstallments : insumoInstallments;
@@ -752,8 +766,7 @@ function Finances() {
     insumoInstallments,
     filamentos,
     insumos,
-    periodAnchor,
-    periodPreset,
+    isDateInSelectedPeriod,
   ]);
 
   const visibleFinanceHistoryRows = useMemo(
@@ -963,31 +976,95 @@ function Finances() {
       </div>
 
       {/* ═══ Hero: TOTAL A PAGAR ESTE MÊS ═══ */}
-      <Card className="overflow-hidden border-2 border-amber-500/40 bg-gradient-to-br from-amber-50/50 to-card">
+      <Card
+        className={cn(
+          "overflow-hidden border-2 bg-gradient-to-br",
+          heroCardState.kind === "paid"
+            ? "border-green-500/40 from-green-50/50 to-card"
+            : heroCardState.kind === "pending"
+              ? "border-amber-500/40 from-amber-50/50 to-card"
+              : "border-muted/40 from-muted/30 to-card",
+        )}
+      >
         <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <CalendarClock className="h-5 w-5 text-amber-600" />
-              <span className="text-sm font-semibold uppercase tracking-wider text-amber-700">
-                Total a pagar em {formatMonthYearLabel(installmentKpiMonthAnchor)}
+              {heroCardState.kind === "paid" ? (
+                <Check className="h-5 w-5 text-green-600" />
+              ) : (
+                <CalendarClock
+                  className={cn(
+                    "h-5 w-5",
+                    heroCardState.kind === "pending" ? "text-amber-600" : "text-muted-foreground",
+                  )}
+                />
+              )}
+              <span
+                className={cn(
+                  "text-sm font-semibold uppercase tracking-wider",
+                  heroCardState.kind === "paid"
+                    ? "text-green-700"
+                    : heroCardState.kind === "pending"
+                      ? "text-amber-700"
+                      : "text-muted-foreground",
+                )}
+              >
+                {heroCardState.kind === "paid"
+                  ? "Pago em"
+                  : heroCardState.kind === "pending"
+                    ? "Total a pagar em"
+                    : "Sem vencimentos em"}{" "}
+                {formatMonthYearLabel(installmentKpiMonthAnchor)}
               </span>
+              {heroCardState.kind === "paid" && (
+                <Badge className="gap-1 bg-green-600 text-[10px]">
+                  <Check className="h-3 w-3" /> Pago
+                </Badge>
+              )}
             </div>
-            <div className="mt-2 font-display text-4xl font-bold tabular-nums text-amber-600">
-              {brl(totalApagarNoMes.total)}
+            <div
+              className={cn(
+                "mt-2 font-display text-4xl font-bold tabular-nums",
+                heroCardState.kind === "paid"
+                  ? "text-green-600"
+                  : heroCardState.kind === "pending"
+                    ? "text-amber-600"
+                    : "text-muted-foreground",
+              )}
+            >
+              {brl(heroCardState.displayValue)}
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Filamentos</div>
-              <div className="mt-1 font-display text-lg font-bold tabular-nums">{brl(totalApagarNoMes.filamentos)}</div>
+              <div className="mt-1 font-display text-lg font-bold tabular-nums">
+                {brl(
+                  heroCardState.kind === "paid"
+                    ? totalApagarNoMes.filamentosDue
+                    : totalApagarNoMes.filamentos,
+                )}
+              </div>
             </div>
             <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Insumos</div>
-              <div className="mt-1 font-display text-lg font-bold tabular-nums">{brl(totalApagarNoMes.insumos)}</div>
+              <div className="mt-1 font-display text-lg font-bold tabular-nums">
+                {brl(
+                  heroCardState.kind === "paid"
+                    ? totalApagarNoMes.insumosDue
+                    : totalApagarNoMes.insumos,
+                )}
+              </div>
             </div>
             <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Impressora</div>
-              <div className="mt-1 font-display text-lg font-bold tabular-nums">{brl(totalApagarNoMes.impressora)}</div>
+              <div className="mt-1 font-display text-lg font-bold tabular-nums">
+                {brl(
+                  heroCardState.kind === "paid"
+                    ? totalApagarNoMes.impressoraDue
+                    : totalApagarNoMes.impressora,
+                )}
+              </div>
             </div>
           </div>
         </div>
