@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   FileText, Plus, Pencil, Trash2, CheckCircle2, XCircle, Clock,
-  Send, Ban, ArrowRightLeft, Percent, Hash, DollarSign, Printer, MessageCircle,
+  Send, Ban, ArrowRightLeft, Percent, Hash, DollarSign, Printer, MessageCircle, ScrollText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import { useBudgetQuotes } from "@/lib/hooks/use-budget-quotes";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { openPrintQuote, openQuoteWhatsApp, type QuoteInput } from "@/lib/domain/quote-print";
+import { openPrintSaleReceipt } from "@/lib/domain/sale-receipt-print";
 import { normalizeText } from "@/lib/utils/normalization";
 import type { BudgetQuote, BudgetQuoteItem, BudgetQuoteStatus } from "@/lib/domain/types";
 
@@ -107,6 +108,21 @@ function OrcamentosPage() {
   const [showForm, setShowForm] = useState(false);
   const [editQuote, setEditQuote] = useState<BudgetQuote | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [receiptDialog, setReceiptDialog] = useState<{
+    open: boolean;
+    quote: BudgetQuote | null;
+    docType: "cnpj" | "cpf";
+    docNumber: string;
+    formaPagamento: string;
+    dataRecebimento: string;
+  }>({
+    open: false,
+    quote: null,
+    docType: "cnpj",
+    docNumber: "",
+    formaPagamento: "",
+    dataRecebimento: new Date().toISOString().slice(0, 10),
+  });
 
   // Form state
   const [clientName, setClientName] = useState("");
@@ -475,6 +491,21 @@ function OrcamentosPage() {
                     >
                       <Printer className="h-3 w-3" /> PDF
                     </Button>
+                    <Button
+                      size="sm" variant="ghost"
+                      onClick={() => setReceiptDialog({
+                        open: true,
+                        quote,
+                        docType: "cnpj",
+                        docNumber: "",
+                        formaPagamento: "",
+                        dataRecebimento: new Date().toISOString().slice(0, 10),
+                      })}
+                      className="gap-1 text-xs"
+                      title="Gerar recibo de venda"
+                    >
+                      <ScrollText className="h-3 w-3" /> Recibo
+                    </Button>
                     {quote.status !== "converted" && (
                       <>
                         <Button
@@ -686,6 +717,130 @@ function OrcamentosPage() {
               Remover
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Receipt Dialog ── */}
+      <Dialog open={receiptDialog.open} onOpenChange={(open) => setReceiptDialog((prev) => ({ ...prev, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScrollText className="h-5 w-5" />
+              Gerar Recibo de Venda
+            </DialogTitle>
+          </DialogHeader>
+          {receiptDialog.quote && (() => {
+            const q = receiptDialog.quote;
+            const total = q.total;
+            return (
+              <div className="space-y-4">
+                {/* Read-only summary */}
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span className="font-semibold">{q.clientName}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-muted-foreground">Itens</span>
+                    <span className="font-medium">{q.items.length} item(ns)</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-muted-foreground">Total</span>
+                    <span className="font-display text-lg font-bold filament-text">{brl(total)}</span>
+                  </div>
+                </div>
+
+                {/* Document type */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Tipo de Documento</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={receiptDialog.docType === "cnpj" ? "default" : "outline"}
+                      className="flex-1"
+                      onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cnpj" }))}
+                    >
+                      CNPJ
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={receiptDialog.docType === "cpf" ? "default" : "outline"}
+                      className="flex-1"
+                      onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cpf" }))}
+                    >
+                      CPF
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Document number */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    Número do {receiptDialog.docType === "cnpj" ? "CNPJ" : "CPF"}
+                  </Label>
+                  <Input
+                    value={receiptDialog.docNumber}
+                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, docNumber: e.target.value }))}
+                    placeholder={receiptDialog.docType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}
+                  />
+                </div>
+
+                {/* Payment info */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Forma de Pagamento</Label>
+                    <Input
+                      value={receiptDialog.formaPagamento}
+                      onChange={(e) => setReceiptDialog((prev) => ({ ...prev, formaPagamento: e.target.value }))}
+                      placeholder="PIX, Dinheiro..."
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Data do Recebimento</Label>
+                    <Input
+                      type="date"
+                      value={receiptDialog.dataRecebimento}
+                      onChange={(e) => setReceiptDialog((prev) => ({ ...prev, dataRecebimento: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="btn-filament gap-2"
+                    onClick={() => {
+                      if (!receiptDialog.quote) return;
+                      openPrintSaleReceipt({
+                        clientName: q.clientName,
+                        items: q.items.map((item) => ({
+                          description: item.description,
+                          quantity: item.quantity,
+                          unitPrice: item.unitPrice,
+                          subtotal: item.subtotal,
+                        })),
+                        docType: receiptDialog.docType,
+                        docNumber: receiptDialog.docNumber,
+                        formaPagamento: receiptDialog.formaPagamento || undefined,
+                        dataRecebimento: receiptDialog.dataRecebimento || undefined,
+                        discountPercent: q.discountPercent ?? undefined,
+                        observacao: q.notes ?? undefined,
+                        studioNome: settingsData?.studioNome ?? "Kurti 3D",
+                        whatsappNumero: settingsData?.whatsappNumero ?? "",
+                      });
+                      setReceiptDialog((prev) => ({ ...prev, open: false }));
+                    }}
+                  >
+                    <Printer className="h-4 w-4" /> Gerar Recibo
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

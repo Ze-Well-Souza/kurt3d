@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2, Printer, ImagePlus } from "lucide-react";
+import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2, Printer, ImagePlus, ScrollText } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -58,6 +58,7 @@ import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizeText } from "@/lib/utils/normalization";
 import { openPrintQuote, type QuoteInput } from "@/lib/domain/quote-print";
 import { openPrintReceipt, type ReceiptInput } from "@/lib/domain/payment-receipt-print";
+import { openPrintSaleReceipt } from "@/lib/domain/sale-receipt-print";
 
 export const Route = createFileRoute("/admin/portfolio")({
   head: () => ({ meta: [{ title: "Calculadora e Pedidos — Kurti 3D" }] }),
@@ -2173,6 +2174,11 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
   const [destinoValor, setDestinoValor] = useState("");
   const [destinoPagamento, setDestinoPagamento] = useState("");
   const [destinoDataPag, setDestinoDataPag] = useState("");
+  const [receiptDialog, setReceiptDialog] = useState<{
+    open: boolean;
+    docType: "cnpj" | "cpf";
+    docNumber: string;
+  }>({ open: false, docType: "cnpj", docNumber: "" });
   const badge = order.status in STATUS_BADGE ? STATUS_BADGE[order.status] : null;
   const filamento = order.filamentoId ? filamentos?.find((f) => f.id === order.filamentoId) : undefined;
   const costResult = calcOrderCostHybrid({ order, filamento, precoVendaUnit: order.precoVenda ?? 0, settings: orderSettings });
@@ -2247,19 +2253,11 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
             className="mt-1 h-7 w-full gap-1 text-[10px] text-muted-foreground hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
-              openPrintReceipt({
-                clientName: order.client,
-                projectName: order.projectName,
-                valorPago: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0),
-                formaPagamento: order.formaPagamento ?? "—",
-                dataPagamento: order.dataPagamento ?? order.updatedAt,
-                studioNome: orderSettings?.studioNome || "Kurti 3D",
-                whatsappNumero: orderSettings?.whatsappNumero || "",
-              });
+              setReceiptDialog({ open: true, docType: "cnpj", docNumber: "" });
             }}
           >
-            <Printer className="h-3 w-3" />
-            Imprimir Recibo
+            <ScrollText className="h-3 w-3" />
+            Recibo de Venda
           </Button>
         )}
         {order.status === "done" && (<Button size="sm" variant="outline" className="mt-2 w-full gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setShowDestino(true); }}><MapPin className="h-3 w-3" />Finalizar Destino</Button>)}
@@ -2282,6 +2280,61 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
               </div>
               <Button className="btn-filament w-full gap-2" disabled={!destinoValor || Number(destinoValor) <= 0} onClick={() => { onFinalizar({ orderId: order.id, destino: "Kurtido e Vendido", valorRecebido: Number(destinoValor), formaPagamento: destinoPagamento || undefined, dataPagamento: destinoDataPag || undefined }); setShowDestino(false); }}>💰 Kurtido e Vendido</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Dialog */}
+      <Dialog open={receiptDialog.open} onOpenChange={(open) => setReceiptDialog((prev) => ({ ...prev, open }))}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScrollText className="h-5 w-5" />
+              Recibo de Venda
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs">
+              <div className="flex justify-between"><span className="text-muted-foreground">Cliente</span><span className="font-semibold">{order.client}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Projeto</span><span className="font-medium">{order.projectName}</span></div>
+              <div className="mt-1 flex justify-between"><span className="text-muted-foreground">Valor</span><span className="font-display font-bold filament-text">{brl(order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0))}</span></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tipo de Documento</Label>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant={receiptDialog.docType === "cnpj" ? "default" : "outline"} className="flex-1" onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cnpj" }))}>CNPJ</Button>
+                <Button type="button" size="sm" variant={receiptDialog.docType === "cpf" ? "default" : "outline"} className="flex-1" onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cpf" }))}>CPF</Button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Número do {receiptDialog.docType === "cnpj" ? "CNPJ" : "CPF"}</Label>
+              <Input
+                value={receiptDialog.docNumber}
+                onChange={(e) => setReceiptDialog((prev) => ({ ...prev, docNumber: e.target.value }))}
+                placeholder={receiptDialog.docType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>Cancelar</Button>
+              <Button
+                className="btn-filament gap-2"
+                onClick={() => {
+                  openPrintSaleReceipt({
+                    clientName: order.client,
+                    items: [{ description: order.projectName, quantity: order.quantity, unitPrice: order.valorRecebido ?? (order.precoVenda ?? 0), subtotal: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0) }],
+                    docType: receiptDialog.docType,
+                    docNumber: receiptDialog.docNumber,
+                    formaPagamento: order.formaPagamento ?? undefined,
+                    dataRecebimento: order.dataPagamento ?? undefined,
+                    studioNome: orderSettings?.studioNome ?? "Kurti 3D",
+                    whatsappNumero: orderSettings?.whatsappNumero ?? "",
+                  });
+                  setReceiptDialog((prev) => ({ ...prev, open: false }));
+                }}
+              >
+                <Printer className="h-4 w-4" /> Gerar Recibo
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
