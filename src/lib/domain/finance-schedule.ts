@@ -1,5 +1,6 @@
 import type {
   Filamento,
+  FilamentoHistory,
   FilamentoPayment,
   FilamentoPaymentInstallment,
   Insumo,
@@ -117,6 +118,7 @@ export function buildScheduleEntries(params: {
   installmentKpiMonthAnchor: string;
   filamentoPayments: FilamentoPayment[];
   filamentos: Filamento[];
+  filamentosHistory: FilamentoHistory[];
   insumoPayments: InsumoPayment[];
   insumos: Insumo[];
   filamentoPaymentProgress: Map<string, PaymentProgress>;
@@ -130,6 +132,7 @@ export function buildScheduleEntries(params: {
     installmentKpiMonthAnchor,
     filamentoPayments,
     filamentos,
+    filamentosHistory,
     insumoPayments,
     insumos,
     filamentoPaymentProgress,
@@ -140,8 +143,16 @@ export function buildScheduleEntries(params: {
 
   const buildFilamentEntry = (i: FilamentoPaymentInstallment): ScheduleEntry<"filamento"> => {
     const payment = filamentoPayments.find((p) => p.id === i.paymentId) ?? null;
-    const batchFilamentos = payment ? filamentos.filter((f) => f.batchId === payment.batchId) : [];
-    const label = batchFilamentos.map((f) => f.sku).join(", ");
+    const activeFilamentos = payment ? filamentos.filter((f) => f.batchId === payment.batchId) : [];
+    const historyFilamentos = payment
+      ? filamentosHistory.filter((f) => f.batchId === payment.batchId)
+      : [];
+    const batchFilamentos = activeFilamentos.length > 0 ? activeFilamentos : historyFilamentos;
+    const label = batchFilamentos.length > 0
+      ? batchFilamentos.map((f) => f.sku).join(", ")
+      : payment?.batchId
+        ? `Lote ${payment.batchId.slice(0, 8)}`
+        : `Pagamento ${i.paymentId.slice(0, 8)}`;
     const dataCompra = batchFilamentos.length
       ? (batchFilamentos
           .map((f) => f.dataCompra)
@@ -181,7 +192,9 @@ export function buildScheduleEntries(params: {
       inst: i,
       payment,
       dataCompra,
-      label: insumo?.nome ?? "",
+      label: insumo?.nome
+        || i.observacao
+        || (payment ? `Insumo ${payment.insumoId.slice(0, 8)}` : `Pagamento ${i.paymentId.slice(0, 8)}`),
       overdue: !i.pago && i.vencimento <= today,
       progress,
     };
