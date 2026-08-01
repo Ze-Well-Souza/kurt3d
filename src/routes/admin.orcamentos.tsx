@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { brl, formatPhoneDisplay } from "@/lib/utils";
 import {
   createBudgetQuote, updateBudgetQuote, deleteBudgetQuote,
-  convertQuoteToOrder,
+  convertQuoteToOrder, saveReceipt,
 } from "@/lib/api/data.functions";
 import { useBudgetQuotes } from "@/lib/hooks/use-budget-quotes";
 import { useOrders } from "@/lib/hooks/use-orders";
@@ -890,16 +890,35 @@ function OrcamentosPage() {
                     size="sm"
                     variant="outline"
                     className="gap-1 text-xs text-green-700"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!receiptDialog.quote) return;
+                      const items = q.items.map((item) => ({
+                        description: item.description,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        subtotal: item.subtotal,
+                      }));
+                      const total = items.reduce((s, i) => s + i.subtotal, 0) * (1 - (q.discountPercent ?? 0) / 100);
+                      const result = await saveReceipt({ data: {
+                        type: "sale",
+                        clientName: q.clientName,
+                        items,
+                        total,
+                        docType: receiptDialog.docType,
+                        docNumber: receiptDialog.docNumber || undefined,
+                        studioDocType: receiptDialog.studioDocType,
+                        studioDocNumber: receiptDialog.studioDocNumber || undefined,
+                        formaPagamento: receiptDialog.formaPagamento || undefined,
+                        observacao: q.notes || undefined,
+                        paid: receiptDialog.paid,
+                        sourceType: "quote",
+                        sourceId: q.id,
+                        discountPercent: q.discountPercent ?? undefined,
+                      }});
+                      if (!result.ok) { toast.error("Erro ao salvar recibo."); return; }
                       openSaleReceiptWhatsApp({
                         clientName: q.clientName,
-                        items: q.items.map((item) => ({
-                          description: item.description,
-                          quantity: item.quantity,
-                          unitPrice: item.unitPrice,
-                          subtotal: item.subtotal,
-                        })),
+                        items,
                         docType: receiptDialog.docType,
                         docNumber: receiptDialog.docNumber,
                         studioDocType: receiptDialog.studioDocType,
@@ -912,6 +931,7 @@ function OrcamentosPage() {
                         whatsappNumero: settingsData?.whatsappNumero ?? "",
                         clientPhone: receiptDialog.clientPhone || undefined,
                         paid: receiptDialog.paid || undefined,
+                        receiptNumber: result.receiptNumber,
                       });
                     }}
                   >
@@ -919,16 +939,35 @@ function OrcamentosPage() {
                   </Button>
                   <Button
                     className="btn-filament gap-2"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!receiptDialog.quote) return;
+                      const items = q.items.map((item) => ({
+                        description: item.description,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice,
+                        subtotal: item.subtotal,
+                      }));
+                      const total = items.reduce((s, i) => s + i.subtotal, 0) * (1 - (q.discountPercent ?? 0) / 100);
+                      const result = await saveReceipt({ data: {
+                        type: "sale",
+                        clientName: q.clientName,
+                        items,
+                        total,
+                        docType: receiptDialog.docType,
+                        docNumber: receiptDialog.docNumber || undefined,
+                        studioDocType: receiptDialog.studioDocType,
+                        studioDocNumber: receiptDialog.studioDocNumber || undefined,
+                        formaPagamento: receiptDialog.formaPagamento || undefined,
+                        observacao: q.notes || undefined,
+                        paid: receiptDialog.paid,
+                        sourceType: "quote",
+                        sourceId: q.id,
+                        discountPercent: q.discountPercent ?? undefined,
+                      }});
+                      if (!result.ok) { toast.error("Erro ao salvar recibo."); return; }
                       openPrintSaleReceipt({
                         clientName: q.clientName,
-                        items: q.items.map((item) => ({
-                          description: item.description,
-                          quantity: item.quantity,
-                          unitPrice: item.unitPrice,
-                          subtotal: item.subtotal,
-                        })),
+                        items,
                         docType: receiptDialog.docType,
                         docNumber: receiptDialog.docNumber,
                         studioDocType: receiptDialog.studioDocType,
@@ -941,6 +980,7 @@ function OrcamentosPage() {
                         whatsappNumero: settingsData?.whatsappNumero ?? "",
                         clientPhone: receiptDialog.clientPhone || undefined,
                         paid: receiptDialog.paid || undefined,
+                        receiptNumber: result.receiptNumber,
                       });
                       setReceiptDialog((prev) => ({ ...prev, open: false }));
                     }}

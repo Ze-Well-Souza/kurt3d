@@ -421,3 +421,29 @@ create table if not exists public.login_rate_limits (
 );
 
 alter table public.login_rate_limits enable row level security;
+
+-- Recibos (venda e pagamento) com numeração sequencial por dia
+create table if not exists public.receipts (
+  id text primary key,
+  receipt_number text not null unique,
+  type text not null check (type in ('sale', 'payment')),
+  client_name text not null,
+  items jsonb not null default '[]',
+  total numeric not null,
+  doc_type text,
+  doc_number text,
+  studio_doc_type text,
+  studio_doc_number text,
+  forma_pagamento text,
+  observacao text,
+  paid boolean not null default false,
+  source_type text,
+  source_id text,
+  discount_percent numeric,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_receipts_number on public.receipts(receipt_number);
+create index if not exists idx_receipts_client on public.receipts(client_name);
+create index if not exists idx_receipts_created on public.receipts(created_at);

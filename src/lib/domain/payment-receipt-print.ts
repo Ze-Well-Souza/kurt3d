@@ -27,6 +27,8 @@ export type ReceiptInput = {
   whatsappNumero: string;
   /** URL do Instagram (opcional, padrão @kurti3d). */
   instagramUrl?: string;
+  /** Número do recibo (se já salvo no banco). Se omitido, gera aleatório. */
+  receiptNumber?: string;
 };
 
 function escapeHtml(str: string) {
@@ -68,7 +70,7 @@ const LOGO_SVG = `
  * Builds the full payment receipt HTML document.
  */
 export function buildPaymentReceiptHtml(input: ReceiptInput): string {
-  const receiptNumber = generateReceiptNumber();
+  const receiptNumber = input.receiptNumber || generateReceiptNumber();
   const issueDate = formatDate(new Date());
   const studio = escapeHtml(input.studioNome);
   const client = escapeHtml(input.clientName || "__________________________");

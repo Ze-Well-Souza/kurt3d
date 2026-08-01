@@ -7,9 +7,10 @@ import {
   ordersRepo,
   portfolioVideosRepo,
   productionCalendarRepo,
+  receiptsRepo,
   savedReportsRepo,
 } from "../../server/repositories.server";
-import type { BudgetQuote, BudgetQuoteItem, Order, PortfolioVideo, ProductionCalendarEvent, SavedReport } from "../../domain/types";
+import type { BudgetQuote, BudgetQuoteItem, Order, PortfolioVideo, ProductionCalendarEvent, Receipt, SavedReport } from "../../domain/types";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
@@ -384,4 +385,65 @@ export const deleteSavedReport = createServerFn({ method: "POST" })
     const repo = await savedReportsRepo();
     await repo.remove(data.reportId);
     return { ok: true };
+  });
+
+// ═══════════ Receipts ═══════════
+
+const receiptItemSchema = z.object({
+  description: z.string().min(1).max(500),
+  quantity: z.number().int().min(1),
+  unitPrice: z.number().min(0),
+  subtotal: z.number().min(0),
+});
+
+export const saveReceipt = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      type: z.enum(["sale", "payment"]),
+      clientName: z.string().min(1).max(200),
+      items: z.array(receiptItemSchema).min(1),
+      total: z.number().min(0),
+      docType: z.enum(["cnpj", "cpf"]).optional(),
+      docNumber: z.string().max(30).optional(),
+      studioDocType: z.enum(["cnpj", "cpf"]).optional(),
+      studioDocNumber: z.string().max(30).optional(),
+      formaPagamento: z.string().max(100).optional(),
+      observacao: z.string().max(1000).optional(),
+      paid: z.boolean().default(false),
+      sourceType: z.string().max(20).optional(),
+      sourceId: z.string().max(50).optional(),
+      discountPercent: z.number().min(0).max(100).optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
+    const repo = await receiptsRepo();
+    const now = nowIso();
+
+    const receiptNumber = repo.generateReceiptNumber();
+
+    const receipt: Receipt = {
+      id: randomUUID(),
+      receiptNumber,
+      type: data.type,
+      clientName: data.clientName,
+      items: data.items,
+      total: data.total,
+      docType: data.docType ?? null,
+      docNumber: data.docNumber ?? null,
+      studioDocType: data.studioDocType ?? null,
+      studioDocNumber: data.studioDocNumber ?? null,
+      formaPagamento: data.formaPagamento ?? null,
+      observacao: data.observacao ?? null,
+      paid: data.paid ?? false,
+      sourceType: data.sourceType ?? null,
+      sourceId: data.sourceId ?? null,
+      discountPercent: data.discountPercent ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await repo.upsert(receipt);
+    return { ok: true, receiptNumber, receiptId: receipt.id };
   });

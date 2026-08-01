@@ -33,7 +33,7 @@ import {
   addOrder, finalizarDestino, updateOrderStatus, removeOrder,
   addPortfolioProject, createOrderFromPortfolio, removePortfolioProject,
   updateOrder, updatePortfolioProject, uploadOrderAsset, resolveOrderAssetUrl, updateOrderPartStatus,
-  saveSettings,
+  saveSettings, saveReceipt,
 } from "@/lib/api/data.functions";
 import type { Order, OrderPart, OrderPartStatus, Status, Filamento, AppSettings, PortfolioProject, CalculatorFilamentoInput, CalculatorExtraCost } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
@@ -2363,10 +2363,27 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                 size="sm"
                 variant="outline"
                 className="gap-1 text-xs text-green-700"
-                onClick={() => {
+                onClick={async () => {
+                  const items = [{ description: order.projectName, quantity: order.quantity, unitPrice: order.valorRecebido ?? (order.precoVenda ?? 0), subtotal: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0) }];
+                  const total = items[0].subtotal;
+                  const result = await saveReceipt({ data: {
+                    type: "sale",
+                    clientName: order.client,
+                    items,
+                    total,
+                    docType: receiptDialog.docType,
+                    docNumber: receiptDialog.docNumber || undefined,
+                    studioDocType: receiptDialog.studioDocType,
+                    studioDocNumber: receiptDialog.studioDocNumber || undefined,
+                    formaPagamento: order.formaPagamento || undefined,
+                    paid: receiptDialog.paid,
+                    sourceType: "order",
+                    sourceId: order.id,
+                  }});
+                  if (!result.ok) { toast.error("Erro ao salvar recibo."); return; }
                   openSaleReceiptWhatsApp({
                     clientName: order.client,
-                    items: [{ description: order.projectName, quantity: order.quantity, unitPrice: order.valorRecebido ?? (order.precoVenda ?? 0), subtotal: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0) }],
+                    items,
                     docType: receiptDialog.docType,
                     docNumber: receiptDialog.docNumber,
                     studioDocType: receiptDialog.studioDocType,
@@ -2377,6 +2394,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                     whatsappNumero: orderSettings?.whatsappNumero ?? "",
                     clientPhone: receiptDialog.clientPhone || undefined,
                     paid: receiptDialog.paid || undefined,
+                    receiptNumber: result.receiptNumber,
                   });
                 }}
               >
@@ -2384,10 +2402,27 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
               </Button>
               <Button
                 className="btn-filament gap-2"
-                onClick={() => {
+                onClick={async () => {
+                  const items = [{ description: order.projectName, quantity: order.quantity, unitPrice: order.valorRecebido ?? (order.precoVenda ?? 0), subtotal: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0) }];
+                  const total = items[0].subtotal;
+                  const result = await saveReceipt({ data: {
+                    type: "sale",
+                    clientName: order.client,
+                    items,
+                    total,
+                    docType: receiptDialog.docType,
+                    docNumber: receiptDialog.docNumber || undefined,
+                    studioDocType: receiptDialog.studioDocType,
+                    studioDocNumber: receiptDialog.studioDocNumber || undefined,
+                    formaPagamento: order.formaPagamento || undefined,
+                    paid: receiptDialog.paid,
+                    sourceType: "order",
+                    sourceId: order.id,
+                  }});
+                  if (!result.ok) { toast.error("Erro ao salvar recibo."); return; }
                   openPrintSaleReceipt({
                     clientName: order.client,
-                    items: [{ description: order.projectName, quantity: order.quantity, unitPrice: order.valorRecebido ?? (order.precoVenda ?? 0), subtotal: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0) }],
+                    items,
                     docType: receiptDialog.docType,
                     docNumber: receiptDialog.docNumber,
                     studioDocType: receiptDialog.studioDocType,
@@ -2398,6 +2433,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                     whatsappNumero: orderSettings?.whatsappNumero ?? "",
                     clientPhone: receiptDialog.clientPhone || undefined,
                     paid: receiptDialog.paid || undefined,
+                    receiptNumber: result.receiptNumber,
                   });
                   setReceiptDialog((prev) => ({ ...prev, open: false }));
                 }}

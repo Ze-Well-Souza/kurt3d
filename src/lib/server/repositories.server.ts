@@ -25,6 +25,7 @@ export { productionCalendarRepo } from "./repositories/extended-repos";
 export { budgetQuotesRepo } from "./repositories/extended-repos";
 export { portfolioVideosRepo } from "./repositories/extended-repos";
 export { savedReportsRepo } from "./repositories/extended-repos";
+export { receiptsRepo } from "./repositories/extended-repos";
 
 import { inventoryRepo as _invRepo } from "./repositories/inventory.repo";
 

@@ -47,6 +47,8 @@ export type SaleReceiptInput = {
   instagramUrl?: string;
   /** Se true, exibe carimbo "PAGO" com assinatura Kurti3D no recibo. */
   paid?: boolean;
+  /** Número do recibo (se já salvo no banco). Se omitido, gera aleatório. */
+  receiptNumber?: string;
 };
 
 function escapeHtml(str: string) {
@@ -103,7 +105,7 @@ const LOGO_SVG = `
 </svg>`;
 
 function buildSaleReceiptHtml(input: SaleReceiptInput): string {
-  const receiptNumber = generateReceiptNumber();
+  const receiptNumber = input.receiptNumber || generateReceiptNumber();
   const issueDate = formatDate(new Date());
   const studioWhatsappDigits = (input.whatsappNumero ?? "").replace(/\D/g, "");
   const studioWhatsappLink = studioWhatsappDigits
