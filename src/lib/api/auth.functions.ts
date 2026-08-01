@@ -12,7 +12,9 @@ import {
   getUserRole,
   listAdminUsers,
   resetUserPassword,
+  setUserActive,
   setupAdminUser,
+  updateUser,
   validateLogin,
 } from "../server/auth.server";
 import { logger } from "../server/logger.server";
@@ -191,6 +193,36 @@ export const resetPassword = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await requireSuperAdmin();
     await resetUserPassword(data.userId);
+    return { ok: true };
+  });
+
+export const deactivateUser = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    await requireSuperAdmin();
+    await setUserActive(data.userId, false);
+    return { ok: true };
+  });
+
+export const activateUser = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    await requireSuperAdmin();
+    await setUserActive(data.userId, true);
+    return { ok: true };
+  });
+
+export const editUser = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      userId: z.string().min(1),
+      nome: z.string().optional(),
+      username: z.string().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireSuperAdmin();
+    await updateUser(data.userId, { nome: data.nome, username: data.username });
     return { ok: true };
   });
 

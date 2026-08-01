@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive, Eye, EyeOff, Copy, Check, RefreshCw } from "lucide-react";
+import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive, Eye, EyeOff, Copy, Check, RefreshCw, Pencil, UserCheck, UserX } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { saveSettings, runStorageCleanup } from "@/lib/api/data.functions";
-import { changePassword, listUsers, createUser, deleteUser, resetPassword, getSiteContent, saveSiteContent, requireAuth } from "@/lib/api/auth.functions";
+import { changePassword, listUsers, createUser, deleteUser, resetPassword, deactivateUser, activateUser, editUser, getSiteContent, saveSiteContent, requireAuth } from "@/lib/api/auth.functions";
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
@@ -455,6 +455,9 @@ function UserManagementCard() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "Kurti-3D" });
   const [showPassword, setShowPassword] = useState(false);
+  // Estado do dialog de edicao
+  const [editTarget, setEditTarget] = useState<{ id: string; nome: string; username: string } | null>(null);
+  const [editForm, setEditForm] = useState({ nome: "", username: "" });
   // Credenciais recem-criadas para compartilhar (so vivem em memoria, uma vez):
   // a senha provisoria nao fica salva em texto puro no banco.
   const [createdCreds, setCreatedCreds] = useState<{ nome: string; phone: string; username: string; password: string } | null>(null);
@@ -493,6 +496,39 @@ function UserManagementCard() {
     onError: () => toast.error("Erro ao resetar senha."),
   });
 
+  const mutateDeactivate = useMutation({
+    mutationFn: (userId: string) => deactivateUser({ data: { userId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      toast.success("Usuario inativado.");
+    },
+    onError: () => toast.error("Erro ao inativar."),
+  });
+
+  const mutateActivate = useMutation({
+    mutationFn: (userId: string) => activateUser({ data: { userId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      toast.success("Usuario ativado.");
+    },
+    onError: () => toast.error("Erro ao ativar."),
+  });
+
+  const mutateEdit = useMutation({
+    mutationFn: () => editUser({ data: { userId: editTarget!.id, nome: editForm.nome, username: editForm.username } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      toast.success("Usuario atualizado.");
+      setEditTarget(null);
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "username_exists") toast.error("Usuario ja existe.");
+      else if (message === "username_empty") toast.error("O login alternativo nao pode ficar vazio.");
+      else toast.error("Erro ao editar.");
+    },
+  });
+
   const users = usersQ.data ?? [];
 
   return (
@@ -522,13 +558,21 @@ function UserManagementCard() {
           ) : (
             <div className="space-y-3">
               {users.map((u) => (
-                <div key={u.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <div key={u.id} className={cn(
+                  "flex items-center justify-between rounded-lg border border-border px-4 py-3",
+                  u.active === false ? "bg-muted/20 opacity-60" : "bg-muted/30",
+                )}>
                   <div>
                     <p className="font-medium">
                       {u.nome ?? u.username}
                       {u.mustChangePassword ? (
                         <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                          Senha provisória
+                          Senha provisoria
+                        </span>
+                      ) : null}
+                      {u.active === false ? (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                          Inativo
                         </span>
                       ) : null}
                     </p>
@@ -536,9 +580,21 @@ function UserManagementCard() {
                   </div>
                   {isSuperAdmin && u.role !== "super_admin" && (
                     <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => { setEditTarget({ id: u.id, nome: u.nome ?? "", username: u.username }); setEditForm({ nome: u.nome ?? "", username: u.username }); }} title="Editar nome e login">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => mutateReset.mutate(u.id)} disabled={mutateReset.isPending} title="Resetar senha para Kurti-3D">
                         <RefreshCw className="h-4 w-4" />
                       </Button>
+                      {u.active !== false ? (
+                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-amber-600" onClick={() => mutateDeactivate.mutate(u.id)} disabled={mutateDeactivate.isPending} title="Inativar usuario">
+                          <UserX className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-green-600" onClick={() => mutateActivate.mutate(u.id)} disabled={mutateActivate.isPending} title="Reativar usuario">
+                          <UserCheck className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -634,6 +690,27 @@ function UserManagementCard() {
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>
             <Button variant="destructive" onClick={() => { if (deleteId) mutateDelete.mutate(deleteId); }} disabled={mutateDelete.isPending}>{mutateDelete.isPending ? "Removendo..." : "Remover"}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit user dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) setEditTarget(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Editar Usuário</DialogTitle></DialogHeader>
+          <form autoComplete="off" onSubmit={(e) => { e.preventDefault(); mutateEdit.mutate(); }} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nome</Label>
+              <Input value={editForm.nome} onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} placeholder="Nome do usuário" autoComplete="off" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Usuário (login alternativo)</Label>
+              <Input value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} placeholder="nome_usuario" autoComplete="off" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditTarget(null)}>Cancelar</Button>
+              <Button type="submit" className="btn-filament" disabled={mutateEdit.isPending}>{mutateEdit.isPending ? "Salvando..." : "Salvar"}</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

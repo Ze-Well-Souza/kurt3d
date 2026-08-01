@@ -33,6 +33,7 @@ export type User = {
   nome?: string | null;
   role: string;
   mustChangePassword: boolean;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -46,6 +47,7 @@ export function fromUserRow(row: any): User {
     nome: row.nome ?? null,
     role: row.role ?? "admin",
     mustChangePassword: row.must_change_password ?? false,
+    active: row.active ?? true,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -78,6 +80,7 @@ export function toUserRow(user: User) {
     nome: user.nome ?? null,
     role: user.role ?? "admin",
     must_change_password: user.mustChangePassword ?? false,
+    active: user.active ?? true,
     created_at: user.createdAt,
     updated_at: user.updatedAt,
   };

@@ -90,6 +90,7 @@ export async function setupAdminUser(input: { username: string; password: string
     role: "super_admin",
     // Ele escolhe a própria senha no setup — não precisa trocar depois.
     mustChangePassword: false,
+    active: true,
     createdAt: now,
     updatedAt: now,
   };
@@ -104,6 +105,8 @@ export async function validateLogin(input: { phone: string; password: string }) 
     (u) => u.phone === normalizedPhone || u.phone === input.phone || u.username === input.phone,
   );
   if (!user) return null;
+  // Usuario inativo nao pode logar.
+  if (user.active === false) return null;
   const ok = await verifyPassword(input.password, user.passwordHash);
   if (!ok) return null;
   return { id: user.id, username: user.username, nome: user.nome };
@@ -130,6 +133,7 @@ export async function listAdminUsers() {
     nome: u.nome ?? null,
     role: u.role ?? "admin",
     mustChangePassword: u.mustChangePassword ?? false,
+    active: u.active ?? true,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
   }));
@@ -166,6 +170,7 @@ export async function createAdminUser(input: { username: string; password: strin
     role: "admin",
     // Senha cadastrada pelo super admin é provisória: troca obrigatória no 1º acesso.
     mustChangePassword: true,
+    active: true,
     createdAt: now,
     updatedAt: now,
   };
@@ -181,6 +186,36 @@ export async function deleteAdminUser(userId: string) {
   if (!target) throw new Error("user_not_found");
   if (target.role === "super_admin") throw new Error("cannot_delete_super_admin");
   repo.list = repo.list.filter((u) => u.id !== userId);
+  await repo.save(repo.list);
+}
+
+/** Ativa ou desativa um usuario (soft-delete). Inativo = nao consegue logar. */
+export async function setUserActive(userId: string, active: boolean) {
+  const repo = await usersRepo();
+  const user = repo.list.find((u) => u.id === userId);
+  if (!user) throw new Error("user_not_found");
+  if (user.role === "super_admin" && !active) throw new Error("cannot_deactivate_super_admin");
+  user.active = active;
+  user.updatedAt = nowIso();
+  await repo.save(repo.list);
+}
+
+/** Atualiza nome e/ou username de um usuario. */
+export async function updateUser(userId: string, input: { nome?: string; username?: string }) {
+  const repo = await usersRepo();
+  const user = repo.list.find((u) => u.id === userId);
+  if (!user) throw new Error("user_not_found");
+  if (input.username !== undefined) {
+    const trimmed = input.username.trim();
+    if (!trimmed) throw new Error("username_empty");
+    const exists = repo.list.find((u) => u.username === trimmed && u.id !== userId);
+    if (exists) throw new Error("username_exists");
+    user.username = trimmed;
+  }
+  if (input.nome !== undefined) {
+    user.nome = input.nome.trim() || null;
+  }
+  user.updatedAt = nowIso();
   await repo.save(repo.list);
 }
 
