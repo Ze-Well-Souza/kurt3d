@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive, Eye, EyeOff, Copy, Check, RefreshCw, Pencil, UserCheck, UserX } from "lucide-react";
+import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive, Eye, EyeOff, Copy, Check, RefreshCw, Pencil, UserCheck, UserX, Share2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +11,17 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { saveSettings, runStorageCleanup } from "@/lib/api/data.functions";
 import { changePassword, listUsers, createUser, deleteUser, resetPassword, deactivateUser, activateUser, editUser, getSiteContent, saveSiteContent, requireAuth } from "@/lib/api/auth.functions";
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
+import {
+  buildWhatsAppUrl,
+  buildCredentialsMessage,
+  DEFAULT_PROVISIONAL_PASSWORD,
+  type CredentialsPayload,
+} from "@/lib/domain/auth-credentials";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
 import { useSettings } from "@/lib/hooks/use-settings";
@@ -348,28 +354,6 @@ function ChangePasswordCard() {
   );
 }
 
-// Monta a URL do WhatsApp com a mensagem ja preenchida (numero brasileiro: +55).
-function buildWhatsAppUrl(phone: string, message: string) {
-  const digits = phone.replace(/\D/g, "");
-  const withCountry = digits.length <= 11 ? `55${digits}` : digits;
-  return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`;
-}
-
-// Mensagem pronta para enviar ao novo admin com os dados de acesso.
-function buildCredentialsMessage(
-  creds: { nome: string; phone: string; username: string; password: string },
-  loginUrl: string,
-) {
-  const login = creds.phone || creds.username;
-  return (
-    `Ola ${creds.nome || "admin"}! Seu acesso ao painel da Kurti 3D foi criado.\n\n` +
-    `Acesse: ${loginUrl}\n` +
-    `Login: ${login}\n` +
-    `Senha provisoria: ${creds.password}\n\n` +
-    `No primeiro acesso o sistema vai pedir para voce criar uma senha pessoal.`
-  );
-}
-
 // Gera uma senha provisoria forte que atende a politica (maiuscula, minuscula, numero).
 function generateProvisionalPassword() {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -381,7 +365,6 @@ function generateProvisionalPassword() {
   const pick = (set: string, n: number) => set[n % set.length];
   const chars = [pick(upper, bytes[0]), pick(lower, bytes[1]), pick(digits, bytes[2])];
   for (let i = 3; i < 10; i++) chars.push(pick(all, bytes[i]));
-  // Embaralha para nao deixar as classes sempre nas mesmas posicoes.
   for (let i = chars.length - 1; i > 0; i--) {
     const j = bytes[i] % (i + 1);
     [chars[i], chars[j]] = [chars[j], chars[i]];
@@ -389,14 +372,18 @@ function generateProvisionalPassword() {
   return chars.join("");
 }
 
-// Tela mostrada apos criar o usuario: exibe as credenciais uma unica vez e permite
-// copiar a mensagem pronta ou enviar direto pelo WhatsApp.
-function CreatedUserShare({
+// Dialog generico para compartilhar credenciais (usado apos criacao, reset manual
+// ou acao de "Enviar Credenciais" na listagem).
+function CredentialsShareDialog({
   creds,
   onClose,
+  title = "Credenciais de Acesso",
+  warnSingleView = false,
 }: {
-  creds: { nome: string; phone: string; username: string; password: string };
+  creds: CredentialsPayload;
   onClose: () => void;
+  title?: string;
+  warnSingleView?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const loginUrl = typeof window !== "undefined" ? `${window.location.origin}/login` : "/login";
@@ -416,11 +403,25 @@ function CreatedUserShare({
 
   return (
     <>
-      <DialogHeader><DialogTitle>Usuario criado — envie o acesso</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+        {warnSingleView && (
+          <DialogDescription className="hidden">
+            Credenciais para envio.
+          </DialogDescription>
+        )}
+      </DialogHeader>
       <div className="space-y-4">
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
-          Esta e a unica vez que a senha provisoria aparece. Copie ou envie agora — depois nao e possivel ve-la novamente.
-        </div>
+        {warnSingleView && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+            Esta e a unica vez que a senha provisoria aparece. Copie ou envie agora — depois nao e possivel ve-la novamente.
+          </div>
+        )}
+        {!warnSingleView && (
+          <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-700 dark:text-blue-400">
+            A senha provisoria e <span className="font-semibold">{DEFAULT_PROVISIONAL_PASSWORD}</span>. No primeiro acesso o usuario devera troca-la por uma senha pessoal.
+          </div>
+        )}
         <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 text-sm">
           <div className="flex justify-between gap-2"><span className="text-muted-foreground">Nome</span><span className="font-medium">{creds.nome}</span></div>
           <div className="flex justify-between gap-2"><span className="text-muted-foreground">Login</span><span className="font-medium">{login}</span></div>
@@ -455,12 +456,11 @@ function UserManagementCard() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "Kurti-3D" });
   const [showPassword, setShowPassword] = useState(false);
-  // Estado do dialog de edicao
   const [editTarget, setEditTarget] = useState<{ id: string; nome: string; username: string } | null>(null);
   const [editForm, setEditForm] = useState({ nome: "", username: "" });
-  // Credenciais recem-criadas para compartilhar (so vivem em memoria, uma vez):
-  // a senha provisoria nao fica salva em texto puro no banco.
-  const [createdCreds, setCreatedCreds] = useState<{ nome: string; phone: string; username: string; password: string } | null>(null);
+  const [createdCreds, setCreatedCreds] = useState<CredentialsPayload | null>(null);
+  const [shareCreds, setShareCreds] = useState<CredentialsPayload | null>(null);
+  const [pendingShareUserId, setPendingShareUserId] = useState<string | null>(null);
   const handleCreateUserError = useToastErrorHandler({ fallbackMessage: "Erro ao criar usuário." });
   const handleDeleteUserError = useToastErrorHandler({ fallbackMessage: "Erro ao remover usuário." });
 
@@ -469,7 +469,6 @@ function UserManagementCard() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["adminUsers"] });
       toast.success("Usuário criado.");
-      // Guarda as credenciais para a tela de compartilhamento antes de limpar o form.
       setCreatedCreds({ ...form });
       setForm({ nome: "", phone: "", username: "", password: "Kurti-3D" });
       setShowPassword(false);
@@ -489,11 +488,43 @@ function UserManagementCard() {
 
   const mutateReset = useMutation({
     mutationFn: (userId: string) => resetPassword({ data: { userId } }),
-    onSuccess: () => {
+    onSuccess: (_, userId) => {
       qc.invalidateQueries({ queryKey: ["adminUsers"] });
-      toast.success("Senha resetada para Kurti-3D. O usuário deverá trocá-la no próximo acesso.");
+      const user = (usersQ.data ?? []).find((u) => u.id === userId);
+      if (user) {
+        setShareCreds({
+          nome: user.nome ?? user.username,
+          phone: user.phone ?? "",
+          username: user.username,
+          password: DEFAULT_PROVISIONAL_PASSWORD,
+        });
+        toast.success("Senha resetada. Envie as novas credenciais ao usuário.");
+      } else {
+        toast.success("Senha resetada para Kurti-3D. O usuário deverá trocá-la no próximo acesso.");
+      }
     },
     onError: () => toast.error("Erro ao resetar senha."),
+  });
+
+  const mutateResetForShare = useMutation({
+    mutationFn: (userId: string) => resetPassword({ data: { userId } }),
+    onSuccess: (_, userId) => {
+      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      const user = (usersQ.data ?? []).find((u) => u.id === userId);
+      if (user) {
+        setShareCreds({
+          nome: user.nome ?? user.username,
+          phone: user.phone ?? "",
+          username: user.username,
+          password: DEFAULT_PROVISIONAL_PASSWORD,
+        });
+      }
+      setPendingShareUserId(null);
+    },
+    onError: () => {
+      toast.error("Erro ao resetar senha.");
+      setPendingShareUserId(null);
+    },
   });
 
   const mutateDeactivate = useMutation({
@@ -528,6 +559,25 @@ function UserManagementCard() {
       else toast.error("Erro ao editar.");
     },
   });
+
+  function handleShareCredentialsClick(user: { id: string; nome: string | null; phone: string | null; username: string; mustChangePassword: boolean }) {
+    if (user.mustChangePassword) {
+      setShareCreds({
+        nome: user.nome ?? user.username,
+        phone: user.phone ?? "",
+        username: user.username,
+        password: DEFAULT_PROVISIONAL_PASSWORD,
+      });
+    } else {
+      setPendingShareUserId(user.id);
+    }
+  }
+
+  function confirmShareWithReset() {
+    if (pendingShareUserId) {
+      mutateResetForShare.mutate(pendingShareUserId);
+    }
+  }
 
   const users = usersQ.data ?? [];
 
@@ -586,6 +636,9 @@ function UserManagementCard() {
                       <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => mutateReset.mutate(u.id)} disabled={mutateReset.isPending} title="Resetar senha para Kurti-3D">
                         <RefreshCw className="h-4 w-4" />
                       </Button>
+                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-[#25D366]" onClick={() => handleShareCredentialsClick(u)} disabled={mutateResetForShare.isPending} title="Enviar credenciais por WhatsApp">
+                        <Share2 className="h-4 w-4" />
+                      </Button>
                       {u.active !== false ? (
                         <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-amber-600" onClick={() => mutateDeactivate.mutate(u.id)} disabled={mutateDeactivate.isPending} title="Inativar usuario">
                           <UserX className="h-4 w-4" />
@@ -621,8 +674,10 @@ function UserManagementCard() {
       >
         <DialogContent className="sm:max-w-md">
           {createdCreds ? (
-            <CreatedUserShare
+            <CredentialsShareDialog
               creds={createdCreds}
+              title="Usuario criado — envie o acesso"
+              warnSingleView
               onClose={() => {
                 setShowDialog(false);
                 setCreatedCreds(null);
@@ -678,6 +733,39 @@ function UserManagementCard() {
               </form>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Share credentials dialog (for resend after creation or after reset) */}
+      <Dialog open={!!shareCreds} onOpenChange={(o) => !o && setShareCreds(null)}>
+        <DialogContent className="sm:max-w-md">
+          {shareCreds && (
+            <CredentialsShareDialog
+              creds={shareCreds}
+              title="Reenvio de Credenciais"
+              warnSingleView={false}
+              onClose={() => setShareCreds(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation before reset when user has already changed password */}
+      <Dialog open={!!pendingShareUserId} onOpenChange={(o) => !o && setPendingShareUserId(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Enviar credenciais</DialogTitle>
+            <DialogDescription>
+              Este usuario ja definiu uma senha pessoal. Para gerar a mensagem de acesso, a senha sera resetada para <span className="font-semibold">{DEFAULT_PROVISIONAL_PASSWORD}</span> e o usuario devera troca-la no proximo login.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => setPendingShareUserId(null)}>Cancelar</Button>
+            <Button className="btn-filament gap-2" onClick={confirmShareWithReset} disabled={mutateResetForShare.isPending}>
+              <RefreshCw className={cn("h-4 w-4", mutateResetForShare.isPending && "animate-spin")} />
+              {mutateResetForShare.isPending ? "Resetando..." : "Resetar e Enviar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
