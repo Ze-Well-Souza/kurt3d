@@ -114,6 +114,27 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
+
+  /* iOS safe-area padding for PWA standalone mode */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-left {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .safe-right {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Ensure sticky/fixed headers respect the notch */
+  @supports (padding-top: env(safe-area-inset-top)) {
+    header.sticky {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+  }
 }
 
 @layer components {

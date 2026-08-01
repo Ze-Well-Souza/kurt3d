@@ -7,8 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle, Upload, ImagePlus, X, Link as LinkIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle, Upload, ImagePlus, X, Link as LinkIcon, ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { submitLead } from "@/lib/api/data.functions";
 import { getSiteContent } from "@/lib/api/auth.functions";
 import { KurtiLogo } from "@/components/KurtiLogo";
@@ -60,27 +61,62 @@ function Landing() {
 }
 
 function Nav() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const navLinks = (
+    <>
+      <a href="#work" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Portfólio</a>
+      <a href="#testimonials" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Depoimentos</a>
+      <a href="#services" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Serviços</a>
+      <a href="#contact" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Contato</a>
+      <Link to="/acompanhar" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Acompanhar pedido</Link>
+    </>
+  );
+
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
+      <div className="mx-auto flex h-16 md:h-20 max-w-7xl items-center justify-between px-4 md:px-6">
         <Link to="/">
           <KurtiLogo />
         </Link>
+
+        {/* Desktop nav */}
         <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
-          <a href="#work" className="transition-colors hover:text-foreground">Portfólio</a>
-          <a href="#testimonials" className="transition-colors hover:text-foreground">Depoimentos</a>
-          <a href="#services" className="transition-colors hover:text-foreground">Serviços</a>
-          <a href="#contact" className="transition-colors hover:text-foreground">Contato</a>
-          <Link to="/acompanhar" className="transition-colors hover:text-foreground">Acompanhar pedido</Link>
+          {navLinks}
         </nav>
+
         <div className="flex items-center gap-2">
           <SocialIcons className="hidden md:flex" />
           <Link to="/admin">
-            <Button variant="ghost" size="sm">Painel</Button>
+            <Button variant="ghost" size="sm" className="hidden sm:inline-flex">Painel</Button>
           </Link>
-          <a href="#contact" className="btn-filament inline-flex h-10 items-center px-5 text-sm font-semibold">
+          <a href="#contact" className="btn-filament hidden h-10 items-center px-5 text-sm font-semibold sm:inline-flex">
             Faça seu Orçamento
           </a>
+
+          {/* Mobile hamburger */}
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Abrir menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[280px] sm:w-[320px]">
+              <SheetHeader className="mb-6">
+                <SheetTitle>Menu</SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-4 text-base font-medium">
+                {navLinks}
+                <Link to="/admin" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Painel Admin</Link>
+                <a href="#contact" className="btn-filament mt-2 inline-flex h-10 items-center justify-center px-5 text-sm font-semibold" onClick={() => setMobileOpen(false)}>
+                  Faça seu Orçamento
+                </a>
+              </nav>
+              <div className="mt-6">
+                <SocialIcons className="flex" />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
       <div className="filament-divider" />
