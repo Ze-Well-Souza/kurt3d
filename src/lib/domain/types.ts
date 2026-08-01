@@ -434,8 +434,39 @@ export type BudgetQuote = {
   notes?: string | null;
   pdfUrl?: string | null;
   createdAt: string;
+  updatedAt: string;
   expiresAt?: string | null;
   convertedToOrderId?: string | null;
+};
+
+export type ReceiptType = "sale" | "payment";
+
+export type Receipt = {
+  id: string;
+  receiptNumber: string;
+  type: ReceiptType;
+  clientName: string;
+  items: ReceiptItem[];
+  total: number;
+  docType?: string | null;
+  docNumber?: string | null;
+  studioDocType?: string | null;
+  studioDocNumber?: string | null;
+  formaPagamento?: string | null;
+  observacao?: string | null;
+  paid: boolean;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  discountPercent?: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReceiptItem = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
 };
 
 export type PortfolioVideoPlatform = "youtube" | "vimeo" | "instagram" | "tiktok";

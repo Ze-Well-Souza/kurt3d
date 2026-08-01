@@ -74,6 +74,7 @@ export const createBudgetQuote = createServerFn({ method: "POST" })
       notes: data.notes ?? null,
       pdfUrl: null,
       createdAt: now,
+      updatedAt: now,
       expiresAt,
       convertedToOrderId: null,
     };
@@ -120,6 +121,7 @@ export const updateBudgetQuote = createServerFn({ method: "POST" })
       validityDays: data.validityDays,
       status: data.status ?? quote.status,
       notes: data.notes ?? null,
+      updatedAt: now,
     };
     
     await repo.upsert(updated);
@@ -171,7 +173,7 @@ export const convertQuoteToOrder = createServerFn({ method: "POST" })
 
     // Save order and update quote
     await orders.save([order, ...orders.list]);
-    const updated: BudgetQuote = { ...quote, status: "converted", convertedToOrderId: orderId };
+    const updated: BudgetQuote = { ...quote, status: "converted", convertedToOrderId: orderId, updatedAt: now };
     await quotesRepo.upsert(updated);
     return { ok: true as const, quoteId: quote.id, orderId };
   });

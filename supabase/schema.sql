@@ -403,6 +403,7 @@ create table if not exists public.budget_quotes (
   notes text null,
   pdf_url text null,
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   expires_at timestamptz null,
   converted_to_order_id text null references public.orders(id) on delete set null
 );

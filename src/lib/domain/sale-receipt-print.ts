@@ -105,19 +105,20 @@ const LOGO_SVG = `
 function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   const receiptNumber = generateReceiptNumber();
   const issueDate = formatDate(new Date());
-  const whatsappLink = `https://wa.me/${input.whatsappNumero.replace(/\D/g, "")}`;
-  const phoneDisplay = formatPhoneDisplay(input.whatsappNumero);
+  const studioWhatsappDigits = (input.whatsappNumero ?? "").replace(/\D/g, "");
+  const studioWhatsappLink = studioWhatsappDigits
+    ? `https://wa.me/${studioWhatsappDigits.length <= 11 ? `55${studioWhatsappDigits}` : studioWhatsappDigits}`
+    : "#";
+  const studioPhoneDisplay = input.whatsappNumero ? formatPhoneDisplay(input.whatsappNumero) : "";
   const instagramUrl = input.instagramUrl || "https://instagram.com/kurti3d";
   const studio = escapeHtml(input.studioNome);
   const client = escapeHtml(input.clientName || "__________________________");
   const docTypeLabel = input.docType === "cnpj" ? "CNPJ" : "CPF";
-  const docDisplay = input.docNumber
-    ? formatDocNumber(input.docType, input.docNumber)
-    : "__________________________";
+  const docDisplay = input.docNumber ? formatDocNumber(input.docType, input.docNumber) : "";
   const studioDocTypeLabel = input.studioDocType === "cnpj" ? "CNPJ" : "CPF";
   const studioDocDisplay = input.studioDocNumber
     ? formatDocNumber(input.studioDocType, input.studioDocNumber)
-    : "__________________________";
+    : "";
   const paymentDateStr = input.dataRecebimento
     ? formatDate(new Date(input.dataRecebimento + "T12:00:00"))
     : issueDate;
@@ -178,6 +179,24 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
 
   const paymentRow = input.formaPagamento
     ? `<div class="info-row"><span class="info-label">Forma de Pagamento</span><span class="info-value">${escapeHtml(input.formaPagamento)}</span></div>`
+    : "";
+
+  const clientDocRow = docDisplay
+    ? `<div class="info-row"><span class="info-label">${docTypeLabel} (Comprador)</span><span class="info-value" style="font-family:monospace">${escapeHtml(docDisplay)}</span></div>`
+    : "";
+
+  const studioDocRow = studioDocDisplay
+    ? `<div class="info-row"><span class="info-label">${studioDocTypeLabel} Kurti 3D</span><span class="info-value" style="font-family:monospace">${escapeHtml(studioDocDisplay)}</span></div>`
+    : "";
+
+  const clientWhatsappDigits = (input.clientPhone ?? "").replace(/\D/g, "");
+  const clientWhatsappRow = clientWhatsappDigits
+    ? (() => {
+        const full = clientWhatsappDigits.length <= 11 ? `55${clientWhatsappDigits}` : clientWhatsappDigits;
+        const link = `https://wa.me/${full}`;
+        const disp = formatPhoneDisplay(input.clientPhone!);
+        return `<div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${link}" style="color:#5fa8a3">${escapeHtml(disp)}</a></span></div>`;
+      })()
     : "";
 
   return `<!DOCTYPE html>
@@ -381,9 +400,9 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   <div class="info-grid">
     <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${client}</span></div>
     <div class="info-row"><span class="info-label">Data de emissão</span><span class="info-value">${issueDate}</span></div>
-    <div class="info-row"><span class="info-label">${docTypeLabel} (Comprador)</span><span class="info-value" style="font-family:monospace">${escapeHtml(docDisplay)}</span></div>
-    <div class="info-row"><span class="info-label">${studioDocTypeLabel} Kurti 3D</span><span class="info-value" style="font-family:monospace">${escapeHtml(studioDocDisplay)}</span></div>
-    <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(phoneDisplay)}</a></span></div>
+    ${clientDocRow}
+    ${studioDocRow}
+    ${clientWhatsappRow}
     ${paymentRow}
   </div>
 
@@ -416,13 +435,10 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   </div>
 
   <div class="footer">
-    <div>
-      <div style="font-weight:600;color:#1a1a1a">${studio}</div>
-      <div>${studioDocTypeLabel}: ${escapeHtml(studioDocDisplay)}</div>
-    </div>
+    <div></div>
     <div class="contact">
       Qualquer dúvida, entre em contato:<br>
-      <a href="${whatsappLink}">WhatsApp ${escapeHtml(phoneDisplay)}</a><br>
+      <a href="${studioWhatsappLink}">WhatsApp ${escapeHtml(studioPhoneDisplay)}</a><br>
       <a href="${escapeHtml(instagramUrl)}" style="color:#e0a93b">Instagram @kurti3d</a>
     </div>
   </div>

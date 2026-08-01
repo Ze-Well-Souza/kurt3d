@@ -1,4 +1,4 @@
-import type { BudgetQuote, PortfolioVideo, ProductionCalendarEvent, SavedReport } from "../../domain/types";
+import type { BudgetQuote, PortfolioVideo, ProductionCalendarEvent, Receipt, SavedReport } from "../../domain/types";
 import { getSupabaseAdminClient } from "../supabase.server";
 import { replaceById, unwrapResult } from "./shared";
 
@@ -47,6 +47,7 @@ function fromBudgetQuoteRow(row: any): BudgetQuote {
     notes: row.notes ?? null,
     pdfUrl: row.pdf_url ?? null,
     createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
     expiresAt: row.expires_at ?? null,
     convertedToOrderId: row.converted_to_order_id ?? null,
   };
@@ -67,6 +68,7 @@ function toBudgetQuoteRow(row: BudgetQuote) {
     notes: row.notes ?? null,
     pdf_url: row.pdfUrl ?? null,
     created_at: row.createdAt,
+    updated_at: row.updatedAt,
     expires_at: row.expiresAt ?? null,
     converted_to_order_id: row.convertedToOrderId ?? null,
   };
@@ -268,6 +270,93 @@ export async function savedReportsRepo() {
         metadata: { reportId: id },
       });
       return list.filter((item) => item.id !== id);
+    },
+  };
+}
+
+// ═══════════ Receipts ═══════════
+
+function fromReceiptRow(row: any): Receipt {
+  return {
+    id: row.id,
+    receiptNumber: row.receipt_number,
+    type: row.type,
+    clientName: row.client_name,
+    items: Array.isArray(row.items) ? row.items : [],
+    total: row.total,
+    docType: row.doc_type ?? null,
+    docNumber: row.doc_number ?? null,
+    studioDocType: row.studio_doc_type ?? null,
+    studioDocNumber: row.studio_doc_number ?? null,
+    formaPagamento: row.forma_pagamento ?? null,
+    observacao: row.observacao ?? null,
+    paid: row.paid ?? false,
+    sourceType: row.source_type ?? null,
+    sourceId: row.source_id ?? null,
+    discountPercent: row.discount_percent ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toReceiptRow(row: Receipt) {
+  return {
+    id: row.id,
+    receipt_number: row.receiptNumber,
+    type: row.type,
+    client_name: row.clientName,
+    items: row.items,
+    total: row.total,
+    doc_type: row.docType ?? null,
+    doc_number: row.docNumber ?? null,
+    studio_doc_type: row.studioDocType ?? null,
+    studio_doc_number: row.studioDocNumber ?? null,
+    forma_pagamento: row.formaPagamento ?? null,
+    observacao: row.observacao ?? null,
+    paid: row.paid,
+    source_type: row.sourceType ?? null,
+    source_id: row.sourceId ?? null,
+    discount_percent: row.discountPercent ?? null,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+  };
+}
+
+export async function receiptsRepo() {
+  const supabase = getSupabaseAdminClient();
+  const rows = unwrapResult(await supabase.from("receipts").select("*").order("created_at", { ascending: false }), {
+    table: "receipts",
+    operation: "list",
+    query: "select(*).order(created_at desc)",
+  });
+  const list = (rows as any[]).map(fromReceiptRow);
+
+  /** Gera o próximo número de recibo sequencial para hoje. */
+  function generateReceiptNumber(): string {
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const prefix = `REC-${today}-`;
+    const todayReceipts = list.filter((r) => r.receiptNumber.startsWith(prefix));
+    const next = todayReceipts.length + 1;
+    return `${prefix}${next.toString().padStart(4, "0")}`;
+  }
+
+  return {
+    list,
+    generateReceiptNumber,
+    async upsert(receipt: Receipt) {
+      unwrapResult(await supabase.from("receipts").upsert(toReceiptRow(receipt), { onConflict: "id" }), {
+        table: "receipts",
+        operation: "upsert",
+        query: "upsert(onConflict=id)",
+        metadata: { receiptNumber: receipt.receiptNumber },
+      });
+      const idx = list.findIndex((item) => item.id === receipt.id);
+      if (idx >= 0) list[idx] = receipt;
+      else list.unshift(receipt);
+      return receipt;
+    },
+    async findByNumber(number: string) {
+      return list.find((r) => r.receiptNumber === number) ?? null;
     },
   };
 }
