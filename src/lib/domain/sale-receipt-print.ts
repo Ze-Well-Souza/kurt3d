@@ -45,6 +45,8 @@ export type SaleReceiptInput = {
   clientPhone?: string | null;
   /** URL do Instagram (opcional, padrão @kurti3d). */
   instagramUrl?: string;
+  /** Se true, exibe carimbo "PAGO" com assinatura Kurti3D no recibo. */
+  paid?: boolean;
 };
 
 function escapeHtml(str: string) {
@@ -158,6 +160,20 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
 
   const observationsBlock = input.observacao
     ? `<div class="observations"><strong>Observações:</strong><br>${escapeHtml(input.observacao)}</div>`
+    : "";
+
+  const paidStamp = input.paid
+    ? `
+  <div class="paid-stamp">
+    <div class="paid-stamp-inner">
+      <div class="paid-badge">PAGO</div>
+      <div class="paid-signature">
+        <div class="paid-logo">${LOGO_SVG}</div>
+        <span>Kurti<span style="font-weight:300;color:#555">3D</span></span>
+      </div>
+      <div class="paid-date">${issueDate}</div>
+    </div>
+  </div>`
     : "";
 
   const paymentRow = input.formaPagamento
@@ -283,9 +299,58 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
       text-align: center;
       line-height: 1.6;
     }
+    .paid-stamp {
+      display: flex;
+      justify-content: center;
+      margin: 28px 0 16px;
+    }
+    .paid-stamp-inner {
+      border: 3px solid #2e7d32;
+      border-radius: 12px;
+      padding: 18px 36px;
+      text-align: center;
+      background: #f0faf2;
+      transform: rotate(-3deg);
+    }
+    .paid-badge {
+      font-size: 28px;
+      font-weight: 900;
+      color: #2e7d32;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .paid-signature {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+    .paid-logo {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+    .paid-logo svg {
+      width: 28px;
+      height: 28px;
+    }
+    .paid-date {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #666;
+    }
     @media print {
       body { padding: 30px 34px; }
       @page { size: A4; margin: 15mm; }
+      .paid-stamp-inner {
+        border-color: #555 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
     }
     .thank-you {
       text-align: center;
@@ -342,6 +407,8 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   </table>
 
   ${observationsBlock}
+
+  ${paidStamp}
 
   <div class="receipt-disclaimer">
     Este recibo comprova a venda dos itens descritos acima.<br>

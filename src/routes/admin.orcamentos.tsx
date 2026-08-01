@@ -118,6 +118,7 @@ function OrcamentosPage() {
     clientPhone: string;
     formaPagamento: string;
     dataRecebimento: string;
+    paid: boolean;
   }>({
     open: false,
     quote: null,
@@ -128,6 +129,7 @@ function OrcamentosPage() {
     clientPhone: "",
     formaPagamento: "",
     dataRecebimento: new Date().toISOString().slice(0, 10),
+    paid: false,
   });
 
   // Form state
@@ -211,7 +213,16 @@ function OrcamentosPage() {
       setShowForm(false);
       setEditQuote(null);
     },
-    onError: () => toast.error("Erro ao atualizar orçamento."),
+    onError: (err: any) => {
+      const msg = err?.message || String(err);
+      if (msg.includes("email") || msg.includes("e-mail")) {
+        toast.error("E-mail do cliente inválido. Corrija ou remova antes de salvar.");
+      } else if (msg.includes("rate_limited")) {
+        toast.error("Muitas operações. Aguarde alguns segundos.");
+      } else {
+        toast.error(`Erro ao atualizar orçamento: ${msg}`);
+      }
+    },
   });
 
   const mutateDelete = useMutation({
@@ -509,6 +520,7 @@ function OrcamentosPage() {
                         clientPhone: quote.clientContact ?? "",
                         formaPagamento: "",
                         dataRecebimento: new Date().toISOString().slice(0, 10),
+                        paid: false,
                       })}
                       className="gap-1 text-xs"
                       title="Gerar recibo de venda"
@@ -856,6 +868,20 @@ function OrcamentosPage() {
                   />
                 </div>
 
+                {/* Paid toggle */}
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                  <input
+                    type="checkbox"
+                    id="rcpt-paid"
+                    checked={receiptDialog.paid}
+                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, paid: e.target.checked }))}
+                    className="h-4 w-4 rounded accent-green-600"
+                  />
+                  <Label htmlFor="rcpt-paid" className="text-sm cursor-pointer">
+                    Pagamento já recebido (exibe carimbo PAGO)
+                  </Label>
+                </div>
+
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>
                     Cancelar
@@ -885,6 +911,7 @@ function OrcamentosPage() {
                         studioNome: settingsData?.studioNome ?? "Kurti 3D",
                         whatsappNumero: settingsData?.whatsappNumero ?? "",
                         clientPhone: receiptDialog.clientPhone || undefined,
+                        paid: receiptDialog.paid || undefined,
                       });
                     }}
                   >
@@ -913,6 +940,7 @@ function OrcamentosPage() {
                         studioNome: settingsData?.studioNome ?? "Kurti 3D",
                         whatsappNumero: settingsData?.whatsappNumero ?? "",
                         clientPhone: receiptDialog.clientPhone || undefined,
+                        paid: receiptDialog.paid || undefined,
                       });
                       setReceiptDialog((prev) => ({ ...prev, open: false }));
                     }}

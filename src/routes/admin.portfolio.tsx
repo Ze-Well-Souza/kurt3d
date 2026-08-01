@@ -2181,7 +2181,8 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
     studioDocType: "cnpj" | "cpf";
     studioDocNumber: string;
     clientPhone: string;
-  }>({ open: false, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "", clientPhone: "" });
+    paid: boolean;
+  }>({ open: false, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "", clientPhone: "", paid: false });
   const badge = order.status in STATUS_BADGE ? STATUS_BADGE[order.status] : null;
   const filamento = order.filamentoId ? filamentos?.find((f) => f.id === order.filamentoId) : undefined;
   const costResult = calcOrderCostHybrid({ order, filamento, precoVendaUnit: order.precoVenda ?? 0, settings: orderSettings });
@@ -2256,7 +2257,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
             className="mt-1 h-7 w-full gap-1 text-[10px] text-muted-foreground hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
-              setReceiptDialog({ open: true, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "", clientPhone: "" });
+              setReceiptDialog({ open: true, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "", clientPhone: "", paid: false });
             }}
           >
             <ScrollText className="h-3 w-3" />
@@ -2342,6 +2343,20 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
               />
             </div>
 
+            {/* Paid toggle */}
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+              <input
+                type="checkbox"
+                id="rcpt-paid-pf"
+                checked={receiptDialog.paid}
+                onChange={(e) => setReceiptDialog((prev) => ({ ...prev, paid: e.target.checked }))}
+                className="h-4 w-4 rounded accent-green-600"
+              />
+              <Label htmlFor="rcpt-paid-pf" className="text-sm cursor-pointer">
+                Pagamento já recebido (exibe carimbo PAGO)
+              </Label>
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>Cancelar</Button>
               <Button
@@ -2361,6 +2376,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                     studioNome: orderSettings?.studioNome ?? "Kurti 3D",
                     whatsappNumero: orderSettings?.whatsappNumero ?? "",
                     clientPhone: receiptDialog.clientPhone || undefined,
+                    paid: receiptDialog.paid || undefined,
                   });
                 }}
               >
@@ -2381,6 +2397,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                     studioNome: orderSettings?.studioNome ?? "Kurti 3D",
                     whatsappNumero: orderSettings?.whatsappNumero ?? "",
                     clientPhone: receiptDialog.clientPhone || undefined,
+                    paid: receiptDialog.paid || undefined,
                   });
                   setReceiptDialog((prev) => ({ ...prev, open: false }));
                 }}
