@@ -57,6 +57,7 @@ import { useSettings } from "@/lib/hooks/use-settings";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizeText } from "@/lib/utils/normalization";
 import { openPrintQuote, type QuoteInput } from "@/lib/domain/quote-print";
+import { openPrintReceipt, type ReceiptInput } from "@/lib/domain/payment-receipt-print";
 
 export const Route = createFileRoute("/admin/portfolio")({
   head: () => ({ meta: [{ title: "Calculadora e Pedidos — Kurti 3D" }] }),
@@ -1323,6 +1324,28 @@ function CalcPedidos() {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
+                  {(detailOrder.valorRecebido || detailOrder.dataPagamento) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        const receiptInput: ReceiptInput = {
+                          clientName: detailOrder.client,
+                          projectName: detailOrder.projectName,
+                          valorPago: detailOrder.valorRecebido ?? (detailOrder.precoVenda ? detailOrder.precoVenda * detailOrder.quantity : 0),
+                          formaPagamento: detailOrder.formaPagamento ?? "—",
+                          dataPagamento: detailOrder.dataPagamento ?? detailOrder.updatedAt,
+                          studioNome: settings.studioNome || "Kurti 3D",
+                          whatsappNumero: settings.whatsappNumero || "",
+                        };
+                        openPrintReceipt(receiptInput);
+                      }}
+                    >
+                      <Printer className="h-4 w-4" />
+                      Imprimir Recibo
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
@@ -2216,6 +2239,28 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
           <Badge variant="outline" className={cn("mt-2 text-[10px] font-semibold", paymentBadge.className)}>
             {paymentBadge.label}
           </Badge>
+        )}
+        {(order.valorRecebido || order.dataPagamento) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="mt-1 h-7 w-full gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              openPrintReceipt({
+                clientName: order.client,
+                projectName: order.projectName,
+                valorPago: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0),
+                formaPagamento: order.formaPagamento ?? "—",
+                dataPagamento: order.dataPagamento ?? order.updatedAt,
+                studioNome: orderSettings?.studioNome || "Kurti 3D",
+                whatsappNumero: orderSettings?.whatsappNumero || "",
+              });
+            }}
+          >
+            <Printer className="h-3 w-3" />
+            Imprimir Recibo
+          </Button>
         )}
         {order.status === "done" && (<Button size="sm" variant="outline" className="mt-2 w-full gap-1 text-xs" onClick={(e) => { e.stopPropagation(); setShowDestino(true); }}><MapPin className="h-3 w-3" />Finalizar Destino</Button>)}
       </Card>
