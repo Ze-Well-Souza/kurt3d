@@ -129,9 +129,23 @@ export async function listAdminUsers() {
     phone: u.phone ?? null,
     nome: u.nome ?? null,
     role: u.role ?? "admin",
+    mustChangePassword: u.mustChangePassword ?? false,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
   }));
+}
+
+export const DEFAULT_PROVISIONAL_PASSWORD = "Kurti-3D";
+
+/** Reseta a senha de um usuario para a senha provisoria padrao e exige troca no proximo acesso. */
+export async function resetUserPassword(userId: string) {
+  const repo = await usersRepo();
+  const user = repo.list.find((u) => u.id === userId);
+  if (!user) throw new Error("user_not_found");
+  user.passwordHash = await hashPassword(DEFAULT_PROVISIONAL_PASSWORD);
+  user.mustChangePassword = true;
+  user.updatedAt = nowIso();
+  await repo.save(repo.list);
 }
 
 export async function createAdminUser(input: { username: string; password: string; phone?: string; nome?: string }) {

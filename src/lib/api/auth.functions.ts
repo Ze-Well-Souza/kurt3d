@@ -11,6 +11,7 @@ import {
   getUserAuthInfo,
   getUserRole,
   listAdminUsers,
+  resetUserPassword,
   setupAdminUser,
   validateLogin,
 } from "../server/auth.server";
@@ -182,6 +183,14 @@ export const deleteUser = createServerFn({ method: "POST" })
     const userId = await requireSuperAdmin();
     if (data.userId === userId) throw new Error("cannot_delete_self");
     await deleteAdminUser(data.userId);
+    return { ok: true };
+  });
+
+export const resetPassword = createServerFn({ method: "POST" })
+  .validator(z.object({ userId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    await requireSuperAdmin();
+    await resetUserPassword(data.userId);
     return { ok: true };
   });
 

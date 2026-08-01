@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { Save, RotateCcw, Printer, Zap, DollarSign, Settings2, Info, MessageCircle, Lock, Users, Plus, Trash2, Globe, HardDrive, Eye, EyeOff, Copy, Check, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { saveSettings, runStorageCleanup } from "@/lib/api/data.functions";
-import { changePassword, listUsers, createUser, deleteUser, getSiteContent, saveSiteContent, requireAuth } from "@/lib/api/auth.functions";
+import { changePassword, listUsers, createUser, deleteUser, resetPassword, getSiteContent, saveSiteContent, requireAuth } from "@/lib/api/auth.functions";
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
@@ -453,7 +453,7 @@ function UserManagementCard() {
   const isSuperAdmin = authQ.data?.role === "super_admin";
   const [showDialog, setShowDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "" });
+  const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "Kurti-3D" });
   const [showPassword, setShowPassword] = useState(false);
   // Credenciais recem-criadas para compartilhar (so vivem em memoria, uma vez):
   // a senha provisoria nao fica salva em texto puro no banco.
@@ -468,7 +468,7 @@ function UserManagementCard() {
       toast.success("Usuário criado.");
       // Guarda as credenciais para a tela de compartilhamento antes de limpar o form.
       setCreatedCreds({ ...form });
-      setForm({ nome: "", phone: "", username: "", password: "" });
+      setForm({ nome: "", phone: "", username: "", password: "Kurti-3D" });
       setShowPassword(false);
     },
     onError: handleCreateUserError,
@@ -482,6 +482,15 @@ function UserManagementCard() {
       setDeleteId(null);
     },
     onError: handleDeleteUserError,
+  });
+
+  const mutateReset = useMutation({
+    mutationFn: (userId: string) => resetPassword({ data: { userId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      toast.success("Senha resetada para Kurti-3D. O usuário deverá trocá-la no próximo acesso.");
+    },
+    onError: () => toast.error("Erro ao resetar senha."),
   });
 
   const users = usersQ.data ?? [];
@@ -515,13 +524,25 @@ function UserManagementCard() {
               {users.map((u) => (
                 <div key={u.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
                   <div>
-                    <p className="font-medium">{u.nome ?? u.username}</p>
+                    <p className="font-medium">
+                      {u.nome ?? u.username}
+                      {u.mustChangePassword ? (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                          Senha provisória
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-xs text-muted-foreground">{u.phone ?? u.username} · {u.role === "super_admin" ? "Super Admin" : "Admin"}</p>
                   </div>
                   {isSuperAdmin && u.role !== "super_admin" && (
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => mutateReset.mutate(u.id)} disabled={mutateReset.isPending} title="Resetar senha para Kurti-3D">
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setDeleteId(u.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -538,7 +559,7 @@ function UserManagementCard() {
             setShowDialog(false);
             setCreatedCreds(null);
             setShowPassword(false);
-            setForm({ nome: "", phone: "", username: "", password: "" });
+            setForm({ nome: "", phone: "", username: "", password: "Kurti-3D" });
           }
         }}
       >
@@ -554,18 +575,18 @@ function UserManagementCard() {
           ) : (
             <>
               <DialogHeader><DialogTitle>Novo Usuário Admin</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); const passwordMessage = getPasswordPolicyMessage(form.password); if (passwordMessage) { toast.error(passwordMessage); return; } mutateCreate.mutate(); }} className="space-y-4">
+              <form autoComplete="off" onSubmit={(e) => { e.preventDefault(); const passwordMessage = getPasswordPolicyMessage(form.password); if (passwordMessage) { toast.error(passwordMessage); return; } mutateCreate.mutate(); }} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label>Nome</Label>
-                  <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Nome do usuário" />
+                  <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Nome do usuário" autoComplete="off" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Telefone</Label>
-                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="11967428594" />
+                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="11967428594" autoComplete="off" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Usuário (login alternativo)</Label>
-                  <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="nome_usuario" />
+                  <Input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="nome_usuario" autoComplete="off" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Senha provisória</Label>
@@ -576,6 +597,7 @@ function UserManagementCard() {
                         value={form.password}
                         onChange={(e) => setForm({ ...form, password: e.target.value })}
                         placeholder="8+ caracteres, maiuscula, minuscula e numero"
+                        autoComplete="new-password"
                         className="pr-10"
                       />
                       <button
@@ -587,8 +609,8 @@ function UserManagementCard() {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => { setForm((f) => ({ ...f, password: generateProvisionalPassword() })); setShowPassword(true); }}>
-                      Gerar
+                    <Button type="button" variant="outline" size="sm" onClick={() => { setForm((f) => ({ ...f, password: "Kurti-3D" })); setShowPassword(true); }}>
+                      Padrão
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">No primeiro acesso, o usuário será obrigado a trocar esta senha por uma pessoal.</p>
