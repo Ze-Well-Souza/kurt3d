@@ -7,7 +7,7 @@
  * Follows the same visual template as quote-print.ts and payment-receipt-print.ts.
  */
 
-import { brl } from "../utils";
+import { brl, formatPhoneDisplay } from "../utils";
 
 export type SaleReceiptItem = {
   description: string;
@@ -43,6 +43,8 @@ export type SaleReceiptInput = {
   whatsappNumero: string;
   /** Telefone do cliente (para envio via WhatsApp). */
   clientPhone?: string | null;
+  /** URL do Instagram (opcional, padrão @kurti3d). */
+  instagramUrl?: string;
 };
 
 function escapeHtml(str: string) {
@@ -102,6 +104,8 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   const receiptNumber = generateReceiptNumber();
   const issueDate = formatDate(new Date());
   const whatsappLink = `https://wa.me/${input.whatsappNumero.replace(/\D/g, "")}`;
+  const phoneDisplay = formatPhoneDisplay(input.whatsappNumero);
+  const instagramUrl = input.instagramUrl || "https://instagram.com/kurti3d";
   const studio = escapeHtml(input.studioNome);
   const client = escapeHtml(input.clientName || "__________________________");
   const docTypeLabel = input.docType === "cnpj" ? "CNPJ" : "CPF";
@@ -314,7 +318,7 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
     <div class="info-row"><span class="info-label">Data de emissão</span><span class="info-value">${issueDate}</span></div>
     <div class="info-row"><span class="info-label">${docTypeLabel} (Comprador)</span><span class="info-value" style="font-family:monospace">${escapeHtml(docDisplay)}</span></div>
     <div class="info-row"><span class="info-label">${studioDocTypeLabel} Kurti 3D</span><span class="info-value" style="font-family:monospace">${escapeHtml(studioDocDisplay)}</span></div>
-    <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(input.whatsappNumero)}</a></span></div>
+    <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(phoneDisplay)}</a></span></div>
     ${paymentRow}
   </div>
 
@@ -351,7 +355,8 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
     </div>
     <div class="contact">
       Qualquer dúvida, entre em contato:<br>
-      <a href="${whatsappLink}">WhatsApp ${escapeHtml(input.whatsappNumero)}</a>
+      <a href="${whatsappLink}">WhatsApp ${escapeHtml(phoneDisplay)}</a><br>
+      <a href="${escapeHtml(instagramUrl)}" style="color:#e0a93b">Instagram @kurti3d</a>
     </div>
   </div>
 
@@ -431,7 +436,7 @@ export function buildSaleReceiptWhatsAppMessage(input: SaleReceiptInput): string
   lines.push("");
   lines.push(`${input.studioNome}`);
   if (studioDocDisplay) lines.push(`${studioDocTypeLabel}: ${studioDocDisplay}`);
-  lines.push(`WhatsApp: ${input.whatsappNumero}`);
+  lines.push(`WhatsApp: ${formatPhoneDisplay(input.whatsappNumero)}`);
   return lines.join("\n");
 }
 

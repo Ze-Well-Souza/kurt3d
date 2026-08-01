@@ -13,6 +13,7 @@ import { useLeads } from "@/lib/hooks/use-leads";
 import { useClients } from "@/lib/hooks/use-clients";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizePhone, normalizeText } from "@/lib/utils/normalization";
+import { formatPhoneDisplay } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/leads")({
   head: () => ({ meta: [{ title: "Leads — Kurti 3D" }] }),
@@ -111,7 +112,7 @@ function LeadsPage() {
                       rel="noopener noreferrer"
                       className="hover:underline"
                     >
-                      {lead.whatsapp}
+                      {formatPhoneDisplay(lead.whatsapp)}
                     </a>
                   </div>
                 </div>

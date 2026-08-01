@@ -6,7 +6,7 @@
  * Follows the same visual template as quote-print.ts (orçamento).
  */
 
-import { brl } from "../utils";
+import { brl, formatPhoneDisplay } from "../utils";
 
 export type ReceiptInput = {
   /** Nome do cliente que efetuou o pagamento. */
@@ -25,6 +25,8 @@ export type ReceiptInput = {
   studioNome: string;
   /** Número de WhatsApp do estúdio para contato. */
   whatsappNumero: string;
+  /** URL do Instagram (opcional, padrão @kurti3d). */
+  instagramUrl?: string;
 };
 
 function escapeHtml(str: string) {
@@ -85,6 +87,8 @@ export function buildPaymentReceiptHtml(input: ReceiptInput): string {
     const full = digits.length <= 11 ? `55${digits}` : digits;
     return `https://wa.me/${full}`;
   })();
+  const phoneDisplay = formatPhoneDisplay(input.whatsappNumero);
+  const instagramUrl = input.instagramUrl || "https://instagram.com/kurti3d";
 
   const observationsBlock = input.observacao
     ? `<div class="observations"><strong>Observações:</strong><br>${escapeHtml(input.observacao)}</div>`
@@ -241,7 +245,7 @@ export function buildPaymentReceiptHtml(input: ReceiptInput): string {
     <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${client}</span></div>
     <div class="info-row"><span class="info-label">Data de emissão</span><span class="info-value">${issueDate}</span></div>
     <div class="info-row"><span class="info-label">Pedido / Projeto</span><span class="info-value">${project}</span></div>
-    <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(input.whatsappNumero)}</a></span></div>
+    <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(phoneDisplay)}</a></span></div>
   </div>
 
   <div class="payment-highlight">
@@ -280,7 +284,8 @@ export function buildPaymentReceiptHtml(input: ReceiptInput): string {
     </div>
     <div class="contact">
       Qualquer dúvida, entre em contato:<br>
-      <a href="${whatsappLink}">WhatsApp ${escapeHtml(input.whatsappNumero)}</a>
+      <a href="${whatsappLink}">WhatsApp ${escapeHtml(phoneDisplay)}</a><br>
+      <a href="${escapeHtml(instagramUrl)}" style="color:#e0a93b">Instagram @kurti3d</a>
     </div>
   </div>
 

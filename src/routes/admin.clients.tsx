@@ -13,7 +13,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { brl } from "@/lib/utils";
+import { brl, formatPhoneDisplay } from "@/lib/utils";
 import { SearchInput } from "@/components/SearchInput";
 import { addClient, updateClient, removeClient } from "@/lib/api/data.functions";
 import type { Client, Order } from "@/lib/domain/types";
@@ -110,7 +110,7 @@ function ClientsPage() {
                       {cOrders.length > 0 && <Badge variant="secondary">{cOrders.length} pedidos</Badge>}
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      {c.whatsapp && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{c.whatsapp}</span>}
+                      {c.whatsapp && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{formatPhoneDisplay(c.whatsapp)}</span>}
                       {c.email && <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{c.email}</span>}
                       {totalGasto > 0 && <span className="inline-flex items-center gap-1 filament-text font-medium"><DollarSign className="h-3 w-3" />{brl(totalGasto)}</span>}
                     </div>

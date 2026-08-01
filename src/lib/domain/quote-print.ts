@@ -4,7 +4,7 @@
  * client details, and itemised pricing — then triggers the browser print dialog.
  */
 
-import { brl } from "../utils";
+import { brl, formatPhoneDisplay } from "../utils";
 
 export type QuoteItem = {
   name: string;
@@ -24,6 +24,7 @@ export type QuoteInput = {
   discountPercent?: number;
   studioNome: string;
   whatsappNumero: string;
+  instagramUrl?: string;
 };
 
 export function getWhatsAppLink(numero: string) {
@@ -80,6 +81,8 @@ export function buildQuoteHtml(input: QuoteInput): string {
   const validUntil = new Date(Date.now() + (input.validityDays ?? 7) * 86_400_000);
   const validityStr = formatDate(validUntil);
   const whatsappLink = getWhatsAppLink(input.whatsappNumero);
+  const phoneDisplay = formatPhoneDisplay(input.whatsappNumero);
+  const instagramUrl = input.instagramUrl || "https://instagram.com/kurti3d";
   const studio = escapeHtml(input.studioNome);
   const client = escapeHtml(input.clientName || "__________________________");
 
@@ -262,7 +265,7 @@ export function buildQuoteHtml(input: QuoteInput): string {
   <div class="info-grid">
     <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${client}</span></div>
     <div class="info-row"><span class="info-label">Data de emissão</span><span class="info-value">${issueDate}</span></div>
-    <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(input.whatsappNumero)}</a></span></div>
+    <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(phoneDisplay)}</a></span></div>
     <div class="info-row"><span class="info-label">Válido até</span><span class="info-value">${validityStr}</span></div>
   </div>
 
@@ -295,7 +298,8 @@ export function buildQuoteHtml(input: QuoteInput): string {
     </div>
     <div class="contact">
       Qualquer dúvida, entre em contato:<br>
-      <a href="${whatsappLink}">WhatsApp ${escapeHtml(input.whatsappNumero)}</a>
+      <a href="${whatsappLink}">WhatsApp ${escapeHtml(phoneDisplay)}</a><br>
+      <a href="${escapeHtml(instagramUrl)}" style="color:#e0a93b">Instagram @kurti3d</a>
     </div>
   </div>
 

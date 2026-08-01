@@ -16,7 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { brl } from "@/lib/utils";
+import { brl, formatPhoneDisplay } from "@/lib/utils";
 import {
   createBudgetQuote, updateBudgetQuote, deleteBudgetQuote,
   convertQuoteToOrder,
@@ -370,7 +370,7 @@ function OrcamentosPage() {
                     <div className="space-y-1">
                       <CardTitle className="text-base">{quote.clientName}</CardTitle>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {quote.clientContact && <span>{quote.clientContact}</span>}
+                        {quote.clientContact && <span>{formatPhoneDisplay(quote.clientContact)}</span>}
                         {quote.clientEmail && <span>{quote.clientEmail}</span>}
                         <span>
                           {new Date(quote.createdAt).toLocaleDateString("pt-BR")}
