@@ -9,7 +9,6 @@ import {
   Plus,
   Trash2,
   AlertCircle,
-  BookOpen,
 
   CreditCard,
   Banknote,
@@ -21,12 +20,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +57,7 @@ import {
   removeExpense,
   payInstallment,
   payInsumoInstallment,
+  rescheduleInstallments,
   settleInsumoPayment,
   settlePayment,
 } from "@/lib/api/data.functions";
@@ -77,7 +71,6 @@ import {
   getInstallmentPaidAmount,
   getInstallmentRemainingAmount,
   getPaymentProgress,
-  getScheduleCounts,
   isPartialInstallment,
   type InstallmentAuditMonthRow,
   type InstallmentViewFilter,
@@ -186,6 +179,10 @@ function Finances() {
     dataPagamento: string;
     valorPago: string;
   } | null>(null);
+  const [rescheduleDialog, setRescheduleDialog] = useState<{
+    open: boolean;
+    targetDate: string;
+  }>({ open: false, targetDate: "" });
   const [installmentKpiMonthAnchor, setInstallmentKpiMonthAnchor] = useState(() =>
     todayIso().slice(0, 7),
   );
@@ -200,7 +197,6 @@ function Finances() {
     categoria: "",
   });
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
-  const [periodAnchor, setPeriodAnchor] = useState(new Date().toISOString().slice(0, 7));
 
   const invalidateExpenses = () => qc.invalidateQueries({ queryKey: ["expenses"] });
   const invalidateFilamentoPayments = () => {
@@ -296,10 +292,20 @@ function Finances() {
       toast.success("Compra quitada. Confira em Pagas.");
     },
   });
+  const mutateReschedule = useMutation({
+    mutationFn: (items: { installmentId: string; kind: "filamento" | "insumo"; newVencimento: string }[]) =>
+      rescheduleInstallments({ data: { items } }),
+    onSuccess: (_data) => {
+      invalidateFilamentoPayments();
+      invalidateInsumoPayments();
+      setRescheduleDialog({ open: false, targetDate: "" });
+      toast.success(`${_data?.count ?? 0} parcela(s) reagendada(s).`);
+    },
+  });
 
   const periodLabel = useMemo(() => {
     if (periodPreset === "all") return "Período completo";
-    const [year, month] = periodAnchor.split("-").map(Number);
+    const [year, month] = installmentKpiMonthAnchor.split("-").map(Number);
     if (!year || !month) return "Período selecionado";
     if (periodPreset === "month") {
       return new Date(year, month - 1, 1).toLocaleDateString("pt-BR", {
@@ -309,13 +315,13 @@ function Finances() {
     }
     const quarter = Math.floor((month - 1) / 3) + 1;
     return `${quarter}º trimestre de ${year}`;
-  }, [periodAnchor, periodPreset]);
+  }, [installmentKpiMonthAnchor, periodPreset]);
 
   const isDateInSelectedPeriod = useCallback(
     (dateIso?: string | null) => {
       if (!dateIso) return periodPreset === "all";
       if (periodPreset === "all") return true;
-      const [anchorYear, anchorMonth] = periodAnchor.split("-").map(Number);
+      const [anchorYear, anchorMonth] = installmentKpiMonthAnchor.split("-").map(Number);
       const [dateYear, dateMonth] = dateIso.slice(0, 7).split("-").map(Number);
       if (!anchorYear || !anchorMonth || !dateYear || !dateMonth) return false;
       if (periodPreset === "month") {
@@ -326,7 +332,7 @@ function Finances() {
         Math.floor((anchorMonth - 1) / 3) === Math.floor((dateMonth - 1) / 3)
       );
     },
-    [periodAnchor, periodPreset],
+    [installmentKpiMonthAnchor, periodPreset],
   );
 
   const periodFilteredVendas = useMemo(
@@ -603,15 +609,6 @@ function Finances() {
     installmentViewFilter,
   ]);
 
-  const scheduleCounts = useMemo(
-    () =>
-      getScheduleCounts({
-        allInstallments,
-        installmentKpiMonthAnchor,
-      }),
-    [allInstallments, installmentKpiMonthAnchor],
-  );
-
   const installmentAuditByMonth = useMemo(
     () => buildInstallmentAuditByMonth({ allInstallments }),
     [allInstallments],
@@ -626,12 +623,13 @@ function Finances() {
 
   const totalApagarNoMes = useMemo(() => {
     return computeTotalApagarNoMes({
-      allInstallments,
+      filamentoInstallments,
+      insumoInstallments,
       insumoPayments,
       insumos,
       dueMonth: installmentKpiMonthAnchor,
     });
-  }, [allInstallments, insumoPayments, insumos, installmentKpiMonthAnchor]);
+  }, [filamentoInstallments, insumoInstallments, insumoPayments, insumos, installmentKpiMonthAnchor]);
 
   const heroCardState = useMemo(() => {
     const { total, totalDue, totalPaid } = totalApagarNoMes;
@@ -781,15 +779,6 @@ function Finances() {
     [financeHistoryRows, paymentHistorySourceFilter, paymentHistoryTypeFilter],
   );
 
-  const financeHistorySummary = useMemo(
-    () => ({
-      pagamentos: visibleFinanceHistoryRows.filter((row) => row.tipo === "pagamento").length,
-      estornos: visibleFinanceHistoryRows.filter((row) => row.tipo === "estorno").length,
-      saldo: visibleFinanceHistoryRows.reduce((sum, row) => sum + getEventSignedAmount(row), 0),
-    }),
-    [visibleFinanceHistoryRows],
-  );
-
   const filteredVendas = useMemo(() => {
     if (!search.trim()) return periodFilteredVendas;
     const s = normalizeText(search);
@@ -877,7 +866,7 @@ function Finances() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `financeiro-${periodPreset}-${periodAnchor}.csv`;
+    anchor.download = `financeiro-${periodPreset}-${installmentKpiMonthAnchor}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -961,6 +950,36 @@ function Finances() {
     popup.document.close();
     popup.focus();
     popup.print();
+  };
+
+  const exportCostCsv = () => {
+    const headers = ["Data", "Descrição", "Categoria", "Fonte", "Valor"];
+    const csvLines = [
+      headers.join(";"),
+      ...classifiedExpenses.map((e) => {
+        const fonte = SOURCE_LABELS[e.source]?.label ?? e.source;
+        const categoria =
+          e.categoria ??
+          (e.financialClass === "investimento"
+            ? "Investimento / Imobilizado"
+            : "Despesa Operacional");
+        const row = [
+          e.data,
+          e.descricao,
+          categoria,
+          fonte,
+          e.valor.toFixed(2).replace(".", ","),
+        ];
+        return row.map((v) => `"${String(v).replaceAll('"', '""')}"`).join(";");
+      }),
+    ];
+    const blob = new Blob(["\uFEFF" + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `custos-${periodPreset}-${installmentKpiMonthAnchor}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   // Falha count
@@ -1071,35 +1090,23 @@ function Finances() {
       </Card>
 
       <div className="filament-top flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-border bg-card p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-2">
-            <Label>Período</Label>
-            <Select
-              value={periodPreset}
-              onValueChange={(value) => setPeriodPreset(value as FinancePeriodPreset)}
-            >
-              <SelectTrigger className="min-w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="month">Mês</SelectItem>
-                <SelectItem value="quarter">Trimestre</SelectItem>
-                <SelectItem value="all">Tudo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Mês de referência</Label>
-            <Input
-              type="month"
-              value={periodAnchor}
-              onChange={(e) => setPeriodAnchor(e.target.value)}
-              disabled={periodPreset === "all"}
-            />
-          </div>
+        <div className="grid gap-2">
+          <Label>Período</Label>
+          <Select
+            value={periodPreset}
+            onValueChange={(value) => setPeriodPreset(value as FinancePeriodPreset)}
+          >
+            <SelectTrigger className="min-w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Mês</SelectItem>
+              <SelectItem value="quarter">Trimestre</SelectItem>
+              <SelectItem value="all">Tudo</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{periodLabel}</Badge>
           <Button variant="outline" className="gap-2" onClick={exportCsv}>
             <Download className="h-4 w-4" />
             Exportar CSV
@@ -1110,163 +1117,6 @@ function Finances() {
           </Button>
         </div>
       </div>
-
-      {/* Manual / Como funciona */}
-      <Accordion
-        type="single"
-        collapsible
-        className="filament-top rounded-2xl border border-border bg-card px-6"
-      >
-        <AccordionItem value="manual" className="border-0">
-          <AccordionTrigger className="py-4 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" style={{ color: "var(--filament-cyan)" }} />
-              <span className="font-display text-base font-semibold">
-                Como funciona o seu Financeiro (manual rápido)
-              </span>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="pb-6 text-sm text-muted-foreground">
-            <div className="space-y-5 leading-relaxed">
-              <p>
-                Este módulo calcula o seu <strong className="text-foreground">lucro real</strong> a
-                partir de três entradas: vendas finalizadas, despesas operacionais registradas e o
-                custo de produção de cada peça.
-              </p>
-
-              <div>
-                <h4
-                  className="mb-1 font-semibold text-foreground"
-                  style={{ color: "var(--filament-cyan)" }}
-                >
-                  1. Receita Total (entradas)
-                </h4>
-                <p>
-                  Só conta como receita quando você{" "}
-                  <strong className="text-foreground">finaliza um pedido</strong> em{" "}
-                  <em>
-                    Calculadora e Pedidos → coluna Concluído → botão Finalizar → "Kurtido e Vendido"
-                  </em>{" "}
-                  e informa o valor recebido. ⚠️ Apenas arrastar o card para "Concluído" no Kanban{" "}
-                  <strong>não</strong> gera receita — isso é só o status de impressão.
-                </p>
-              </div>
-
-              <div>
-                <h4
-                  className="mb-1 font-semibold text-foreground"
-                  style={{ color: "var(--filament-magenta)" }}
-                >
-                  2. Despesas (saídas)
-                </h4>
-                <ul className="ml-4 list-disc space-y-1">
-                  <li>
-                    <strong className="text-foreground">Insumo operacional</strong> — itens de apoio
-                    como álcool, bicos e ferramentas consumíveis entram em{" "}
-                    <em>Despesas Operacionais</em>.
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Investimento / Imobilizado</strong> —
-                    compras como impressoras não derrubam o lucro do mês; ficam separadas em{" "}
-                    <em>Investimentos</em>.
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Manual</strong> — despesas fixas (aluguel,
-                    internet, marketing) adicionadas pelo botão "Nova despesa".
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Falha</strong> — pedidos finalizados como
-                    "Falha de Impressão" geram despesa automática com o custo do filamento
-                    desperdiçado.
-                  </li>
-                </ul>
-              </div>
-
-              <div>
-                <h4
-                  className="mb-1 font-semibold text-foreground"
-                  style={{ color: "var(--filament-yellow)" }}
-                >
-                  3. Custo de Produção (por venda)
-                </h4>
-                <p>
-                  Calculado peça a peça com a fórmula:{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                    filamento consumido (R$/g × g) + energia (kWh × tarifa) + depreciação (R$/h) +
-                    custo fixo por unidade
-                  </code>
-                  . Esses parâmetros vêm de <em>Configurações</em>.
-                </p>
-              </div>
-
-              <div>
-                <h4
-                  className="mb-1 font-semibold text-foreground"
-                  style={{ color: "var(--filament-green)" }}
-                >
-                  4. Lucro Líquido (resultado)
-                </h4>
-                <p className="rounded-md bg-muted/50 p-3 font-mono text-xs text-foreground">
-                  Lucro = Receita Total − Custo de Produção − Despesas Operacionais
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <h4 className="mb-2 font-semibold text-foreground">Exemplo prático</h4>
-                <ul className="ml-4 list-disc space-y-1 text-xs">
-                  <li>
-                    Você comprou 1 impressora por <strong>R$ 5.299</strong> e 1 frasco de álcool por{" "}
-                    <strong>R$ 25</strong>.
-                  </li>
-                  <li>
-                    → Investimentos: <strong>R$ 5.299</strong>. Despesas operacionais:{" "}
-                    <strong>R$ 25</strong>.
-                  </li>
-                  <li>
-                    Vendeu 10 chaveiros por <strong>R$ 150</strong> (Kurtido e Vendido).
-                  </li>
-                  <li>
-                    → Receita: <strong>R$ 150</strong>. Custo calculado (filamento + energia +
-                    depreciação): <strong>R$ 18</strong>.
-                  </li>
-                  <li>
-                    →{" "}
-                    <strong className="filament-text">
-                      Lucro Líquido = 150 − 18 − 25 = R$ 107
-                    </strong>
-                    . A impressora continua visível em investimentos, sem distorcer o lucro
-                    operacional.
-                  </li>
-                </ul>
-                <p className="mt-2 text-xs italic">
-                  Dica: filamentos seguem como estoque/investimento de produção e a impressora entra
-                  como imobilizado. Assim o resultado mensal fica mais fiel para análise gerencial.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="mb-1 font-semibold text-foreground">Checklist diário</h4>
-                <ol className="ml-4 list-decimal space-y-1 text-xs">
-                  <li>
-                    Cadastrou um item em Outros Insumos? → escolha se ele e despesa operacional ou
-                    investimento / imobilizado.
-                  </li>
-                  <li>
-                    Imprimiu e entregou um pedido? → finalize como "Kurtido e Vendido" com o valor
-                    recebido.
-                  </li>
-                  <li>
-                    Print falhou? → finalize como "Falha de Impressão" para contabilizar a perda.
-                  </li>
-                  <li>
-                    Pagou algo fora do estoque (luz, internet)? → "Nova despesa" aqui em Finanças.
-                  </li>
-                </ol>
-              </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -1308,151 +1158,50 @@ function Finances() {
         />
       </div>
 
-      {/* Purchase Analysis — Collapsible */}
-      <Accordion
-        type="single"
-        collapsible
-        className="filament-top rounded-2xl border border-border bg-card px-6"
-      >
-        <AccordionItem value="purchase" className="border-0">
-          <AccordionTrigger className="py-4 hover:no-underline">
-            <div className="flex items-center gap-2">
-              <Tags className="h-5 w-5" style={{ color: "var(--filament-cyan)" }} />
-              <span className="font-display text-base font-semibold">
-                Análise de Compra de Filamentos
-              </span>
-              <Badge variant="secondary" className="ml-2 text-[10px]">
-                {purchaseAnalysis.count} compras · média{" "}
-                {purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.average) : "—"}
-              </Badge>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="pb-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Média do preço pago por rolo para comprovar se as compras estão abaixo da meta de
-                  R$ 100,00.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>Marca</Label>
-                  <Select value={purchaseBrandFilter} onValueChange={setPurchaseBrandFilter}>
-                    <SelectTrigger className="min-w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as marcas</SelectItem>
-                      {purchaseBrands.map((brand) => (
-                        <SelectItem key={brand} value={brand}>
-                          {brand}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Material</Label>
-                  <Select
-                    value={purchaseMaterialFilter}
-                    onValueChange={setPurchaseMaterialFilter}
-                  >
-                    <SelectTrigger className="min-w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os materiais</SelectItem>
-                      {purchaseMaterials.map((material) => (
-                        <SelectItem key={material} value={material}>
-                          {material}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <KpiCard
-                icon={<Tags className="h-4 w-4" />}
-                label="Preço Médio por Rolo"
-                value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.average) : "—"}
-                color={
-                  purchaseAnalysis.count === 0
-                    ? "var(--muted-foreground)"
-                    : purchaseAnalysis.average <= purchaseAnalysis.target
-                      ? "var(--filament-green)"
-                      : "var(--filament-magenta)"
-                }
-              />
-              <KpiCard
-                icon={<TrendingUp className="h-4 w-4" />}
-                label="Diferença da Meta"
-                value={
-                  purchaseAnalysis.count > 0
-                    ? `${purchaseAnalysis.delta <= 0 ? "-" : "+"}${brl(Math.abs(purchaseAnalysis.delta))}`
-                    : "—"
-                }
-                color={
-                  purchaseAnalysis.count === 0
-                    ? "var(--muted-foreground)"
-                    : purchaseAnalysis.delta <= 0
-                      ? "var(--filament-green)"
-                      : "var(--filament-magenta)"
-                }
-              />
-              <KpiCard
-                icon={<DollarSign className="h-4 w-4" />}
-                label="Menor Preço"
-                value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.min) : "—"}
-                color="var(--filament-cyan)"
-              />
-              <KpiCard
-                icon={<AlertCircle className="h-4 w-4" />}
-                label="Maior Preço"
-                value={purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.max) : "—"}
-                color="var(--filament-yellow)"
-              />
-              <KpiCard
-                icon={<Package className="h-4 w-4" />}
-                label="Compras Analisadas"
-                value={String(purchaseAnalysis.count)}
-                color="var(--filament-pink)"
-              />
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-              <Badge
-                variant="outline"
-                className={
-                  purchaseAnalysis.count === 0
-                    ? "text-muted-foreground"
-                    : purchaseAnalysis.delta <= 0
-                      ? "border-green-500/30 bg-green-50 text-green-700"
-                      : "border-red-500/30 bg-red-50 text-red-700"
-                }
-              >
-                {purchaseAnalysis.count === 0
-                  ? "Nenhuma compra encontrada no filtro atual"
-                  : purchaseAnalysis.delta <= 0
-                    ? `Média ${brl(Math.abs(purchaseAnalysis.delta))} abaixo da meta de R$ 100,00`
-                    : `Média ${brl(Math.abs(purchaseAnalysis.delta))} acima da meta de R$ 100,00`}
-              </Badge>
-              <Badge variant="secondary">
-                {purchaseAnalysis.belowTargetCount} abaixo de R$ 100
-              </Badge>
-              <Badge variant="secondary">
-                {purchaseAnalysis.atTargetCount} exatamente em R$ 100
-              </Badge>
-              <Badge variant="secondary">
-                {purchaseAnalysis.aboveTargetCount} acima de R$ 100
-              </Badge>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+      {/* Purchase Analysis — Compact */}
+      <div className="filament-top flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3">
+        <div className="flex items-center gap-2">
+          <Tags className="h-4 w-4" style={{ color: "var(--filament-cyan)" }} />
+          <span className="text-sm font-semibold">Compras de Filamento</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={purchaseBrandFilter} onValueChange={setPurchaseBrandFilter}>
+            <SelectTrigger className="h-7 min-w-[130px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as marcas</SelectItem>
+              {purchaseBrands.map((brand) => (
+                <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={purchaseMaterialFilter} onValueChange={setPurchaseMaterialFilter}>
+            <SelectTrigger className="h-7 min-w-[130px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os materiais</SelectItem>
+              {purchaseMaterials.map((material) => (
+                <SelectItem key={material} value={material}>{material}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary" className="text-[10px]">
+            {purchaseAnalysis.count} compras · média {purchaseAnalysis.count > 0 ? brl(purchaseAnalysis.average) : "—"}
+          </Badge>
+          {purchaseAnalysis.count > 0 && (
+            <Badge
+              variant="outline"
+              className={`text-[10px] ${purchaseAnalysis.delta <= 0 ? "border-green-500/30 bg-green-50 text-green-700" : "border-red-500/30 bg-red-50 text-red-700"}`}
+            >
+              {purchaseAnalysis.delta <= 0 ? `${brl(Math.abs(purchaseAnalysis.delta))} abaixo` : `${brl(Math.abs(purchaseAnalysis.delta))} acima`}
+            </Badge>
+          )}
+        </div>
+      </div>
 
       {/* Installments (Parcelas) KPIs */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
@@ -1532,22 +1281,17 @@ function Finances() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <h2 className="font-display text-lg font-semibold">Cronograma de Parcelas</h2>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{scheduleCounts.pending} pendente(s)</span>
-                <span>· {scheduleCounts.paid} paga(s)</span>
-                <span>· {scheduleCounts.partial} parcial(is)</span>
-                <span>· {scheduleCounts.total} no período</span>
-                {installmentKpis.atrasadas > 0 && (
-                  <span className="font-semibold text-destructive">
-                    · {installmentKpis.atrasadas} atrasada(s)
-                  </span>
-                )}
-              </div>
-            </div>
+            <h2 className="font-display text-lg font-semibold">Cronograma de Parcelas</h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 text-xs"
+              onClick={() => setRescheduleDialog({ open: true, targetDate: "" })}
+            >
+              <CalendarClock className="h-3 w-3" /> Adiar vencimentos
+            </Button>
             <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
               <Button
                 size="sm"
@@ -1574,13 +1318,6 @@ function Finances() {
                 Todas
               </Button>
             </div>
-            <Badge variant="secondary">
-              {installmentViewFilter === "pending"
-                ? "Mostrando apenas pendentes"
-                : installmentViewFilter === "paid"
-                  ? "Mostrando pagamentos confirmados"
-                  : "Mostrando pendentes e pagas"}
-            </Badge>
           </div>
         </div>
         <div className="border-b border-border px-6 py-3 text-xs text-muted-foreground">
@@ -1890,6 +1627,25 @@ function Finances() {
                                 {kind === "filamento" ? "Quitar lote" : "Quitar compra"}
                               </Button>
                             )}
+                            {!inst.pago && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                disabled={mutateReschedule.isPending}
+                                onClick={() => {
+                                  const target = "2026-09-01";
+                                  mutateReschedule.mutate([{
+                                    installmentId: inst.id,
+                                    kind,
+                                    newVencimento: target,
+                                  }]);
+                                }}
+                                title="Mover vencimento para 01/09"
+                              >
+                                <CalendarClock className="h-3 w-3" /> Adiar
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1997,6 +1753,93 @@ function Finances() {
         </DialogContent>
       </Dialog>
 
+      {/* Reschedule Dialog */}
+      <Dialog open={rescheduleDialog.open} onOpenChange={(open) => setRescheduleDialog((prev) => ({ ...prev, open }))}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              Reagendar vencimentos
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Selecione as parcelas pendentes abaixo para mover o vencimento para uma nova data.
+          </p>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Nova data de vencimento</Label>
+              <Input
+                type="date"
+                value={rescheduleDialog.targetDate}
+                onChange={(e) =>
+                  setRescheduleDialog((prev) => ({ ...prev, targetDate: e.target.value }))
+                }
+              />
+            </div>
+            <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+              {scheduleEntries
+                .filter(({ inst }) => !inst.pago)
+                .map(({ kind, inst, label }) => (
+                  <label
+                    key={inst.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/50"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 rounded"
+                      defaultChecked={false}
+                      data-installment-id={inst.id}
+                      data-kind={kind}
+                    />
+                    <span className="font-mono text-muted-foreground">
+                      {inst.vencimento.slice(5)}
+                    </span>
+                    <span className="flex-1 truncate">
+                      {kind === "filamento" ? "🧵" : "📦"} {label || "—"}
+                    </span>
+                    <span className="tabular-nums">{brl(inst.valor)}</span>
+                  </label>
+                ))}
+              {scheduleEntries.filter(({ inst }) => !inst.pago).length === 0 && (
+                <p className="py-4 text-center text-xs text-muted-foreground">
+                  Nenhuma parcela pendente para reagendar.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRescheduleDialog({ open: false, targetDate: "" })}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!rescheduleDialog.targetDate || mutateReschedule.isPending}
+              onClick={() => {
+                const checks = document.querySelectorAll<HTMLInputElement>(
+                  '[data-installment-id]',
+                );
+                const selected: { installmentId: string; kind: "filamento" | "insumo"; newVencimento: string }[] = [];
+                checks.forEach((cb) => {
+                  if (cb.checked) {
+                    selected.push({
+                      installmentId: cb.dataset.installmentId!,
+                      kind: cb.dataset.kind as "filamento" | "insumo",
+                      newVencimento: rescheduleDialog.targetDate,
+                    });
+                  }
+                });
+                if (selected.length === 0) {
+                  toast.error("Selecione ao menos uma parcela.");
+                  return;
+                }
+                mutateReschedule.mutate(selected);
+              }}
+            >
+              {mutateReschedule.isPending ? "Reagendando..." : `Reagendar ${rescheduleDialog.targetDate ? `para ${rescheduleDialog.targetDate.split("-").reverse().join("/")}` : ""}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="filament-top rounded-2xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
           <div>
@@ -2042,16 +1885,6 @@ function Finances() {
                   <SelectItem value="estorno">Estornos</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <Badge variant="secondary">{financeHistorySummary.pagamentos} pagamento(s)</Badge>
-              <Badge variant="secondary">{financeHistorySummary.estornos} estorno(s)</Badge>
-              <Badge
-                variant="secondary"
-                className={financeHistorySummary.saldo >= 0 ? "text-green-700" : "text-destructive"}
-              >
-                Saldo movimentado: {brl(financeHistorySummary.saldo)}
-              </Badge>
             </div>
           </div>
         </div>
@@ -2152,10 +1985,15 @@ function Finances() {
               <Badge variant="secondary">Manuais: {brl(despesasManuais)}</Badge>
             </div>
           </div>
-          <Button size="sm" className="btn-filament gap-2" onClick={() => setShowExpense(true)}>
-            <Plus className="h-4 w-4" />
-            Nova despesa
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={exportCostCsv}>
+              <Download className="h-3 w-3" /> Exportar Excel
+            </Button>
+            <Button size="sm" className="btn-filament gap-2" onClick={() => setShowExpense(true)}>
+              <Plus className="h-4 w-4" />
+              Nova despesa
+            </Button>
+          </div>
         </div>
         {classifiedExpenses.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-muted-foreground">

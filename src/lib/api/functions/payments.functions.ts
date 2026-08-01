@@ -561,3 +561,48 @@ export const deleteInsumoPayment = createServerFn({ method: "POST" })
     await paymentsRepo.remove(data.paymentId);
     return { ok: true };
   });
+
+/**
+ * Reagenda (altera vencimento) de uma ou mais parcelas, filamento ou insumo.
+ * Usado para adiar pagamentos — ex: jogar tudo que vencia este mês para 01/09.
+ */
+export const rescheduleInstallments = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      items: z
+        .array(
+          z.object({
+            installmentId: z.string().min(1),
+            kind: z.enum(["filamento", "insumo"]),
+            newVencimento: z.string().min(1).max(30),
+          }),
+        )
+        .min(1)
+        .max(100),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
+
+    const filamentoRepo = await filamentoInstallmentsRepo();
+    const insumoRepo = await insumoInstallmentsRepo();
+
+    for (const item of data.items) {
+      if (item.kind === "filamento") {
+        const inst = filamentoRepo.list.find((i) => i.id === item.installmentId);
+        if (!inst) throw new Error(`Parcela de filamento ${item.installmentId} não encontrada.`);
+        if (inst.pago) throw new Error(`Parcela ${inst.numero} já está quitada e não pode ser reagendada.`);
+        const updated = { ...inst, vencimento: item.newVencimento };
+        await filamentoRepo.update(updated);
+      } else {
+        const inst = insumoRepo.list.find((i) => i.id === item.installmentId);
+        if (!inst) throw new Error(`Parcela de insumo ${item.installmentId} não encontrada.`);
+        if (inst.pago) throw new Error(`Parcela ${inst.numero} já está quitada e não pode ser reagendada.`);
+        const updated = { ...inst, vencimento: item.newVencimento };
+        await insumoRepo.update(updated);
+      }
+    }
+
+    return { ok: true, count: data.items.length };
+  });

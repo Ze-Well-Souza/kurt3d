@@ -87,9 +87,7 @@ export function computeInstallmentKpis(params: {
   for (const inst of referenceMonthInstallments) {
     if (!inst.pago) {
       const remainingAmount = getInstallmentRemainingAmount(inst);
-      if (inst.vencimento >= today) {
-        vencendoNoMes += remainingAmount;
-      }
+      vencendoNoMes += remainingAmount;
     }
   }
   const installmentIdsWithEventThisMonth = new Set(
@@ -198,15 +196,13 @@ export function buildScheduleEntries(params: {
   const paidFilamentEntries = filamentoInstallments
     .filter((i) => {
       if (!i.pago) return false;
-      const effectiveMonth = (i.dataPagamento ?? i.vencimento).slice(0, 7);
-      return effectiveMonth === installmentKpiMonthAnchor;
+      return i.vencimento.slice(0, 7) === installmentKpiMonthAnchor;
     })
     .map(buildFilamentEntry);
   const paidInsumoEntries = insumoInstallments
     .filter((i) => {
       if (!i.pago) return false;
-      const effectiveMonth = (i.dataPagamento ?? i.vencimento).slice(0, 7);
-      return effectiveMonth === installmentKpiMonthAnchor;
+      return i.vencimento.slice(0, 7) === installmentKpiMonthAnchor;
     })
     .map(buildInsumoEntry);
   const paidEntries = [...paidFilamentEntries, ...paidInsumoEntries];
@@ -245,8 +241,7 @@ export function getScheduleCounts(params: {
   const pendingItems = allInstallments.filter((item) => !item.pago);
   const paidInRefMonth = allInstallments.filter((item) => {
     if (!item.pago) return false;
-    const effectiveMonth = (item.dataPagamento ?? item.vencimento).slice(0, 7);
-    return effectiveMonth === installmentKpiMonthAnchor;
+    return item.vencimento.slice(0, 7) === installmentKpiMonthAnchor;
   });
   const partialPending = pendingItems.filter((item) => isPartialInstallment(item)).length;
   const partialPaid = paidInRefMonth.filter((item) => isPartialInstallment(item)).length;
@@ -395,12 +390,13 @@ export type TotalApagarNoMes = {
  * Considera apenas parcelas pendentes com vencimento dentro do mês.
  */
 export function computeTotalApagarNoMes(params: {
-  allInstallments: (FilamentoPaymentInstallment | InsumoPaymentInstallment)[];
+  filamentoInstallments: FilamentoPaymentInstallment[];
+  insumoInstallments: InsumoPaymentInstallment[];
   insumoPayments: InsumoPayment[];
   insumos: Insumo[];
   dueMonth: string;
 }): TotalApagarNoMes {
-  const { allInstallments, insumoPayments, insumos, dueMonth } = params;
+  const { filamentoInstallments, insumoInstallments, insumoPayments, insumos, dueMonth } = params;
 
   let filamentos = 0;
   let insumosTotal = 0;
@@ -419,41 +415,42 @@ export function computeTotalApagarNoMes(params: {
     }
   }
 
-  for (const inst of allInstallments) {
+  // Process filament installments
+  for (const inst of filamentoInstallments) {
     if (inst.vencimento.slice(0, 7) !== dueMonth) continue;
-
     const valor = inst.valor;
     const paid = getInstallmentPaidAmount(inst);
     totalDue += valor;
     totalPaid += paid;
-
-    // Track total due by category (includes paid and pending)
-    if ("paymentId" in inst && insumoClassificacao.has(inst.paymentId)) {
-      const classification = insumoClassificacao.get(inst.paymentId);
-      if (classification === "investimento") {
-        impressoraDue += valor;
-      } else {
-        insumosDue += valor;
-      }
-    } else {
-      filamentosDue += valor;
+    filamentosDue += valor;
+    if (!inst.pago) {
+      const remaining = getInstallmentRemainingAmount(inst);
+      if (remaining > 0) filamentos += remaining;
     }
+  }
 
-    if (inst.pago) continue;
-
-    const remaining = getInstallmentRemainingAmount(inst);
-    if (remaining <= 0) continue;
-
-    // Distingue filamento vs insumo pelo paymentId (IDs de pagamentos de insumos são conhecidos)
-    if ("paymentId" in inst && insumoClassificacao.has(inst.paymentId)) {
-      const classification = insumoClassificacao.get(inst.paymentId);
-      if (classification === "investimento") {
-        impressora += remaining;
-      } else {
-        insumosTotal += remaining;
-      }
+  // Process insumo installments
+  for (const inst of insumoInstallments) {
+    if (inst.vencimento.slice(0, 7) !== dueMonth) continue;
+    const valor = inst.valor;
+    const paid = getInstallmentPaidAmount(inst);
+    totalDue += valor;
+    totalPaid += paid;
+    const classification = insumoClassificacao.get(inst.paymentId) ?? "operacional";
+    if (classification === "investimento") {
+      impressoraDue += valor;
     } else {
-      filamentos += remaining;
+      insumosDue += valor;
+    }
+    if (!inst.pago) {
+      const remaining = getInstallmentRemainingAmount(inst);
+      if (remaining > 0) {
+        if (classification === "investimento") {
+          impressora += remaining;
+        } else {
+          insumosTotal += remaining;
+        }
+      }
     }
   }
 
