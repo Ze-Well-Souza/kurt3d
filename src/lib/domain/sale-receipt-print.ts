@@ -21,10 +21,14 @@ export type SaleReceiptInput = {
   clientName: string;
   /** Itens vendidos (produtos/serviços). */
   items: SaleReceiptItem[];
-  /** Tipo de documento: CNPJ ou CPF. */
+  /** Tipo de documento do CLIENTE: CNPJ ou CPF. */
   docType: "cnpj" | "cpf";
-  /** Número do documento (CNPJ ou CPF). */
+  /** Número do documento do CLIENTE (CNPJ ou CPF). */
   docNumber: string;
+  /** Tipo de documento da KURT3D (vendedor): CNPJ ou CPF. */
+  studioDocType: "cnpj" | "cpf";
+  /** Número do documento da KURT3D (CNPJ ou CPF). */
+  studioDocNumber: string;
   /** Forma de pagamento (PIX, Dinheiro, Cartão, etc.). */
   formaPagamento?: string;
   /** Data do pagamento/recebimento no formato ISO. */
@@ -77,9 +81,19 @@ function generateReceiptNumber() {
   return `REC-${datePart}-${rand}`;
 }
 
-const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="36" height="36" rx="8" fill="#c96f4a"/>
-  <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="18" fill="white">K3</text>
+/** Kurti 3D thumbs-up logo as inline SVG (print-safe). */
+const LOGO_SVG = `
+<svg viewBox="0 0 56 56" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="kfill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c96f4a"/>
+      <stop offset="30%" stop-color="#e0a93b"/>
+      <stop offset="55%" stop-color="#8aab6e"/>
+      <stop offset="80%" stop-color="#5fa8a3"/>
+      <stop offset="100%" stop-color="#8a3a52"/>
+    </linearGradient>
+  </defs>
+  <path d="M14 28 L14 46 L20 46 L20 28 Z M22 28 L22 46 Q22 48 24 48 L36 48 Q39 48 40 45 L43 33 Q43.5 30 40.5 30 L32 30 L33 22 Q33.5 18 30 17 Q27 16 26 19 L22 28 Z" fill="url(#kfill)"/>
 </svg>`;
 
 function buildSaleReceiptHtml(input: SaleReceiptInput): string {
@@ -91,6 +105,10 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   const docTypeLabel = input.docType === "cnpj" ? "CNPJ" : "CPF";
   const docDisplay = input.docNumber
     ? formatDocNumber(input.docType, input.docNumber)
+    : "__________________________";
+  const studioDocTypeLabel = input.studioDocType === "cnpj" ? "CNPJ" : "CPF";
+  const studioDocDisplay = input.studioDocNumber
+    ? formatDocNumber(input.studioDocType, input.studioDocNumber)
     : "__________________________";
   const paymentDateStr = input.dataRecebimento
     ? formatDate(new Date(input.dataRecebimento + "T12:00:00"))
@@ -286,7 +304,8 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   <div class="info-grid">
     <div class="info-row"><span class="info-label">Cliente</span><span class="info-value">${client}</span></div>
     <div class="info-row"><span class="info-label">Data de emissão</span><span class="info-value">${issueDate}</span></div>
-    <div class="info-row"><span class="info-label">${docTypeLabel}</span><span class="info-value" style="font-family:monospace">${escapeHtml(docDisplay)}</span></div>
+    <div class="info-row"><span class="info-label">${docTypeLabel} (Comprador)</span><span class="info-value" style="font-family:monospace">${escapeHtml(docDisplay)}</span></div>
+    <div class="info-row"><span class="info-label">${studioDocTypeLabel} Kurti 3D</span><span class="info-value" style="font-family:monospace">${escapeHtml(studioDocDisplay)}</span></div>
     <div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${whatsappLink}" style="color:#5fa8a3">${escapeHtml(input.whatsappNumero)}</a></span></div>
     ${paymentRow}
   </div>
@@ -320,7 +339,7 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   <div class="footer">
     <div>
       <div style="font-weight:600;color:#1a1a1a">${studio}</div>
-      <div>${docTypeLabel}: ${escapeHtml(docDisplay)}</div>
+      <div>${studioDocTypeLabel}: ${escapeHtml(studioDocDisplay)}</div>
     </div>
     <div class="contact">
       Qualquer dúvida, entre em contato:<br>

@@ -2178,7 +2178,9 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
     open: boolean;
     docType: "cnpj" | "cpf";
     docNumber: string;
-  }>({ open: false, docType: "cnpj", docNumber: "" });
+    studioDocType: "cnpj" | "cpf";
+    studioDocNumber: string;
+  }>({ open: false, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "" });
   const badge = order.status in STATUS_BADGE ? STATUS_BADGE[order.status] : null;
   const filamento = order.filamentoId ? filamentos?.find((f) => f.id === order.filamentoId) : undefined;
   const costResult = calcOrderCostHybrid({ order, filamento, precoVendaUnit: order.precoVenda ?? 0, settings: orderSettings });
@@ -2253,7 +2255,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
             className="mt-1 h-7 w-full gap-1 text-[10px] text-muted-foreground hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
-              setReceiptDialog({ open: true, docType: "cnpj", docNumber: "" });
+              setReceiptDialog({ open: true, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "" });
             }}
           >
             <ScrollText className="h-3 w-3" />
@@ -2314,6 +2316,21 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                 placeholder={receiptDialog.docType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}
               />
             </div>
+
+            {/* Kurt3D document info */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Documento da Kurti 3D (Vendedor)</Label>
+              <div className="flex gap-2 mb-2">
+                <Button type="button" size="sm" variant={receiptDialog.studioDocType === "cnpj" ? "default" : "outline"} className="flex-1" onClick={() => setReceiptDialog((prev) => ({ ...prev, studioDocType: "cnpj" }))}>CNPJ</Button>
+                <Button type="button" size="sm" variant={receiptDialog.studioDocType === "cpf" ? "default" : "outline"} className="flex-1" onClick={() => setReceiptDialog((prev) => ({ ...prev, studioDocType: "cpf" }))}>CPF</Button>
+              </div>
+              <Input
+                value={receiptDialog.studioDocNumber}
+                onChange={(e) => setReceiptDialog((prev) => ({ ...prev, studioDocNumber: e.target.value }))}
+                placeholder={receiptDialog.studioDocType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}
+              />
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>Cancelar</Button>
               <Button
@@ -2324,6 +2341,8 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                     items: [{ description: order.projectName, quantity: order.quantity, unitPrice: order.valorRecebido ?? (order.precoVenda ?? 0), subtotal: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0) }],
                     docType: receiptDialog.docType,
                     docNumber: receiptDialog.docNumber,
+                    studioDocType: receiptDialog.studioDocType,
+                    studioDocNumber: receiptDialog.studioDocNumber,
                     formaPagamento: order.formaPagamento ?? undefined,
                     dataRecebimento: order.dataPagamento ?? undefined,
                     studioNome: orderSettings?.studioNome ?? "Kurti 3D",

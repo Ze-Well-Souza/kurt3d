@@ -113,6 +113,8 @@ function OrcamentosPage() {
     quote: BudgetQuote | null;
     docType: "cnpj" | "cpf";
     docNumber: string;
+    studioDocType: "cnpj" | "cpf";
+    studioDocNumber: string;
     formaPagamento: string;
     dataRecebimento: string;
   }>({
@@ -120,6 +122,8 @@ function OrcamentosPage() {
     quote: null,
     docType: "cnpj",
     docNumber: "",
+    studioDocType: "cnpj",
+    studioDocNumber: "",
     formaPagamento: "",
     dataRecebimento: new Date().toISOString().slice(0, 10),
   });
@@ -498,6 +502,8 @@ function OrcamentosPage() {
                         quote,
                         docType: "cnpj",
                         docNumber: "",
+                        studioDocType: "cnpj",
+                        studioDocNumber: "",
                         formaPagamento: "",
                         dataRecebimento: new Date().toISOString().slice(0, 10),
                       })}
@@ -787,6 +793,36 @@ function OrcamentosPage() {
                   />
                 </div>
 
+                {/* Kurt3D document info */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Documento da Kurti 3D (Vendedor)</Label>
+                  <div className="flex gap-2 mb-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={receiptDialog.studioDocType === "cnpj" ? "default" : "outline"}
+                      className="flex-1"
+                      onClick={() => setReceiptDialog((prev) => ({ ...prev, studioDocType: "cnpj" }))}
+                    >
+                      CNPJ
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={receiptDialog.studioDocType === "cpf" ? "default" : "outline"}
+                      className="flex-1"
+                      onClick={() => setReceiptDialog((prev) => ({ ...prev, studioDocType: "cpf" }))}
+                    >
+                      CPF
+                    </Button>
+                  </div>
+                  <Input
+                    value={receiptDialog.studioDocNumber}
+                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, studioDocNumber: e.target.value }))}
+                    placeholder={receiptDialog.studioDocType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}
+                  />
+                </div>
+
                 {/* Payment info */}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -825,6 +861,8 @@ function OrcamentosPage() {
                         })),
                         docType: receiptDialog.docType,
                         docNumber: receiptDialog.docNumber,
+                        studioDocType: receiptDialog.studioDocType,
+                        studioDocNumber: receiptDialog.studioDocNumber,
                         formaPagamento: receiptDialog.formaPagamento || undefined,
                         dataRecebimento: receiptDialog.dataRecebimento || undefined,
                         discountPercent: q.discountPercent ?? undefined,
