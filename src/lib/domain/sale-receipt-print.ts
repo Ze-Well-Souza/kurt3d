@@ -41,6 +41,8 @@ export type SaleReceiptInput = {
   studioNome: string;
   /** Número de WhatsApp do estúdio para contato. */
   whatsappNumero: string;
+  /** Telefone do cliente (para envio via WhatsApp). */
+  clientPhone?: string | null;
 };
 
 function escapeHtml(str: string) {
@@ -119,6 +121,12 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   const discountValue = subtotal * (discountPercent / 100);
   const grandTotal = subtotal - discountValue;
 
+  const productSummary = input.items
+    .slice(0, 2)
+    .map((i) => i.description)
+    .join(", ")
+    + (input.items.length > 2 ? " + mais" : "");
+
   const itemsHtml = input.items
     .map(
       (item) => `
@@ -156,7 +164,7 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Recibo ${receiptNumber} — ${studio}</title>
+  <title>Recibo - ${escapeHtml(productSummary)} - ${client} — Kurti 3D</title>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body {
@@ -378,4 +386,64 @@ export function openPrintSaleReceipt(input: SaleReceiptInput) {
     return;
   }
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
+ * Builds a plain-text receipt summary suitable for sending via WhatsApp.
+ */
+export function buildSaleReceiptWhatsAppMessage(input: SaleReceiptInput): string {
+  const subtotal = input.items.reduce((sum, i) => sum + i.subtotal, 0);
+  const discountPercent = input.discountPercent ?? 0;
+  const discountValue = subtotal * (discountPercent / 100);
+  const total = subtotal - discountValue;
+  const issueDate = formatDate(new Date());
+  const docTypeLabel = input.docType === "cnpj" ? "CNPJ" : "CPF";
+  const docDisplay = input.docNumber
+    ? formatDocNumber(input.docType, input.docNumber)
+    : "";
+  const studioDocTypeLabel = input.studioDocType === "cnpj" ? "CNPJ" : "CPF";
+  const studioDocDisplay = input.studioDocNumber
+    ? formatDocNumber(input.studioDocType, input.studioDocNumber)
+    : "";
+
+  const lines: string[] = [];
+  lines.push(`*Recibo de Venda — ${input.studioNome}*`);
+  if (input.clientName.trim()) lines.push(`Cliente: ${input.clientName.trim()}`);
+  if (docDisplay) lines.push(`${docTypeLabel}: ${docDisplay}`);
+  lines.push(`Data: ${issueDate}`);
+  if (input.formaPagamento) lines.push(`Pagamento: ${input.formaPagamento}`);
+  lines.push("");
+  for (const item of input.items) {
+    const qty = item.quantity > 1 ? ` x${item.quantity}` : "";
+    lines.push(`• ${item.description}${qty} — ${brl(item.subtotal)}`);
+  }
+  if (discountPercent > 0) {
+    lines.push("");
+    lines.push(`Subtotal: ${brl(subtotal)}`);
+    lines.push(`Desconto: ${discountPercent}% (-${brl(discountValue)})`);
+  }
+  lines.push("");
+  lines.push(`*Total: ${brl(total)}*`);
+  if (input.observacao?.trim()) {
+    lines.push("");
+    lines.push(`Obs.: ${input.observacao.trim()}`);
+  }
+  lines.push("");
+  lines.push(`${input.studioNome}`);
+  if (studioDocDisplay) lines.push(`${studioDocTypeLabel}: ${studioDocDisplay}`);
+  lines.push(`WhatsApp: ${input.whatsappNumero}`);
+  return lines.join("\n");
+}
+
+/**
+ * Opens WhatsApp with the receipt message pre-filled.
+ * If the client's phone is provided, opens the chat directly.
+ */
+export function openSaleReceiptWhatsApp(input: SaleReceiptInput) {
+  const message = buildSaleReceiptWhatsAppMessage(input);
+  const digits = (input.clientPhone ?? "").replace(/\D/g, "");
+  const base = digits
+    ? `https://wa.me/${digits.length <= 11 ? `55${digits}` : digits}`
+    : "https://wa.me/";
+  window.open(`${base}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
 }

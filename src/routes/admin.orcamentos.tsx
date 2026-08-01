@@ -25,7 +25,7 @@ import { useBudgetQuotes } from "@/lib/hooks/use-budget-quotes";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { openPrintQuote, openQuoteWhatsApp, type QuoteInput } from "@/lib/domain/quote-print";
-import { openPrintSaleReceipt } from "@/lib/domain/sale-receipt-print";
+import { openPrintSaleReceipt, openSaleReceiptWhatsApp } from "@/lib/domain/sale-receipt-print";
 import { normalizeText } from "@/lib/utils/normalization";
 import type { BudgetQuote, BudgetQuoteItem, BudgetQuoteStatus } from "@/lib/domain/types";
 
@@ -115,6 +115,7 @@ function OrcamentosPage() {
     docNumber: string;
     studioDocType: "cnpj" | "cpf";
     studioDocNumber: string;
+    clientPhone: string;
     formaPagamento: string;
     dataRecebimento: string;
   }>({
@@ -124,6 +125,7 @@ function OrcamentosPage() {
     docNumber: "",
     studioDocType: "cnpj",
     studioDocNumber: "",
+    clientPhone: "",
     formaPagamento: "",
     dataRecebimento: new Date().toISOString().slice(0, 10),
   });
@@ -504,6 +506,7 @@ function OrcamentosPage() {
                         docNumber: "",
                         studioDocType: "cnpj",
                         studioDocNumber: "",
+                        clientPhone: quote.clientContact ?? "",
                         formaPagamento: "",
                         dataRecebimento: new Date().toISOString().slice(0, 10),
                       })}
@@ -843,9 +846,49 @@ function OrcamentosPage() {
                   </div>
                 </div>
 
+                {/* Client phone */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Telefone do Cliente (WhatsApp)</Label>
+                  <Input
+                    value={receiptDialog.clientPhone}
+                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, clientPhone: e.target.value }))}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>
                     Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 text-xs text-green-700"
+                    onClick={() => {
+                      if (!receiptDialog.quote) return;
+                      openSaleReceiptWhatsApp({
+                        clientName: q.clientName,
+                        items: q.items.map((item) => ({
+                          description: item.description,
+                          quantity: item.quantity,
+                          unitPrice: item.unitPrice,
+                          subtotal: item.subtotal,
+                        })),
+                        docType: receiptDialog.docType,
+                        docNumber: receiptDialog.docNumber,
+                        studioDocType: receiptDialog.studioDocType,
+                        studioDocNumber: receiptDialog.studioDocNumber,
+                        formaPagamento: receiptDialog.formaPagamento || undefined,
+                        dataRecebimento: receiptDialog.dataRecebimento || undefined,
+                        discountPercent: q.discountPercent ?? undefined,
+                        observacao: q.notes ?? undefined,
+                        studioNome: settingsData?.studioNome ?? "Kurti 3D",
+                        whatsappNumero: settingsData?.whatsappNumero ?? "",
+                        clientPhone: receiptDialog.clientPhone || undefined,
+                      });
+                    }}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
                   </Button>
                   <Button
                     className="btn-filament gap-2"
@@ -869,6 +912,7 @@ function OrcamentosPage() {
                         observacao: q.notes ?? undefined,
                         studioNome: settingsData?.studioNome ?? "Kurti 3D",
                         whatsappNumero: settingsData?.whatsappNumero ?? "",
+                        clientPhone: receiptDialog.clientPhone || undefined,
                       });
                       setReceiptDialog((prev) => ({ ...prev, open: false }));
                     }}

@@ -5,7 +5,7 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2, Printer, ImagePlus, ScrollText } from "lucide-react";
+import { Clock, Package, User, Plus, MapPin, ExternalLink, Layers, CreditCard, CalendarDays, Trash2, Calculator, ListChecks, Eye, TriangleAlert as AlertTriangle, Pencil, Search, Info, Wand as Wand2, Download, Lock, Globe, ShoppingCart, Loader2, Printer, ImagePlus, ScrollText, MessageCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { z } from "zod";
 import { Card } from "@/components/ui/card";
@@ -58,7 +58,7 @@ import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizeText } from "@/lib/utils/normalization";
 import { openPrintQuote, type QuoteInput } from "@/lib/domain/quote-print";
 import { openPrintReceipt, type ReceiptInput } from "@/lib/domain/payment-receipt-print";
-import { openPrintSaleReceipt } from "@/lib/domain/sale-receipt-print";
+import { openPrintSaleReceipt, openSaleReceiptWhatsApp } from "@/lib/domain/sale-receipt-print";
 
 export const Route = createFileRoute("/admin/portfolio")({
   head: () => ({ meta: [{ title: "Calculadora e Pedidos — Kurti 3D" }] }),
@@ -2180,7 +2180,8 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
     docNumber: string;
     studioDocType: "cnpj" | "cpf";
     studioDocNumber: string;
-  }>({ open: false, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "" });
+    clientPhone: string;
+  }>({ open: false, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "", clientPhone: "" });
   const badge = order.status in STATUS_BADGE ? STATUS_BADGE[order.status] : null;
   const filamento = order.filamentoId ? filamentos?.find((f) => f.id === order.filamentoId) : undefined;
   const costResult = calcOrderCostHybrid({ order, filamento, precoVendaUnit: order.precoVenda ?? 0, settings: orderSettings });
@@ -2255,7 +2256,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
             className="mt-1 h-7 w-full gap-1 text-[10px] text-muted-foreground hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
-              setReceiptDialog({ open: true, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "" });
+              setReceiptDialog({ open: true, docType: "cnpj", docNumber: "", studioDocType: "cnpj", studioDocNumber: "", clientPhone: "" });
             }}
           >
             <ScrollText className="h-3 w-3" />
@@ -2331,8 +2332,40 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
               />
             </div>
 
+            {/* Client phone */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Telefone do Cliente (WhatsApp)</Label>
+              <Input
+                value={receiptDialog.clientPhone}
+                onChange={(e) => setReceiptDialog((prev) => ({ ...prev, clientPhone: e.target.value }))}
+                placeholder="(11) 99999-9999"
+              />
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>Cancelar</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 text-xs text-green-700"
+                onClick={() => {
+                  openSaleReceiptWhatsApp({
+                    clientName: order.client,
+                    items: [{ description: order.projectName, quantity: order.quantity, unitPrice: order.valorRecebido ?? (order.precoVenda ?? 0), subtotal: order.valorRecebido ?? (order.precoVenda ? order.precoVenda * order.quantity : 0) }],
+                    docType: receiptDialog.docType,
+                    docNumber: receiptDialog.docNumber,
+                    studioDocType: receiptDialog.studioDocType,
+                    studioDocNumber: receiptDialog.studioDocNumber,
+                    formaPagamento: order.formaPagamento ?? undefined,
+                    dataRecebimento: order.dataPagamento ?? undefined,
+                    studioNome: orderSettings?.studioNome ?? "Kurti 3D",
+                    whatsappNumero: orderSettings?.whatsappNumero ?? "",
+                    clientPhone: receiptDialog.clientPhone || undefined,
+                  });
+                }}
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+              </Button>
               <Button
                 className="btn-filament gap-2"
                 onClick={() => {
@@ -2347,6 +2380,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                     dataRecebimento: order.dataPagamento ?? undefined,
                     studioNome: orderSettings?.studioNome ?? "Kurti 3D",
                     whatsappNumero: orderSettings?.whatsappNumero ?? "",
+                    clientPhone: receiptDialog.clientPhone || undefined,
                   });
                   setReceiptDialog((prev) => ({ ...prev, open: false }));
                 }}
