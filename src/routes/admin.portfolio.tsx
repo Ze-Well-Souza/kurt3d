@@ -2434,6 +2434,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
                 <div className="grid gap-2"><Label>Forma de Pagamento</Label><Select value={destinoPagamento} onValueChange={setDestinoPagamento}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{PAYMENT_METHODS.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}</SelectContent></Select></div>
                 <div className="grid gap-2"><Label>Data do Pagamento</Label><Input type="date" value={destinoDataPag} onChange={(e) => setDestinoDataPag(e.target.value)} /></div>
               </div>
+              <p className="text-xs text-muted-foreground">Ao confirmar, a venda entra na Receita Total e aparece em Finanças → aba Vendas.</p>
               <Button className="btn-filament w-full gap-2" disabled={!destinoValor || Number(destinoValor) <= 0} onClick={() => { onFinalizar({ orderId: order.id, destino: "Kurtido e Vendido", valorRecebido: Number(destinoValor), formaPagamento: destinoPagamento || undefined, dataPagamento: destinoDataPag || undefined }); setShowDestino(false); }}>💰 Kurtido e Vendido</Button>
             </div>
           </div>

@@ -56,6 +56,21 @@ import {
   type PaymentHistoryTypeFilter,
 } from "./finance-shared";
 
+const MONTHS_SHORT_PT = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+];
+
 /**
  * Estado completo da pagina financeira: dados, filtros, dialogs, mutacoes,
  * metricas derivadas e exportacoes. As abas recebem este objeto como `ctx`
@@ -278,9 +293,9 @@ export function useFinancePageState() {
 
   const insumoById = useMemo(() => new Map(insumos.map((item) => [item.id, item])), [insumos]);
 
-  const classifiedExpenses = useMemo(
+  const allClassifiedExpenses = useMemo(
     () =>
-      filteredExpenses.map((expense) => {
+      expenses.map((expense) => {
         const linkedInsumo = expense.source === "insumo" ? insumoById.get(expense.refId) : null;
         const financialClass =
           linkedInsumo?.classificacaoFinanceira === "investimento" ||
@@ -289,7 +304,12 @@ export function useFinancePageState() {
             : "operacional";
         return { ...expense, financialClass };
       }),
-    [filteredExpenses, insumoById],
+    [expenses, insumoById],
+  );
+
+  const classifiedExpenses = useMemo(
+    () => allClassifiedExpenses.filter((expense) => isDateInSelectedPeriod(expense.data)),
+    [allClassifiedExpenses, isDateInSelectedPeriod],
   );
 
   const allFilamentPurchases = useMemo(
@@ -453,6 +473,46 @@ export function useFinancePageState() {
     const lucro = receita - custo - despesasOperacionais;
     return { receita, custo, lucro, despesasOperacionais, investimentos };
   }, [classifiedExpenses, periodFilteredVendas, insumoPayments]);
+
+  // Série dos últimos 6 meses (terminando no mês âncora) para comparativo mês a mês
+  // na aba Vendas, usando a mesma regra de despesas operacionais do totals.
+  const monthlySalesSeries = useMemo(() => {
+    const [anchorYear, anchorMonth] = installmentKpiMonthAnchor.split("-").map(Number);
+    if (!anchorYear || !anchorMonth) return [];
+    const insumoIdsComParcelamento = new Set(insumoPayments.map((p) => p.insumoId));
+    const series: {
+      key: string;
+      label: string;
+      receita: number;
+      custo: number;
+      despesas: number;
+      liquido: number;
+    }[] = [];
+    for (let offset = 5; offset >= 0; offset--) {
+      const date = new Date(anchorYear, anchorMonth - 1 - offset, 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const monthVendas = vendas.filter((v) => v.data.slice(0, 7) === key);
+      const receita = monthVendas.reduce((s, v) => s + v.valor, 0);
+      const custo = monthVendas.reduce((s, v) => s + v.custo, 0);
+      const despesas = allClassifiedExpenses
+        .filter((e) => {
+          if (e.data.slice(0, 7) !== key) return false;
+          if (e.financialClass !== "operacional") return false;
+          if (e.source === "insumo" && insumoIdsComParcelamento.has(e.refId)) return false;
+          return true;
+        })
+        .reduce((s, e) => s + e.valor, 0);
+      series.push({
+        key,
+        label: `${MONTHS_SHORT_PT[date.getMonth()]}/${String(date.getFullYear()).slice(2)}`,
+        receita,
+        custo,
+        despesas,
+        liquido: receita - custo - despesas,
+      });
+    }
+    return series;
+  }, [vendas, allClassifiedExpenses, insumoPayments, installmentKpiMonthAnchor]);
 
   const despesasManuais = classifiedExpenses
     .filter((e) => e.source === "manual")
@@ -1051,6 +1111,7 @@ export function useFinancePageState() {
     allInstallments,
     allPaymentEvents,
     totals,
+    monthlySalesSeries,
     despesasManuais,
     despesasFalha,
     despesasInsumosOperacionais,
