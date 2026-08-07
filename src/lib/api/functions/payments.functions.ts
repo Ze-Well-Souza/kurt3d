@@ -95,6 +95,13 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
     await requireSession();
     const paymentsRepo = await filamentoPaymentsRepo();
     const installmentsRepo = await filamentoInstallmentsRepo();
+    // Protecao contra duplicacao: um lote so pode ter um plano de pagamento.
+    // Se ja existir (ex.: reenvio de formulario), reutiliza o existente em vez
+    // de criar um pagamento fantasma.
+    const existingForBatch = paymentsRepo.list.find((item) => item.batchId === data.batchId);
+    if (existingForBatch) {
+      return { ok: true, paymentId: existingForBatch.id };
+    }
     const paymentId = randomUUID();
     const payment: FilamentoPayment = {
       id: paymentId,

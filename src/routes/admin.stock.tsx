@@ -374,8 +374,13 @@ function Stock() {
     const dataParaPagamento = editForm.dataParaPagamento || editForm.dataCompra || todayIso();
 
     const existingFilamento = filamentos.find((x) => x.id === editForm.id);
-    const existingPaymentId = existingFilamento?.paymentId ?? null;
     const batchId = existingFilamento?.batchId ?? makeBatchId();
+    // Evita duplicar pagamento na edicao: se o filamento ainda nao tem paymentId
+    // vinculado, reutiliza o pagamento existente do lote em vez de criar outro.
+    const existingPaymentId =
+      existingFilamento?.paymentId
+      ?? filamentoPayments.find((p) => p.batchId === batchId)?.id
+      ?? null;
 
     try {
       if (existingPaymentId) {

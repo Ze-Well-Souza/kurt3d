@@ -50,6 +50,8 @@ export type PortfolioCalculatorResult = {
   taxaGatewayAplicada?: number;
   precoComTaxa?: number;
   custoBaseLote?: number;
+  /** Lucro liquido efetivo: usa precoVenda quando informado, senao usa precoSugerido como fallback. */
+  lucroLiquidoEfetivo?: number;
 };
 
 function clampNumber(n: number) {
@@ -149,6 +151,10 @@ export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorI
     : precoComMargem;
   const taxaGatewayAplicada = precoSugerido - precoComMargem;
 
+  // Lucro liquido efetivo: usa precoVenda se informado, caso contrario usa precoSugerido
+  const effectivePrice = input.precoVenda > 0 ? input.precoVenda : precoSugerido;
+  const lucroLiquidoEfetivo = (effectivePrice * quantidade) - custoLote;
+
   return {
     custoUnidade,
     custoFilamento: quantidade > 0 ? custoFilamentoLote / quantidade : 0,
@@ -172,6 +178,7 @@ export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorI
     taxaGatewayAplicada: taxaGateway > 0 ? taxaGatewayAplicada : 0,
     precoComTaxa: precoSugerido,
     custoBaseLote,
+    lucroLiquidoEfetivo,
   };
 }
 

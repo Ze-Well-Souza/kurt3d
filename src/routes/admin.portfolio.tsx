@@ -48,6 +48,7 @@ import {
   calcPortfolioPricing,
   calcAdvancedPortfolioPricing,
   type PortfolioCalculatorEntryMode,
+  type PortfolioCalculatorResult,
 } from "@/lib/domain/portfolio-pricing";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useFilamentos } from "@/lib/hooks/use-filamentos";
@@ -150,7 +151,7 @@ const FALLBACK_QUANTIDADE = 10;
 
 function buildEmptyFilamentoItem(): CalculatorFilamentoInput {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `fil-${Date.now()}-${Math.random()}`;
-  return { id, source: "manual", marca: "", cor: "", precoRolo: 0, pesoRolo: 0, pesoUsado: 0 };
+  return { id, source: "manual", marca: "", cor: "", precoRolo: FALLBACK_CUSTO_ROLO, pesoRolo: FALLBACK_PESO_ROLO, pesoUsado: 0 };
 }
 
 function buildEmptyExtraCost(): CalculatorExtraCost {
@@ -426,7 +427,7 @@ function CalcPedidos() {
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const isSlicerMode = form.entryMode === "slicer";
   const effectiveUnitPrice = numeric.precoVenda > 0 ? numeric.precoVenda : results.precoSugerido;
-  const effectiveLotProfit = effectiveUnitPrice * numeric.quantidade - results.custoLote;
+  const effectiveLotProfit = results.lucroLiquidoEfetivo ?? effectiveUnitPrice * numeric.quantidade - results.custoLote;
 
   const totals = useMemo(() => projects.reduce((acc, p) => {
     const r = calcAdvancedPortfolioPricing({
@@ -1865,38 +1866,56 @@ function CalcPedidos() {
             </p>
           </div>
 
-          {/* Results */}
-          <div className="grid gap-4 rounded-xl border border-border bg-muted/40 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <ResultCard label="Filamentos" value={brl(results.custoFilamentosDetalhado ?? results.custoFilamento * numeric.quantidade)} accent="cyan" tip="Custo total de todos os filamentos usados no lote." />
-            <ResultCard label="Energia + Depreciacao" value={brl((results.custoEnergia + results.custoDepreciacao) * numeric.quantidade)} accent="yellow" tip="Custo total de energia e desgaste da maquina para o lote inteiro." />
-            <ResultCard label="Custos Extras" value={brl(results.custoExtraTotal ?? 0)} accent="pink" tip="Soma de todos os custos adicionais (embalagem, cola, etc.)" />
-            <ResultCard label="Mao de Obra" value={brl(results.custoTrabalho ?? 0)} accent="orange" tip="Custo de mao de obra (horas x valor hora)." />
-            <ResultCard label="Desperdicio" value={brl(results.custoPerda * numeric.quantidade)} accent="pink" tip="Acrescimo para cobrir perdas, falhas ou retrabalho." />
-            <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="pink" tip="Custo total estimado para entregar todo o pedido/lote informado." />
-            <div className="relative overflow-hidden rounded-xl border border-border bg-card p-4">
-              <div aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: ACCENT_COLORS.green }} />
-              <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
-                Preco Sugerido /un. <InfoTip text={`Custo medio por unidade + ${form.margemPercent || 0}% de margem${Number(form.taxaGateway) > 0 ? ` + ${form.taxaGateway}% de taxa do gateway` : ""}. Clique em "Aplicar" para usar como Preco de Venda por unidade.`} />
-              </div>
-              <div className="mt-2 font-display text-2xl font-bold tabular-nums" style={{ color: ACCENT_COLORS.green }}>{brl(results.precoSugerido)}</div>
-              <Button type="button" size="sm" variant="outline" className="mt-2 h-7 gap-1 text-xs" onClick={() => setField("precoVenda", results.precoSugerido.toFixed(2))}>
-                <Wand2 className="h-3 w-3" /> Aplicar
-              </Button>
+          {/* Results Panel — Donut + KPIs */}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <Calculator className="h-3.5 w-3.5" /> Resumo do Orçamento
             </div>
-            <ResultCard
-              label="Lucro Liquido do Lote"
-              value={brl(effectiveLotProfit)}
-              accent={effectiveLotProfit >= 0 ? "green" : "magenta"}
-              emphasize
-              tip={
-                numeric.precoVenda > 0
-                  ? "Lucro do lote usando o Preco de Venda informado."
-                  : "Lucro estimado do lote usando o Preco Sugerido, ja que ainda nao ha um Preco de Venda informado."
-              }
-            />
+
+            <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
+              {/* Left: Donut Chart */}
+              <div className="flex items-center justify-center">
+                <CalculatorDonutChart results={results} numeric={numeric} />
+              </div>
+
+              {/* Right: BIG highlight cards */}
+              <div className="flex flex-col gap-3 min-w-[220px]">
+                <div className="relative overflow-hidden rounded-xl border-2 border-green-500/30 bg-green-50/30 p-4">
+                  <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
+                    Preco Sugerido /un. <InfoTip text={`Custo medio por unidade + ${form.margemPercent || 0}% de margem${Number(form.taxaGateway) > 0 ? ` + ${form.taxaGateway}% de taxa do gateway` : ""}.`} />
+                  </div>
+                  <div className="mt-1 font-display text-3xl font-bold tabular-nums" style={{ color: ACCENT_COLORS.green }}>{brl(results.precoSugerido)}</div>
+                  <Button type="button" size="sm" variant="outline" className="mt-2 h-7 gap-1 text-xs" onClick={() => setField("precoVenda", results.precoSugerido.toFixed(2))}>
+                    <Wand2 className="h-3 w-3" /> Aplicar
+                  </Button>
+                </div>
+
+                <div className={`relative overflow-hidden rounded-xl border-2 p-4 ${effectiveLotProfit >= 0 ? "border-green-500/30 bg-green-50/30" : "border-red-500/30 bg-red-50/30"}`}>
+                  <div className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground">
+                    Lucro Liquido do Lote <InfoTip text={numeric.precoVenda > 0 ? "Lucro do lote usando o Preco de Venda informado." : "Lucro estimado do lote usando o Preco Sugerido, ja que ainda nao ha um Preco de Venda informado."} />
+                  </div>
+                  <div className="mt-1 font-display text-3xl font-bold tabular-nums" style={{ color: effectiveLotProfit >= 0 ? ACCENT_COLORS.green : ACCENT_COLORS.magenta }}>{brl(effectiveLotProfit)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Mini cards grid */}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <ResultCard label="Filamentos" value={brl(results.custoFilamentosDetalhado ?? results.custoFilamento * numeric.quantidade)} accent="cyan" tip="Custo total de todos os filamentos usados no lote." />
+              <ResultCard label="Energia" value={brl(results.custoEnergia * numeric.quantidade)} accent="yellow" tip="Custo total de energia eletrica para o lote inteiro." />
+              <ResultCard label="Depreciacao" value={brl(results.custoDepreciacao * numeric.quantidade)} accent="orange" tip="Custo de desgaste da maquina (amortizacao) para o lote inteiro." />
+              <ResultCard label="Custos Extras" value={brl(results.custoExtraTotal ?? 0)} accent="pink" tip="Soma de todos os custos adicionais (embalagem, cola, etc.)" />
+              <ResultCard label="Mao de Obra" value={brl(results.custoTrabalho ?? 0)} accent="magenta" tip="Custo de mao de obra (horas x valor hora)." />
+              <ResultCard label="Desperdicio" value={brl(results.custoPerda * numeric.quantidade)} accent="pink" tip="Acrescimo para cobrir perdas, falhas ou retrabalho." />
+              <ResultCard label="Custo Total do Lote" value={brl(results.custoLote)} accent="magenta" tip="Custo total estimado para entregar todo o pedido/lote informado." />
+              {results.taxaGatewayAplicada ? (
+                <ResultCard label="Taxa Gateway" value={brl(results.taxaGatewayAplicada * numeric.quantidade)} accent="orange" tip="Valor da taxa de marketplace/gateway repassada ao preco." />
+              ) : null}
+            </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 pt-2">
+          {/* Sticky CTA bar */}
+          <div className="sticky bottom-0 z-10 -mx-6 -mb-6 flex flex-wrap justify-end gap-3 rounded-b-2xl border-t border-border bg-card/95 px-6 py-4 backdrop-blur-sm">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2146,6 +2165,66 @@ function ResultCard({ label, value, accent, emphasize = false, tip }: { label: s
       </div>
       <div className={`mt-2 font-display font-bold tabular-nums ${emphasize ? "text-3xl" : "text-2xl"}`} style={emphasize ? undefined : { color }}>
         {emphasize ? <span className="filament-text">{value}</span> : value}
+      </div>
+    </div>
+  );
+}
+
+function CalculatorDonutChart({ results, numeric }: { results: PortfolioCalculatorResult; numeric: any }) {
+  const total = results.custoLote || 1;
+  const segments = [
+    { label: "Filamentos", value: results.custoFilamentosDetalhado ?? 0, color: ACCENT_COLORS.cyan },
+    { label: "Energia", value: (results.custoEnergia * numeric.quantidade) || 0, color: ACCENT_COLORS.yellow },
+    { label: "Depreciacao", value: (results.custoDepreciacao * numeric.quantidade) || 0, color: ACCENT_COLORS.orange },
+    { label: "Extras", value: results.custoExtraTotal ?? 0, color: ACCENT_COLORS.pink },
+    { label: "Mao de Obra", value: results.custoTrabalho ?? 0, color: ACCENT_COLORS.magenta },
+    { label: "Desperdicio", value: (results.custoPerda * numeric.quantidade) || 0, color: "#c084fc" },
+  ].filter(s => s.value > 0);
+
+  const size = 160;
+  const strokeWidth = 24;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const center = size / 2;
+
+  let offset = 0;
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="drop-shadow-sm">
+        {segments.length === 0 ? (
+          <circle cx={center} cy={center} r={radius} fill="none" stroke="var(--border)" strokeWidth={strokeWidth} />
+        ) : (
+          segments.map((seg, i) => {
+            const pct = seg.value / total;
+            const dashLength = Math.max(pct * circumference, 0.5);
+            const dashOffset = -offset;
+            offset += dashLength;
+            return (
+              <circle
+                key={i}
+                cx={center} cy={center} r={radius}
+                fill="none" stroke={seg.color} strokeWidth={strokeWidth}
+                strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                strokeDashoffset={dashOffset}
+                strokeLinecap="butt"
+                transform={`rotate(-90 ${center} ${center})`}
+                className="transition-all duration-500"
+              />
+            );
+          })
+        )}
+        <text x={center} y={center - 8} textAnchor="middle" className="fill-foreground text-[15px] font-bold" fontFamily="inherit">Custos</text>
+        <text x={center} y={center + 12} textAnchor="middle" className="fill-muted-foreground text-[11px]" fontFamily="inherit">do Lote</text>
+      </svg>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">
+        {segments.map((seg, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: seg.color }} />
+            <span className="text-muted-foreground">{seg.label}</span>
+            <span className="font-medium">{((seg.value / total) * 100).toFixed(0)}%</span>
+          </div>
+        ))}
       </div>
     </div>
   );
