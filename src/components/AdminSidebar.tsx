@@ -1,5 +1,19 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { LayoutDashboard, Wallet, Settings, ThumbsUp, Layers, Calculator, Users, UserCheck, LogOut, MessageSquare, BarChart3, Calendar as CalendarIcon, FileText, Printer } from "lucide-react";
+import {
+  LayoutDashboard,
+  Wallet,
+  Settings,
+  ThumbsUp,
+  Layers,
+  Calculator,
+  Users,
+  UserCheck,
+  LogOut,
+  MessageSquare,
+  BarChart3,
+  Calendar as CalendarIcon,
+  FileText,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -21,7 +35,6 @@ const items = [
   { title: "Painel", url: "/admin", icon: LayoutDashboard },
   { title: "Estoque de Filamentos", url: "/admin/stock", icon: Layers },
   { title: "Calculadora e Pedidos", url: "/admin/portfolio", icon: Calculator },
-  { title: "Fila de Impressão", url: "/admin/fila", icon: Printer },
   { title: "Clientes", url: "/admin/clients", icon: Users },
   { title: "Leads", url: "/admin/leads", icon: MessageSquare },
   { title: "Finanças", url: "/admin/finances", icon: Wallet },
@@ -50,8 +63,7 @@ export function AdminSidebar() {
           <div
             className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-white"
             style={{
-              background:
-                "linear-gradient(135deg,#c96f4a,#e0a93b,#8aab6e,#5fa8a3,#8a3a52)",
+              background: "linear-gradient(135deg,#c96f4a,#e0a93b,#8aab6e,#5fa8a3,#8a3a52)",
             }}
           >
             <ThumbsUp className="h-4 w-4" />
@@ -102,4 +114,3 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
-

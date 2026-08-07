@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -62,6 +62,9 @@ import { openPrintReceipt, type ReceiptInput } from "@/lib/domain/payment-receip
 import { openPrintSaleReceipt, openSaleReceiptWhatsApp } from "@/lib/domain/sale-receipt-print";
 
 export const Route = createFileRoute("/admin/portfolio")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    aba: search.aba === "orders" ? "orders" : "calc",
+  }),
   head: () => ({ meta: [{ title: "Calculadora e Pedidos — Kurti 3D" }] }),
   component: CalcPedidos,
 });
@@ -97,6 +100,8 @@ const COLUMNS: { id: Status; title: string; hint: string }[] = [
   { id: "acabamento", title: "Acabamento", hint: "Impressos, em pós-processamento e acabamento" },
   { id: "done", title: "Concluído", hint: "Prontos para retirada ou envio" },
 ];
+const PRINTERS = ["Bambu Lab A1", "Bambu Lab A1 Mini"] as const;
+const NO_PRINTER = "__none__";
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   vendido: { label: "Vendido", color: "var(--filament-green)" },
   presente: { label: "Presente", color: "var(--filament-yellow)" },
@@ -360,7 +365,11 @@ function CalcPedidos() {
   const projects = portfolioData ?? [];
   const clients = clientsData ?? [];
   const settings = settingsData ?? DEFAULT_APP_SETTINGS;
-  const [activeTab, setActiveTab] = useState<"calc" | "orders">("calc");
+  const { aba } = Route.useSearch();
+  const navigate = useNavigate();
+  const activeTab: "calc" | "orders" = aba === "orders" ? "orders" : "calc";
+  const setTab = (tab: "calc" | "orders") =>
+    navigate({ to: "/admin/portfolio", search: (prev: Record<string, unknown>) => ({ ...prev, aba: tab }) });
   const [form, setForm] = useState<FormState>({
     ...initialForm,
     custoRolo: initialForm.custoRolo,
@@ -454,7 +463,7 @@ function CalcPedidos() {
   /* ── order dialogs ── */
   const [orderDialog, setOrderDialog] = useState<{ open: boolean; projectId: string; client: string; clientId: string; quantity: string }>({ open: false, projectId: "", client: "", clientId: "", quantity: "1" });
   const [showNewOrder, setShowNewOrder] = useState(false);
-  const [newOrder, setNewOrder] = useState({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", filamentoIds: [] as string[], gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+  const [newOrder, setNewOrder] = useState({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", filamentoIds: [] as string[], gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "", printer: "" });
   const [newOrderAsset, setNewOrderAsset] = useState<File | null>(null);
   const [newOrderParts, setNewOrderParts] = useState<NewOrderPartForm[]>([buildEmptyOrderPart()]);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
@@ -468,7 +477,7 @@ function CalcPedidos() {
   const [updatingPartId, setUpdatingPartId] = useState<string | null>(null);
 
   function resetNewOrderForm() {
-    setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", filamentoIds: [], gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "" });
+    setNewOrder({ client: "", clientId: "", projectName: "", quantity: "1", timeMinutes: "60", filamentoId: "", filamentoIds: [], gramsPerUnit: "5", linkProjeto: "", multiPart: false, precoVenda: "", formaPagamento: "", dataPagamento: "", printer: "" });
     setNewOrderAsset(null);
     setNewOrderParts([buildEmptyOrderPart()]);
   }
@@ -504,6 +513,15 @@ function CalcPedidos() {
     }
     return g;
   }, [orders, orderSearch]);
+  const printingByPrinter = useMemo(() => {
+    const map = new Map<string, Order[]>();
+    for (const p of PRINTERS) map.set(p, []);
+    for (const o of grouped.printing ?? []) {
+      const key = o.printer && map.has(o.printer) ? o.printer : PRINTERS[0];
+      map.get(key)!.push(o);
+    }
+    return map;
+  }, [grouped.printing]);
   const filteredProjects = useMemo(() => {
     if (!projectSearch.trim()) return projects;
     const s = normalizeText(projectSearch);
@@ -771,6 +789,7 @@ function CalcPedidos() {
         linkProjeto, multiPart: newOrder.multiPart,
         precoVenda: newOrder.precoVenda ? Number(newOrder.precoVenda) : undefined,
         formaPagamento: newOrder.formaPagamento || undefined, dataPagamento: newOrder.dataPagamento || undefined,
+        printer: newOrder.printer || undefined,
         parts: partsPayload,
       });
       setShowNewOrder(false);
@@ -799,10 +818,10 @@ function CalcPedidos() {
 
       {/* Tab bar */}
       <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
-        <button className={cn("flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors", activeTab === "calc" ? "bg-background text-foreground shadow-sm filament-text" : "text-muted-foreground hover:text-foreground")} onClick={() => setActiveTab("calc")}>
+        <button className={cn("flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors", activeTab === "calc" ? "bg-background text-foreground shadow-sm filament-text" : "text-muted-foreground hover:text-foreground")} onClick={() => setTab("calc")}>
           <Calculator className="h-4 w-4" /> Calculadora
         </button>
-        <button className={cn("flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors", activeTab === "orders" ? "bg-background text-foreground shadow-sm filament-text" : "text-muted-foreground hover:text-foreground")} onClick={() => setActiveTab("orders")}>
+        <button className={cn("flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors", activeTab === "orders" ? "bg-background text-foreground shadow-sm filament-text" : "text-muted-foreground hover:text-foreground")} onClick={() => setTab("orders")}>
           <ListChecks className="h-4 w-4" /> Pedidos
           {orders.filter((o) => ["todo","printing","done"].includes(o.status)).length > 0 && (
             <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-xs font-bold">{orders.filter((o) => ["todo","printing","done"].includes(o.status)).length}</span>
@@ -831,7 +850,7 @@ function CalcPedidos() {
                 return;
               }
               setOrderDialog((s) => ({ ...s, open: false }));
-              setActiveTab("orders");
+              setTab("orders");
             } catch (error) {
               toast.error(error instanceof Error ? error.message : "Erro ao criar o pedido.");
             }
@@ -930,6 +949,16 @@ function CalcPedidos() {
             </div>
             <div className="grid gap-2"><Label>Cliente</Label><Input value={newOrder.client} onChange={(e) => setNewOrder((s) => ({ ...s, client: e.target.value }))} /></div>
             <div className="grid gap-2"><Label>Projeto</Label><Input value={newOrder.projectName} onChange={(e) => setNewOrder((s) => ({ ...s, projectName: e.target.value }))} /></div>
+            <div className="grid gap-2">
+              <Label>Impressora</Label>
+              <Select value={newOrder.printer || NO_PRINTER} onValueChange={(v) => setNewOrder((s) => ({ ...s, printer: v === NO_PRINTER ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Sem impressora" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_PRINTER}>Sem impressora</SelectItem>
+                  {PRINTERS.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="grid gap-2"><Label>Quantidade</Label><Input type="number" min={1} value={newOrder.quantity} onChange={(e) => setNewOrder((s) => ({ ...s, quantity: e.target.value }))} /></div>
               <div className="grid gap-2">
@@ -1410,6 +1439,7 @@ function CalcPedidos() {
               const fd = new FormData(e.currentTarget);
               const selectedClientId = (fd.get("clientId") as string) || "";
               const selectedClient = clients.find((client) => client.id === selectedClientId);
+              const printerValue = (fd.get("printer") as string) || "";
               mutateUpdateOrder.mutate({
                 orderId: editOrder.id,
                 client: (selectedClient?.nome ?? (fd.get("client") as string)?.trim()) || editOrder.client,
@@ -1424,6 +1454,7 @@ function CalcPedidos() {
                 formaPagamento: (fd.get("formaPagamento") as string) || null,
                 dataPagamento: (fd.get("dataPagamento") as string) || null,
                 clientId: selectedClient?.id ?? null,
+                printer: printerValue && printerValue !== NO_PRINTER ? printerValue : null,
               });
               setEditOrder(null);
             }}>
@@ -1457,6 +1488,16 @@ function CalcPedidos() {
                   </Select>
                 </div>
                 <div className="grid gap-2"><Label>{editOrder.parts?.length ? "Gramas totais (calculado)" : "Gramas / unidade"}</Label><Input name="gramsPerUnit" type="number" min={0} defaultValue={editOrder.gramsPerUnit ?? ""} disabled={Boolean(editOrder.parts?.length)} /></div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Impressora</Label>
+                <Select name="printer" defaultValue={editOrder.printer ?? NO_PRINTER}>
+                  <SelectTrigger><SelectValue placeholder="Sem impressora" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_PRINTER}>Sem impressora</SelectItem>
+                    {PRINTERS.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
+                  </SelectContent>
+                </Select>
               </div>
               {editOrder.parts?.length ? (
                 <p className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
@@ -2071,6 +2112,37 @@ function CalcPedidos() {
   function renderOrdersTab() {
     return (
       <div className="space-y-6">
+        {/* Painel de impressoras: o que esta rodando em cada uma agora */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {PRINTERS.map((printer) => {
+            const active = printingByPrinter.get(printer) ?? [];
+            return (
+              <Card key={printer} className="filament-top border-border bg-card p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Printer className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-display text-sm font-semibold">{printer}</span>
+                  </div>
+                  <Badge variant="outline" className={active.length > 0 ? "border-cyan-600/30 bg-cyan-50 text-cyan-700" : "border-green-600/30 bg-green-50 text-green-700"}>
+                    {active.length > 0 ? "Imprimindo" : "Livre"}
+                  </Badge>
+                </div>
+                {active.length > 0 ? (
+                  <ul className="mt-2 space-y-1">
+                    {active.map((o) => (
+                      <li key={o.id} className="text-sm">
+                        <span className="font-medium">{o.projectName}</span>
+                        <span className="text-muted-foreground"> · {o.client} · {formatTime(o.timeMinutes)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-2 text-sm text-muted-foreground">Nenhuma impressão em andamento.</p>
+                )}
+              </Card>
+            );
+          })}
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SearchInput value={orderSearch} onChange={setOrderSearch} placeholder="Buscar pedido..." />
           <Button onClick={() => setShowNewOrder(true)} className="btn-filament gap-2"><Plus className="h-4 w-4" />Novo pedido</Button>
@@ -2287,6 +2359,7 @@ function OrderCardView({ order, dragging = false, onFinalizar, filamentos, onDel
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Package className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{order.quantity}</span> un.</span>
           <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /><span className="font-medium text-foreground">{formatTime(order.timeMinutes)}</span></span>
+          {order.printer && (<span className="inline-flex items-center gap-1"><Printer className="h-3.5 w-3.5" />{order.printer}</span>)}
           {order.multiPart && (<span className="inline-flex items-center gap-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700"><Layers className="h-3 w-3" />Multi</span>)}
         </div>
         {partSummary && (
