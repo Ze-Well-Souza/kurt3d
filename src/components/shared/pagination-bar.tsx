@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Barra de paginacao compacta das listas do financeiro.
+ * Barra de paginacao compacta das listas do sistema (financeiro e estoque).
  * Some quando nao ha registros (os empty states das abas ja comunicam isso).
  */
 export function PaginationBar({

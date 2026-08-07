@@ -19,7 +19,7 @@ import {
 import { brl } from "@/lib/utils";
 import { formatIsoDatePtBr } from "@/lib/domain/installments";
 import { usePagination } from "@/lib/hooks/use-pagination";
-import { PaginationBar } from "./PaginationBar";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import type { FinanceCtx } from "./use-finance-page-state";
 
 export function PurchasesTab({ ctx }: { ctx: FinanceCtx }) {

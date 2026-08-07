@@ -3,7 +3,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Filamento, FilamentoQualidade } from "../../domain/types";
 import { computeReservedByFilament } from "../../domain/inventory";
-import { filamentosHistoryRepo, filamentosRepo, inventoryRepo } from "../../server/repositories.server";
+import {
+  filamentosHistoryRepo,
+  filamentosRepo,
+  inventoryRepo,
+} from "../../server/repositories.server";
 import { requireSession } from "../../server/require-session.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { buildFilamentoLabel } from "./shared";
@@ -66,16 +70,19 @@ export const upsertFilamento = createServerFn({ method: "POST" })
     }
     if (!existing) {
       const history = await filamentosHistoryRepo();
-      const inHistory = history.list.find((filamento) => filamento.sku.trim().toLowerCase() === skuNorm);
+      const inHistory = history.list.find(
+        (filamento) => filamento.sku.trim().toLowerCase() === skuNorm,
+      );
       if (inHistory) {
         throw new Error(`SKU "${data.sku}" já foi utilizado em um filamento arquivado.`);
       }
     }
-    const nextPesoAtual = data.pesoAtual !== undefined
-      ? Math.min(data.pesoAtual, data.pesoInicial)
-      : existing
-        ? Math.min(existing.pesoAtual, data.pesoInicial)
-        : data.pesoInicial;
+    const nextPesoAtual =
+      data.pesoAtual !== undefined
+        ? Math.min(data.pesoAtual, data.pesoInicial)
+        : existing
+          ? Math.min(existing.pesoAtual, data.pesoInicial)
+          : data.pesoInicial;
     const filamento: Filamento = {
       id,
       sku: data.sku,
@@ -86,16 +93,23 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       pesoAtual: nextPesoAtual,
       precoPago: data.precoPago,
       dataCompra: data.dataCompra,
-      dataEntrega: data.dataEntrega !== undefined ? data.dataEntrega : existing?.dataEntrega ?? null,
+      dataEntrega:
+        data.dataEntrega !== undefined ? data.dataEntrega : (existing?.dataEntrega ?? null),
       dataFim: existing?.dataFim ?? null,
-      qualidade: data.qualidade !== undefined ? data.qualidade : existing?.qualidade ?? null,
-      observacao: data.observacao !== undefined ? data.observacao : existing?.observacao ?? existing?.comentario ?? null,
-      comentario: data.observacao !== undefined ? data.observacao : existing?.comentario ?? null,
-      linkProduto: data.linkProduto !== undefined ? data.linkProduto : existing?.linkProduto ?? null,
+      qualidade: data.qualidade !== undefined ? data.qualidade : (existing?.qualidade ?? null),
+      observacao:
+        data.observacao !== undefined
+          ? data.observacao
+          : (existing?.observacao ?? existing?.comentario ?? null),
+      comentario: data.observacao !== undefined ? data.observacao : (existing?.comentario ?? null),
+      linkProduto:
+        data.linkProduto !== undefined ? data.linkProduto : (existing?.linkProduto ?? null),
       batchId: data.batchId ?? existing?.batchId ?? null,
       paymentId: data.paymentId ?? existing?.paymentId ?? null,
     };
-    const next = existing ? repo.list.map((item) => (item.id === id ? filamento : item)) : [...repo.list, filamento];
+    const next = existing
+      ? repo.list.map((item) => (item.id === id ? filamento : item))
+      : [...repo.list, filamento];
     await repo.save(next);
     return { ok: true, filamento };
   });
@@ -156,9 +170,16 @@ export const updateFilamentoQualidade = createServerFn({ method: "POST" })
 
     const updated: Filamento = {
       ...filamento,
-      qualidade: data.qualidade !== undefined ? (data.qualidade as FilamentoQualidade) : filamento.qualidade,
-      observacao: data.observacao !== undefined ? data.observacao : filamento.observacao ?? filamento.comentario,
-      comentario: data.observacao !== undefined ? data.observacao : filamento.observacao ?? filamento.comentario,
+      qualidade:
+        data.qualidade !== undefined ? (data.qualidade as FilamentoQualidade) : filamento.qualidade,
+      observacao:
+        data.observacao !== undefined
+          ? data.observacao
+          : (filamento.observacao ?? filamento.comentario),
+      comentario:
+        data.observacao !== undefined
+          ? data.observacao
+          : (filamento.observacao ?? filamento.comentario),
     };
 
     await repo.save(repo.list.map((item) => (item.id === data.id ? updated : item)));
@@ -182,4 +203,123 @@ export const updateFilamentoPeso = createServerFn({ method: "POST" })
     const updated: Filamento = { ...filamento, pesoAtual: data.pesoAtual };
     await repo.save(repo.list.map((item) => (item.id === filamento.id ? updated : item)));
     return { ok: true as const };
+  });
+
+export const updateArchivedFilamento = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      id: z.string().min(1),
+      sku: z.string().trim().min(1).max(50),
+      marca: z.string().trim().min(1).max(100),
+      cor: z.string().trim().min(1).max(100),
+      material: z.string().trim().min(1).max(20),
+      pesoInicial: z.number().min(1).max(100000),
+      pesoAtual: z.number().min(0).max(100000).optional(),
+      precoPago: z.number().min(0.01).max(100000),
+      dataCompra: z.string().min(1).max(30),
+      dataEntrega: z.string().min(1).max(30).nullable().optional(),
+      dataFim: z.string().min(1).max(30).nullable().optional(),
+      qualidade: filamentoQualidadeSchema.nullable().optional(),
+      observacao: z.string().max(500).nullable().optional(),
+      linkProduto: z.string().url().max(500).nullable().optional(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
+    const historyRepo = await filamentosHistoryRepo();
+    const existing = historyRepo.list.find((item) => item.id === data.id);
+    if (!existing) return { ok: false as const, reason: "not_found" as const };
+
+    const skuNorm = data.sku.trim().toLowerCase();
+    const activeRepo = await filamentosRepo();
+    const duplicateActive = activeRepo.list.find(
+      (filamento) => filamento.sku.trim().toLowerCase() === skuNorm,
+    );
+    if (duplicateActive) {
+      throw new Error(`SKU "${data.sku}" já está cadastrado em um filamento ativo.`);
+    }
+    const duplicateArchived = historyRepo.list.find(
+      (item) => item.sku.trim().toLowerCase() === skuNorm && item.id !== data.id,
+    );
+    if (duplicateArchived) {
+      throw new Error(`SKU "${data.sku}" já está em uso por outro filamento arquivado.`);
+    }
+
+    const nextPesoInicial = data.pesoInicial;
+    const nextPesoAtual =
+      data.pesoAtual !== undefined
+        ? Math.min(data.pesoAtual, nextPesoInicial)
+        : Math.min(existing.pesoAtual, nextPesoInicial);
+    const updated = {
+      ...existing,
+      sku: data.sku,
+      marca: data.marca,
+      cor: data.cor,
+      material: data.material,
+      pesoInicial: nextPesoInicial,
+      pesoAtual: nextPesoAtual,
+      precoPago: data.precoPago,
+      dataCompra: data.dataCompra,
+      dataEntrega: data.dataEntrega !== undefined ? data.dataEntrega : existing.dataEntrega,
+      dataFim: data.dataFim !== undefined ? data.dataFim : existing.dataFim,
+      qualidade:
+        data.qualidade !== undefined ? (data.qualidade as FilamentoQualidade) : existing.qualidade,
+      observacao:
+        data.observacao !== undefined
+          ? data.observacao
+          : (existing.observacao ?? existing.comentario),
+      comentario:
+        data.observacao !== undefined
+          ? data.observacao
+          : (existing.observacao ?? existing.comentario),
+      linkProduto: data.linkProduto !== undefined ? data.linkProduto : existing.linkProduto,
+    };
+    await historyRepo.save(historyRepo.list.map((item) => (item.id === data.id ? updated : item)));
+    return { ok: true as const, filamento: updated };
+  });
+
+export const restoreFilamento = createServerFn({ method: "POST" })
+  .validator(z.object({ id: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    await checkMutationRateLimit();
+    await requireSession();
+    const historyRepo = await filamentosHistoryRepo();
+    const archived = historyRepo.list.find((item) => item.id === data.id);
+    if (!archived) return { ok: false as const, reason: "not_found" as const };
+
+    const activeRepo = await filamentosRepo();
+    const skuNorm = archived.sku.trim().toLowerCase();
+    const duplicateActive = activeRepo.list.find(
+      (filamento) => filamento.sku.trim().toLowerCase() === skuNorm,
+    );
+    if (duplicateActive) {
+      throw new Error(
+        `Não é possível reativar: o SKU "${archived.sku}" já está em uso por um filamento ativo.`,
+      );
+    }
+
+    // Mantem o peso arquivado (editavel depois) e os vinculos de lote/pagamento.
+    const restored: Filamento = {
+      id: archived.id,
+      sku: archived.sku,
+      marca: archived.marca,
+      cor: archived.cor,
+      material: archived.material,
+      pesoInicial: archived.pesoInicial,
+      pesoAtual: archived.pesoAtual,
+      precoPago: archived.precoPago,
+      dataCompra: archived.dataCompra,
+      dataEntrega: archived.dataEntrega,
+      dataFim: archived.dataFim ?? null,
+      qualidade: archived.qualidade,
+      observacao: archived.observacao ?? archived.comentario,
+      comentario: archived.comentario,
+      linkProduto: archived.linkProduto,
+      batchId: archived.batchId,
+      paymentId: archived.paymentId,
+    };
+    await activeRepo.save([...activeRepo.list, restored]);
+    await historyRepo.save(historyRepo.list.filter((item) => item.id !== data.id));
+    return { ok: true as const, filamento: restored };
   });

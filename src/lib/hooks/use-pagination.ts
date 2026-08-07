@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 /**
- * Paginacao generica de listas no modulo financeiro.
+ * Paginacao generica de listas (financeiro e estoque).
  * `resetKey` deve mudar quando filtros/periodo mudarem, para voltar a pagina 1.
  */
 export function usePagination<T>(rows: T[], resetKey: string, pageSize = 25) {

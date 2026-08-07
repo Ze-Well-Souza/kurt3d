@@ -28,7 +28,7 @@ import {
 import { brl } from "@/lib/utils";
 import { formatIsoDatePtBr } from "@/lib/domain/installments";
 import { EXPENSE_CATEGORIES, SOURCE_LABELS } from "./finance-shared";
-import { PaginationBar } from "./PaginationBar";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import type { FinanceCtx } from "./use-finance-page-state";
 
