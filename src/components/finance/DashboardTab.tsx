@@ -3,10 +3,12 @@ import {
   ArrowRight,
   CalendarClock,
   Check,
+  Coins,
   DollarSign,
   Download,
   FileText,
   Package,
+  TrendingDown,
   TrendingUp,
   Wallet,
   Wrench,
@@ -39,17 +41,25 @@ export function DashboardTab({
     exportCsv,
     exportPdf,
     totals,
+    monthlySalesSeries,
     despesasFalha,
   } = ctx;
 
   const monthLabel = formatMonthYearLabel(installmentKpiMonthAnchor);
+  const monthSales = monthlySalesSeries.find((m) => m.key === installmentKpiMonthAnchor);
+  const salesKind: "profit" | "loss" | "empty" =
+    !monthSales || (monthSales.receita === 0 && monthSales.liquido === 0)
+      ? "empty"
+      : monthSales.liquido >= 0
+        ? "profit"
+        : "loss";
   const overdueEntries = pendingScheduleEntries.filter((entry) => entry.overdue);
   const upcomingEntries = pendingScheduleEntries.filter((entry) => !entry.overdue).slice(0, 5);
 
   return (
     <>
-      {/* ═══ Conta do mês (vencimentos) + Caixa do mês ═══ */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* ═══ Conta do mês (vencimentos) + Caixa do mês + Venda do mês ═══ */}
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {/* Conta do mês: o que venceu/vence neste mês, independente de quando foi pago */}
         <Card
           className={cn(
@@ -187,6 +197,103 @@ export function DashboardTab({
               onClick={() => onNavigate("caixa")}
             >
               Ver lançamentos na aba Caixa <ArrowRight className="h-3 w-3" />
+            </Button>
+          </div>
+        </Card>
+
+        {/* Venda do mês: resultado das vendas finalizadas no mês de referência */}
+        <Card
+          className={cn(
+            "overflow-hidden border-2 bg-gradient-to-br",
+            salesKind === "profit"
+              ? "border-green-500/40 from-green-50/50 to-card"
+              : salesKind === "loss"
+                ? "border-red-500/40 from-red-50/50 to-card"
+                : "border-muted/40 from-muted/30 to-card",
+          )}
+        >
+          <div className="p-6">
+            <div className="flex items-center gap-2">
+              {salesKind === "profit" ? (
+                <TrendingUp className="h-5 w-5 text-green-600" />
+              ) : salesKind === "loss" ? (
+                <TrendingDown className="h-5 w-5 text-red-600" />
+              ) : (
+                <Coins className="h-5 w-5 text-muted-foreground" />
+              )}
+              <span
+                className={cn(
+                  "text-sm font-semibold uppercase tracking-wider",
+                  salesKind === "profit"
+                    ? "text-green-700"
+                    : salesKind === "loss"
+                      ? "text-red-700"
+                      : "text-muted-foreground",
+                )}
+              >
+                Venda de {monthLabel}
+              </span>
+              {salesKind !== "empty" && (
+                <Badge
+                  className={cn(
+                    "gap-1 text-[10px]",
+                    salesKind === "profit" ? "bg-green-600" : "bg-red-600",
+                  )}
+                >
+                  {salesKind === "profit" ? "Lucro" : "Prejuízo"}
+                </Badge>
+              )}
+            </div>
+            <div
+              className={cn(
+                "mt-2 font-display text-4xl font-bold tabular-nums",
+                salesKind === "profit"
+                  ? "text-green-600"
+                  : salesKind === "loss"
+                    ? "text-red-600"
+                    : "text-muted-foreground",
+              )}
+            >
+              {brl(monthSales?.liquido ?? 0)}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {salesKind === "empty"
+                ? `Nenhuma venda finalizada em ${monthLabel}.`
+                : "Bruto do mês menos custos de produção e despesas operacionais."}
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Bruto
+                </div>
+                <div className="mt-1 font-display text-lg font-bold tabular-nums">
+                  {brl(monthSales?.receita ?? 0)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Custos
+                </div>
+                <div className="mt-1 font-display text-lg font-bold tabular-nums">
+                  {brl(monthSales?.custo ?? 0)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Despesas
+                </div>
+                <div className="mt-1 font-display text-lg font-bold tabular-nums">
+                  {brl(monthSales?.despesas ?? 0)}
+                </div>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-3 gap-1 px-0 text-xs"
+              onClick={() => onNavigate("vendas")}
+            >
+              Ver detalhes na aba Vendas <ArrowRight className="h-3 w-3" />
             </Button>
           </div>
         </Card>
