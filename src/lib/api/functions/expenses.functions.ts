@@ -34,7 +34,7 @@ export const addManualExpense = createServerFn({ method: "POST" })
       descricao: data.descricao,
       categoria: data.categoria ?? null,
     };
-    await repo.save([expense, ...repo.list]);
+    await repo.insert(expense);
     return { ok: true };
   });
 
@@ -44,6 +44,6 @@ export const removeExpense = createServerFn({ method: "POST" })
     await checkMutationRateLimit();
     await requireSession();
     const repo = await expensesRepo();
-    await repo.save(repo.list.filter((expense) => expense.id !== data.id));
+    await repo.remove(data.id);
     return { ok: true };
   });

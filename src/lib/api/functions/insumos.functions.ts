@@ -92,7 +92,7 @@ async function createOrUpdateInsumoPayment(input: {
       });
     }
     await installmentsRepo.insertMany(items);
-    await paymentsRepo.attachToInsumo(input.insumoId, paymentId);
+    await paymentsRepo.attach(input.insumoId, paymentId);
     return { paymentId };
   }
 
@@ -203,7 +203,7 @@ export const addInsumo = createServerFn({ method: "POST" })
       paymentId: provisionalPaymentId,
       classificacaoFinanceira: data.classificacaoFinanceira,
     };
-    await repo.save([insumo, ...repo.list]);
+    await repo.insert(insumo);
 
     if (provisionalPaymentId) {
       const paymentsRepo = await insumoPaymentsRepo();
@@ -251,7 +251,7 @@ export const addInsumo = createServerFn({ method: "POST" })
       descricao: `Compra de insumo: ${insumo.nome}`,
       categoria: buildInsumoExpenseCategory(insumo.classificacaoFinanceira),
     };
-    await expRepo.save([expense, ...expRepo.list]);
+    await expRepo.insert(expense);
     return { ok: true };
   });
 
@@ -262,10 +262,12 @@ export const removeInsumo = createServerFn({ method: "POST" })
     await requireSession();
     const repo = await insumosRepo();
     const current = repo.list.find((insumo) => insumo.id === data.id) ?? null;
-    await repo.save(repo.list.filter((insumo) => insumo.id !== data.id));
+    await repo.remove(data.id);
     const expRepo = await expensesRepo();
-    await expRepo.save(
-      expRepo.list.filter((expense) => !(expense.source === "insumo" && expense.refId === data.id)),
+    await expRepo.removeMany(
+      expRepo.list
+        .filter((expense) => expense.source === "insumo" && expense.refId === data.id)
+        .map((expense) => expense.id),
     );
     if (current?.paymentId) {
       const [paymentsRepo, installmentsRepo] = await Promise.all([
@@ -273,7 +275,7 @@ export const removeInsumo = createServerFn({ method: "POST" })
         insumoInstallmentsRepo(),
       ]);
       await installmentsRepo.deleteByPayment(current.paymentId);
-      await paymentsRepo.detachFromInsumo(current.paymentId);
+      await paymentsRepo.detach(current.paymentId);
       await paymentsRepo.remove(current.paymentId);
     }
     return { ok: true };
@@ -319,7 +321,7 @@ export const updateInsumo = createServerFn({ method: "POST" })
       classificacaoFinanceira: data.classificacaoFinanceira,
     };
 
-    await repo.save(repo.list.map((insumo) => (insumo.id === data.id ? updated : insumo)));
+    await repo.update(updated);
 
     const linkedExpense = expRepo.list.find(
       (expense) => expense.source === "insumo" && expense.refId === data.id,
@@ -334,10 +336,8 @@ export const updateInsumo = createServerFn({ method: "POST" })
       categoria: buildInsumoExpenseCategory(updated.classificacaoFinanceira),
     };
 
-    const nextExpenses = linkedExpense
-      ? expRepo.list.map((expense) => (expense.id === linkedExpense.id ? nextExpense : expense))
-      : [nextExpense, ...expRepo.list];
-    await expRepo.save(nextExpenses);
+    if (linkedExpense) await expRepo.update(nextExpense);
+    else await expRepo.insert(nextExpense);
 
     return { ok: true as const };
   });

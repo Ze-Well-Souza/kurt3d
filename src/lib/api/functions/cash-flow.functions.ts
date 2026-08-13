@@ -65,7 +65,7 @@ export const registerOrderPayment = createServerFn({ method: "POST" })
       registradoPor: userId,
       createdAt: nowIso(),
     };
-    await repo.save([payment, ...repo.list]);
+    await repo.insert(payment);
     return { ok: true, payment };
   });
 
@@ -76,7 +76,7 @@ export const removeOrderPayment = createServerFn({ method: "POST" })
     await checkMutationRateLimit();
     await requireSession();
     const repo = await orderPaymentsRepo();
-    await repo.save(repo.list.filter((payment) => payment.id !== data.id));
+    await repo.remove(data.id);
     return { ok: true };
   });
 

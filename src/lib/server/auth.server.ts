@@ -114,7 +114,7 @@ export async function setupAdminUser(input: {
     createdAt: now,
     updatedAt: now,
   };
-  await repo.save([admin]);
+  await repo.insert(admin);
   return { id: admin.id, username: admin.username };
 }
 
@@ -137,11 +137,13 @@ export async function changeUserPassword(userId: string, newPassword: string) {
   const user = repo.list.find((u) => u.id === userId);
   if (!user) throw new Error("user_not_found");
   assertPasswordPolicy(newPassword);
-  user.passwordHash = await hashPassword(newPassword);
-  // Ao definir a senha pessoal, deixa de ser provisória: libera o painel.
-  user.mustChangePassword = false;
-  user.updatedAt = nowIso();
-  await repo.save(repo.list);
+  await repo.update({
+    ...user,
+    passwordHash: await hashPassword(newPassword),
+    // Ao definir a senha pessoal, deixa de ser provisória: libera o painel.
+    mustChangePassword: false,
+    updatedAt: nowIso(),
+  });
 }
 
 export async function listAdminUsers() {
@@ -166,10 +168,12 @@ export async function resetUserPassword(userId: string) {
   const repo = await usersRepo();
   const user = repo.list.find((u) => u.id === userId);
   if (!user) throw new Error("user_not_found");
-  user.passwordHash = await hashPassword(DEFAULT_PROVISIONAL_PASSWORD);
-  user.mustChangePassword = true;
-  user.updatedAt = nowIso();
-  await repo.save(repo.list);
+  await repo.update({
+    ...user,
+    passwordHash: await hashPassword(DEFAULT_PROVISIONAL_PASSWORD),
+    mustChangePassword: true,
+    updatedAt: nowIso(),
+  });
 }
 
 export async function createAdminUser(input: {
@@ -199,8 +203,7 @@ export async function createAdminUser(input: {
     createdAt: now,
     updatedAt: now,
   };
-  repo.list.push(user);
-  await repo.save(repo.list);
+  await repo.insert(user);
   return { id: user.id, username: user.username };
 }
 
@@ -210,8 +213,7 @@ export async function deleteAdminUser(userId: string) {
   const target = repo.list.find((u) => u.id === userId);
   if (!target) throw new Error("user_not_found");
   if (target.role === "super_admin") throw new Error("cannot_delete_super_admin");
-  repo.list = repo.list.filter((u) => u.id !== userId);
-  await repo.save(repo.list);
+  await repo.remove(userId);
 }
 
 /** Ativa ou desativa um usuario (soft-delete). Inativo = nao consegue logar. */
@@ -220,9 +222,7 @@ export async function setUserActive(userId: string, active: boolean) {
   const user = repo.list.find((u) => u.id === userId);
   if (!user) throw new Error("user_not_found");
   if (user.role === "super_admin" && !active) throw new Error("cannot_deactivate_super_admin");
-  user.active = active;
-  user.updatedAt = nowIso();
-  await repo.save(repo.list);
+  await repo.update({ ...user, active, updatedAt: nowIso() });
 }
 
 /** Atualiza nome e/ou username de um usuario. */
@@ -230,16 +230,17 @@ export async function updateUser(userId: string, input: { nome?: string; usernam
   const repo = await usersRepo();
   const user = repo.list.find((u) => u.id === userId);
   if (!user) throw new Error("user_not_found");
+
+  const next = { ...user, updatedAt: nowIso() };
   if (input.username !== undefined) {
     const trimmed = input.username.trim();
     if (!trimmed) throw new Error("username_empty");
     const exists = repo.list.find((u) => u.username === trimmed && u.id !== userId);
     if (exists) throw new Error("username_exists");
-    user.username = trimmed;
+    next.username = trimmed;
   }
   if (input.nome !== undefined) {
-    user.nome = input.nome.trim() || null;
+    next.nome = input.nome.trim() || null;
   }
-  user.updatedAt = nowIso();
-  await repo.save(repo.list);
+  await repo.update(next);
 }

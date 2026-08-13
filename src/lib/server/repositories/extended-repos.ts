@@ -6,7 +6,8 @@ import type {
   SavedReport,
 } from "../../domain/types";
 import { getSupabaseAdminClient } from "../supabase.server";
-import { replaceById, unwrapResult } from "./shared";
+import { createCrudRepo } from "./crud-repo";
+import { unwrapResult } from "./shared";
 
 function fromProductionCalendarRow(row: any): ProductionCalendarEvent {
   return {
@@ -140,181 +141,33 @@ function toSavedReportRow(row: SavedReport) {
   };
 }
 
-export async function productionCalendarRepo() {
-  const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(
-    await supabase.from("production_calendar").select("*").order("start_date", { ascending: true }),
-    {
-      table: "production_calendar",
-      operation: "list",
-      query: "select(*).order(start_date asc)",
-    },
-  );
-  const list = (rows as any[]).map(fromProductionCalendarRow);
-  return {
-    list,
-    async save(next: ProductionCalendarEvent[]) {
-      await replaceById("production_calendar", next.map(toProductionCalendarRow));
-      return next;
-    },
-    async upsert(event: ProductionCalendarEvent) {
-      unwrapResult(
-        await supabase
-          .from("production_calendar")
-          .upsert(toProductionCalendarRow(event), { onConflict: "id" }),
-        {
-          table: "production_calendar",
-          operation: "upsert",
-          query: "upsert(onConflict=id)",
-          metadata: { eventId: event.id },
-        },
-      );
-      return list.some((item) => item.id === event.id)
-        ? list.map((item) => (item.id === event.id ? event : item))
-        : [...list, event];
-    },
-    async remove(id: string) {
-      unwrapResult(await supabase.from("production_calendar").delete().eq("id", id), {
-        table: "production_calendar",
-        operation: "delete",
-        query: "delete().eq(id)",
-        metadata: { eventId: id },
-      });
-      return list.filter((item) => item.id !== id);
-    },
-  };
-}
+export const productionCalendarRepo = createCrudRepo({
+  table: "production_calendar",
+  fromRow: fromProductionCalendarRow,
+  toRow: toProductionCalendarRow,
+  order: [{ column: "start_date", ascending: true }],
+});
 
-export async function budgetQuotesRepo() {
-  const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(
-    await supabase.from("budget_quotes").select("*").order("created_at", { ascending: false }),
-    {
-      table: "budget_quotes",
-      operation: "list",
-      query: "select(*).order(created_at desc)",
-    },
-  );
-  const list = (rows as any[]).map(fromBudgetQuoteRow);
-  return {
-    list,
-    async save(next: BudgetQuote[]) {
-      await replaceById("budget_quotes", next.map(toBudgetQuoteRow));
-      return next;
-    },
-    async upsert(quote: BudgetQuote) {
-      unwrapResult(
-        await supabase.from("budget_quotes").upsert(toBudgetQuoteRow(quote), { onConflict: "id" }),
-        {
-          table: "budget_quotes",
-          operation: "upsert",
-          query: "upsert(onConflict=id)",
-          metadata: { quoteId: quote.id },
-        },
-      );
-      return list.some((item) => item.id === quote.id)
-        ? list.map((item) => (item.id === quote.id ? quote : item))
-        : [quote, ...list];
-    },
-    async remove(id: string) {
-      unwrapResult(await supabase.from("budget_quotes").delete().eq("id", id), {
-        table: "budget_quotes",
-        operation: "delete",
-        query: "delete().eq(id)",
-        metadata: { quoteId: id },
-      });
-      return list.filter((item) => item.id !== id);
-    },
-  };
-}
+export const budgetQuotesRepo = createCrudRepo({
+  table: "budget_quotes",
+  fromRow: fromBudgetQuoteRow,
+  toRow: toBudgetQuoteRow,
+  order: [{ column: "created_at", ascending: false }],
+});
 
-export async function portfolioVideosRepo() {
-  const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(
-    await supabase.from("portfolio_videos").select("*").order("created_at", { ascending: false }),
-    {
-      table: "portfolio_videos",
-      operation: "list",
-      query: "select(*).order(created_at desc)",
-    },
-  );
-  const list = (rows as any[]).map(fromPortfolioVideoRow);
-  return {
-    list,
-    async save(next: PortfolioVideo[]) {
-      await replaceById("portfolio_videos", next.map(toPortfolioVideoRow));
-      return next;
-    },
-    async upsert(video: PortfolioVideo) {
-      unwrapResult(
-        await supabase
-          .from("portfolio_videos")
-          .upsert(toPortfolioVideoRow(video), { onConflict: "id" }),
-        {
-          table: "portfolio_videos",
-          operation: "upsert",
-          query: "upsert(onConflict=id)",
-          metadata: { videoId: video.id },
-        },
-      );
-      return list.some((item) => item.id === video.id)
-        ? list.map((item) => (item.id === video.id ? video : item))
-        : [video, ...list];
-    },
-    async remove(id: string) {
-      unwrapResult(await supabase.from("portfolio_videos").delete().eq("id", id), {
-        table: "portfolio_videos",
-        operation: "delete",
-        query: "delete().eq(id)",
-        metadata: { videoId: id },
-      });
-      return list.filter((item) => item.id !== id);
-    },
-  };
-}
+export const portfolioVideosRepo = createCrudRepo({
+  table: "portfolio_videos",
+  fromRow: fromPortfolioVideoRow,
+  toRow: toPortfolioVideoRow,
+  order: [{ column: "created_at", ascending: false }],
+});
 
-export async function savedReportsRepo() {
-  const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(
-    await supabase.from("saved_reports").select("*").order("created_at", { ascending: false }),
-    {
-      table: "saved_reports",
-      operation: "list",
-      query: "select(*).order(created_at desc)",
-    },
-  );
-  const list = (rows as any[]).map(fromSavedReportRow);
-  return {
-    list,
-    async save(next: SavedReport[]) {
-      await replaceById("saved_reports", next.map(toSavedReportRow));
-      return next;
-    },
-    async upsert(report: SavedReport) {
-      unwrapResult(
-        await supabase.from("saved_reports").upsert(toSavedReportRow(report), { onConflict: "id" }),
-        {
-          table: "saved_reports",
-          operation: "upsert",
-          query: "upsert(onConflict=id)",
-          metadata: { reportId: report.id },
-        },
-      );
-      return list.some((item) => item.id === report.id)
-        ? list.map((item) => (item.id === report.id ? report : item))
-        : [report, ...list];
-    },
-    async remove(id: string) {
-      unwrapResult(await supabase.from("saved_reports").delete().eq("id", id), {
-        table: "saved_reports",
-        operation: "delete",
-        query: "delete().eq(id)",
-        metadata: { reportId: id },
-      });
-      return list.filter((item) => item.id !== id);
-    },
-  };
-}
+export const savedReportsRepo = createCrudRepo({
+  table: "saved_reports",
+  fromRow: fromSavedReportRow,
+  toRow: toSavedReportRow,
+  order: [{ column: "created_at", ascending: false }],
+});
 
 // ═══════════ Receipts ═══════════
 
@@ -364,47 +217,71 @@ function toReceiptRow(row: Receipt) {
   };
 }
 
+const baseReceiptsRepo = createCrudRepo({
+  table: "receipts",
+  fromRow: fromReceiptRow,
+  toRow: toReceiptRow,
+  order: [{ column: "created_at", ascending: false }],
+});
+
 export async function receiptsRepo() {
+  const repo = await baseReceiptsRepo();
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(
-    await supabase.from("receipts").select("*").order("created_at", { ascending: false }),
-    {
-      table: "receipts",
-      operation: "list",
-      query: "select(*).order(created_at desc)",
-    },
-  );
-  const list = (rows as any[]).map(fromReceiptRow);
 
-  /** Gera o próximo número de recibo sequencial para hoje. */
-  function generateReceiptNumber(): string {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const prefix = `REC-${today}-`;
-    const todayReceipts = list.filter((r) => r.receiptNumber.startsWith(prefix));
-    const next = todayReceipts.length + 1;
-    return `${prefix}${next.toString().padStart(4, "0")}`;
-  }
+  /**
+   * Insere o recibo com o próximo número sequencial do dia (P1-3).
+   *
+   * A numeração antes era `recibos_de_hoje.length + 1` calculada sobre a lista
+   * em memória. Isso colidia com a constraint UNIQUE de `receipt_number` em
+   * três situações: dois recibos emitidos ao mesmo tempo recebiam o mesmo
+   * número; apagar um recibo fazia o próximo reutilizar o número já usado; e a
+   * lista podia nem conter os recibos de hoje.
+   *
+   * Agora o próximo número vem de um MAX no banco e a inserção é retentada em
+   * caso de violação de unicidade — quem perder a corrida simplesmente pega o
+   * número seguinte.
+   */
+  async function insertWithNextNumber(
+    receipt: Omit<Receipt, "receiptNumber">,
+    maxAttempts = 5,
+  ): Promise<Receipt> {
+    const prefix = `REC-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-`;
 
-  return {
-    list,
-    generateReceiptNumber,
-    async upsert(receipt: Receipt) {
-      unwrapResult(
-        await supabase.from("receipts").upsert(toReceiptRow(receipt), { onConflict: "id" }),
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const existing = unwrapResult(
+        await supabase
+          .from("receipts")
+          .select("receipt_number")
+          .like("receipt_number", `${prefix}%`)
+          .order("receipt_number", { ascending: false })
+          .limit(1),
         {
           table: "receipts",
-          operation: "upsert",
-          query: "upsert(onConflict=id)",
-          metadata: { receiptNumber: receipt.receiptNumber },
+          operation: "nextReceiptNumber",
+          query: "select(receipt_number).like(prefix).order desc.limit(1)",
         },
-      );
-      const idx = list.findIndex((item) => item.id === receipt.id);
-      if (idx >= 0) list[idx] = receipt;
-      else list.unshift(receipt);
-      return receipt;
-    },
-    async findByNumber(number: string) {
-      return list.find((r) => r.receiptNumber === number) ?? null;
-    },
-  };
+      ) as { receipt_number: string }[];
+
+      const ultimo = existing[0]?.receipt_number;
+      const sequencial = ultimo ? Number(ultimo.slice(prefix.length)) : 0;
+      const proximo = (Number.isFinite(sequencial) ? sequencial : 0) + 1 + attempt;
+      const completo: Receipt = {
+        ...receipt,
+        receiptNumber: `${prefix}${String(proximo).padStart(4, "0")}`,
+      };
+
+      const { error } = await supabase.from("receipts").insert(toReceiptRow(completo));
+      if (!error) return completo;
+      // 23505 = unique_violation: outro recibo levou este número. Tenta o seguinte.
+      if (error.code !== "23505") {
+        throw new Error(`[receipts.insertWithNextNumber] ${error.message}`);
+      }
+    }
+
+    throw new Error(
+      "Nao foi possivel gerar um numero de recibo unico apos varias tentativas. Tente novamente.",
+    );
+  }
+
+  return { ...repo, insertWithNextNumber };
 }

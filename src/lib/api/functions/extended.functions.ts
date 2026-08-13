@@ -187,7 +187,7 @@ export const convertQuoteToOrder = createServerFn({ method: "POST" })
     };
 
     // Save order and update quote
-    await orders.save([order, ...orders.list]);
+    await orders.insert(order);
     const updated: BudgetQuote = {
       ...quote,
       status: "converted",
@@ -440,11 +440,10 @@ export const saveReceipt = createServerFn({ method: "POST" })
     const repo = await receiptsRepo();
     const now = nowIso();
 
-    const receiptNumber = repo.generateReceiptNumber();
-
-    const receipt: Receipt = {
+    // O numero sequencial e atribuido dentro do insert, com retry em caso de
+    // colisao — ver receiptsRepo.insertWithNextNumber (P1-3).
+    const receipt = await repo.insertWithNextNumber({
       id: randomUUID(),
-      receiptNumber,
       type: data.type,
       clientName: data.clientName,
       items: data.items,
@@ -461,8 +460,7 @@ export const saveReceipt = createServerFn({ method: "POST" })
       discountPercent: data.discountPercent ?? null,
       createdAt: now,
       updatedAt: now,
-    };
+    });
 
-    await repo.upsert(receipt);
-    return { ok: true, receiptNumber, receiptId: receipt.id };
+    return { ok: true, receiptNumber: receipt.receiptNumber, receiptId: receipt.id };
   });

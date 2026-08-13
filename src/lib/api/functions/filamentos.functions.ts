@@ -107,10 +107,8 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       batchId: data.batchId ?? existing?.batchId ?? null,
       paymentId: data.paymentId ?? existing?.paymentId ?? null,
     };
-    const next = existing
-      ? repo.list.map((item) => (item.id === id ? filamento : item))
-      : [...repo.list, filamento];
-    await repo.save(next);
+    if (existing) await repo.update(filamento);
+    else await repo.insert(filamento);
     return { ok: true, filamento };
   });
 
@@ -120,7 +118,7 @@ export const removeFilamento = createServerFn({ method: "POST" })
     await checkMutationRateLimit();
     await requireSession();
     const repo = await filamentosRepo();
-    await repo.save(repo.list.filter((filamento) => filamento.id !== data.id));
+    await repo.remove(data.id);
     return { ok: true };
   });
 
@@ -182,7 +180,7 @@ export const updateFilamentoQualidade = createServerFn({ method: "POST" })
           : (filamento.observacao ?? filamento.comentario),
     };
 
-    await repo.save(repo.list.map((item) => (item.id === data.id ? updated : item)));
+    await repo.update(updated);
     return { ok: true as const };
   });
 
@@ -201,7 +199,7 @@ export const updateFilamentoPeso = createServerFn({ method: "POST" })
     if (!filamento) return { ok: false as const, reason: "not_found" as const };
 
     const updated: Filamento = { ...filamento, pesoAtual: data.pesoAtual };
-    await repo.save(repo.list.map((item) => (item.id === filamento.id ? updated : item)));
+    await repo.update(updated);
     return { ok: true as const };
   });
 
@@ -275,7 +273,7 @@ export const updateArchivedFilamento = createServerFn({ method: "POST" })
           : (existing.observacao ?? existing.comentario),
       linkProduto: data.linkProduto !== undefined ? data.linkProduto : existing.linkProduto,
     };
-    await historyRepo.save(historyRepo.list.map((item) => (item.id === data.id ? updated : item)));
+    await historyRepo.update(updated);
     return { ok: true as const, filamento: updated };
   });
 
@@ -319,7 +317,10 @@ export const restoreFilamento = createServerFn({ method: "POST" })
       batchId: archived.batchId,
       paymentId: archived.paymentId,
     };
-    await activeRepo.save([...activeRepo.list, restored]);
-    await historyRepo.save(historyRepo.list.filter((item) => item.id !== data.id));
+    // Mesma ordem deliberada de archive(): grava no destino antes de remover da
+    // origem, para que uma falha no meio deixe duplicata visivel em vez de
+    // sumir com o rolo das duas tabelas.
+    await activeRepo.insert(restored);
+    await historyRepo.remove(data.id);
     return { ok: true as const, filamento: restored };
   });

@@ -16,15 +16,15 @@ import { DEFAULT_APP_SETTINGS } from "../../domain/types";
 // só era criada quando existia projeto de portfólio vinculado, então pedido
 // avulso que falhava não registrava perda de material nenhuma.
 
-const ordersRepoMock = { list: [] as Order[], save: vi.fn(async (_next: Order[]) => undefined) };
-const vendasRepoMock = { list: [] as Venda[], save: vi.fn(async (_next: Venda[]) => undefined) };
+const ordersRepoMock = { list: [] as Order[], update: vi.fn(async (row: Order) => row) };
+const vendasRepoMock = { list: [] as Venda[], insert: vi.fn(async (row: Venda) => row) };
 const expensesRepoMock = {
   list: [] as Expense[],
-  save: vi.fn(async (_next: Expense[]) => undefined),
+  insert: vi.fn(async (row: Expense) => row),
 };
 const filamentosRepoMock = {
   list: [] as Filamento[],
-  save: vi.fn(async (_next: Filamento[]) => undefined),
+  update: vi.fn(async (row: Filamento) => row),
 };
 const portfolioRepoMock = { list: [] as any[] };
 let settingsMock: AppSettings = DEFAULT_APP_SETTINGS;
@@ -122,7 +122,7 @@ describe("finalizarDestino — custo da venda", () => {
       data: { orderId: "ord-1", destino: "Kurtido e Vendido", valorRecebido: 200 },
     });
 
-    const venda = vendasRepoMock.save.mock.calls[0]![0]![0]!;
+    const venda = vendasRepoMock.insert.mock.calls[0]![0]!;
 
     // por unidade: filamento 50g x R$0,10 = 5,00
     //              energia   (60/60) x 0,5 x 2 = 1,00
@@ -149,8 +149,8 @@ describe("finalizarDestino — custo da venda", () => {
 
     await finalizarDestino({ data: { orderId: "ord-1", destino: "Dado de Presente" } });
 
-    expect(vendasRepoMock.save).not.toHaveBeenCalled();
-    expect(expensesRepoMock.save).not.toHaveBeenCalled();
+    expect(vendasRepoMock.insert).not.toHaveBeenCalled();
+    expect(expensesRepoMock.insert).not.toHaveBeenCalled();
   });
 
   it("recusa pedido que nao esta concluido", async () => {
@@ -162,7 +162,7 @@ describe("finalizarDestino — custo da venda", () => {
     });
 
     expect(res).toEqual({ ok: false, reason: "invalid_state" });
-    expect(vendasRepoMock.save).not.toHaveBeenCalled();
+    expect(vendasRepoMock.insert).not.toHaveBeenCalled();
   });
 });
 
@@ -173,8 +173,8 @@ describe("finalizarDestino — perda por falha de impressao", () => {
 
     await finalizarDestino({ data: { orderId: "ord-1", destino: "Falha de Impressão" } });
 
-    expect(expensesRepoMock.save).toHaveBeenCalledOnce();
-    const despesa = expensesRepoMock.save.mock.calls[0]![0]![0]!;
+    expect(expensesRepoMock.insert).toHaveBeenCalledOnce();
+    const despesa = expensesRepoMock.insert.mock.calls[0]![0]!;
     expect(despesa.source).toBe("falha");
     expect(despesa.refId).toBe("ord-1");
     // 50g/un x 2 un = 100g x R$0,10 = R$ 10,00
@@ -191,7 +191,7 @@ describe("finalizarDestino — perda por falha de impressao", () => {
 
     await finalizarDestino({ data: { orderId: "ord-1", destino: "Falha de Impressão" } });
 
-    const despesa = expensesRepoMock.save.mock.calls[0]![0]![0]!;
+    const despesa = expensesRepoMock.insert.mock.calls[0]![0]!;
     // 30g x 3 un = 90g x R$0,10 = R$ 9,00
     expect(despesa.valor).toBeCloseTo(9, 2);
   });
@@ -202,6 +202,6 @@ describe("finalizarDestino — perda por falha de impressao", () => {
 
     await finalizarDestino({ data: { orderId: "ord-1", destino: "Falha de Impressão" } });
 
-    expect(expensesRepoMock.save).not.toHaveBeenCalled();
+    expect(expensesRepoMock.insert).not.toHaveBeenCalled();
   });
 });

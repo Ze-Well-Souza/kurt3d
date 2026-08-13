@@ -142,7 +142,7 @@ export const addOrder = createServerFn({ method: "POST" })
       printer: data.printer ?? null,
       parts: normalizedParts,
     };
-    await repo.save([order, ...repo.list]);
+    await repo.insert(order);
     if (normalizedParts.length > 0) {
       await partsRepo.saveForOrder(orderId, normalizedParts);
     }
@@ -181,7 +181,7 @@ export const removeOrder = createServerFn({ method: "POST" })
       }
     }
 
-    await repo.save(repo.list.filter((item) => item.id !== data.orderId));
+    await repo.remove(data.orderId);
     return { ok: true };
   });
 
@@ -235,19 +235,18 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
         if (toConsume > 0) {
           const filamento = filamentos.list.find((item) => item.id === filamentId);
           if (filamento) {
-            const updatedFilamentos = filamentos.list.map((item) =>
-              item.id === filamento.id
-                ? { ...item, pesoAtual: Math.max(0, item.pesoAtual - toConsume) }
-                : item,
-            );
-            await filamentos.save(updatedFilamentos);
+            const nextFilamento = {
+              ...filamento,
+              pesoAtual: Math.max(0, filamento.pesoAtual - toConsume),
+            };
+            await filamentos.update(nextFilamento);
           }
           await inv.append({ orderId: order.id, filamentId, type: "consume", grams: toConsume });
         }
       }
     }
 
-    await orders.save(orders.list.map((item) => (item.id === order.id ? nextOrder : item)));
+    await orders.update(nextOrder);
     await notifyOrderStatusChange({
       order: nextOrder,
       previousStatus: order.status,
@@ -299,7 +298,7 @@ export const finalizarDestino = createServerFn({ method: "POST" })
       status: statusMap[destino],
       updatedAt: now,
     };
-    await orders.save(orders.list.map((item) => (item.id === order.id ? updatedOrder : item)));
+    await orders.update(updatedOrder);
     await notifyOrderStatusChange({
       order: updatedOrder,
       previousStatus: order.status,
@@ -340,7 +339,7 @@ export const finalizarDestino = createServerFn({ method: "POST" })
         depreciacao: cost.depreciacao,
         data: now,
       };
-      await vendas.save([venda, ...vendas.list]);
+      await vendas.insert(venda);
     }
 
     if (destino === "Falha de Impressão") {
@@ -371,7 +370,7 @@ export const finalizarDestino = createServerFn({ method: "POST" })
           descricao: `Falha: ${order.projectName} (${order.quantity}x)`,
           categoria: "Perda de Material",
         };
-        await expenses.save([expense, ...expenses.list]);
+        await expenses.insert(expense);
       }
     }
 
@@ -513,7 +512,7 @@ export const updateOrder = createServerFn({ method: "POST" })
       printer: data.printer !== undefined ? data.printer : (order.printer ?? null),
       updatedAt: nowIso(),
     };
-    await orders.save(orders.list.map((item) => (item.id === order.id ? updated : item)));
+    await orders.update(updated);
     return { ok: true as const };
   });
 
@@ -544,8 +543,6 @@ export const updateOrderPartStatus = createServerFn({ method: "POST" })
       );
 
     await partsRepo.saveForOrder(data.orderId, nextParts);
-    await orders.save(
-      orders.list.map((item) => (item.id === order.id ? { ...item, updatedAt: now } : item)),
-    );
+    await orders.update({ ...order, updatedAt: now });
     return { ok: true as const };
   });

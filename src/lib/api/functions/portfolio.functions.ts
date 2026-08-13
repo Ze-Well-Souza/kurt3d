@@ -116,7 +116,7 @@ export const addPortfolioProject = createServerFn({ method: "POST" })
       custoTrabalhoValorHora: data.custoTrabalhoValorHora ?? null,
       taxaGateway: data.taxaGateway ?? null,
     };
-    await repo.save([project, ...repo.list]);
+    await repo.insert(project);
     return { ok: true, projectId: project.id };
   });
 
@@ -131,7 +131,7 @@ export const removePortfolioProject = createServerFn({ method: "POST" })
     for (const url of project ? collectProjectImages(project) : []) {
       await deletePortfolioImage(url);
     }
-    await repo.save(repo.list.filter((project) => project.id !== data.id));
+    await repo.remove(data.id);
     return { ok: true };
   });
 
@@ -228,7 +228,7 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
       taxaGateway: data.taxaGateway ?? null,
       updatedAt: now,
     };
-    await portfolio.save(portfolio.list.map((item) => (item.id === project.id ? updated : item)));
+    await portfolio.update(updated);
     return { ok: true as const };
   });
 
@@ -269,6 +269,6 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
       linkProjeto: project.linkModelo ?? null,
       clientId: resolveClientId(clientsData.list, data.client, data.clientId),
     };
-    await orders.save([order, ...orders.list]);
+    await orders.insert(order);
     return { ok: true as const };
   });

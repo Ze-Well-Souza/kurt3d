@@ -48,7 +48,10 @@ export function getPaidAmount(installment: { valor: number; valorPago: number | 
   return Math.min(roundMoney(installment.valorPago ?? 0), installment.valor);
 }
 
-export function getRemainingAmount(installment: { valor: number; valorPago: number | null }): number {
+export function getRemainingAmount(installment: {
+  valor: number;
+  valorPago: number | null;
+}): number {
   return Math.max(roundMoney(installment.valor - getPaidAmount(installment)), 0);
 }
 

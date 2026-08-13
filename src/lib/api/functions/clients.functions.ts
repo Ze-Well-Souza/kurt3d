@@ -37,10 +37,9 @@ export const addClient = createServerFn({ method: "POST" })
       createdAt: now,
       updatedAt: now,
     };
-    await repo.save([client, ...repo.list]);
+    await repo.insert(client);
     const ordersData = await ordersRepo();
-    const linkedOrders = relinkOrdersToClient(ordersData.list, client.id, [data.nome], now);
-    await ordersData.save(linkedOrders);
+    await ordersData.updateMany(relinkOrdersToClient(ordersData.list, client.id, [data.nome], now));
     return { ok: true };
   });
 
@@ -70,15 +69,11 @@ export const updateClient = createServerFn({ method: "POST" })
       notas: data.notas ?? null,
       updatedAt: now,
     };
-    await repo.save(repo.list.map((client) => (client.id === data.id ? updated : client)));
+    await repo.update(updated);
     const ordersData = await ordersRepo();
-    const linkedOrders = relinkOrdersToClient(
-      ordersData.list,
-      updated.id,
-      [existing.nome, updated.nome],
-      now,
+    await ordersData.updateMany(
+      relinkOrdersToClient(ordersData.list, updated.id, [existing.nome, updated.nome], now),
     );
-    await ordersData.save(linkedOrders);
     return { ok: true as const };
   });
 
@@ -88,6 +83,6 @@ export const removeClient = createServerFn({ method: "POST" })
     await checkMutationRateLimit();
     await requireSession();
     const repo = await clientsRepo();
-    await repo.save(repo.list.filter((client) => client.id !== data.id));
+    await repo.remove(data.id);
     return { ok: true };
   });

@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-type OrderRepoMock = {
+type CrudMock = {
   list: any[];
-  save: ReturnType<typeof vi.fn>;
+  insert: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+  updateMany: ReturnType<typeof vi.fn>;
+  remove: ReturnType<typeof vi.fn>;
+  removeMany: ReturnType<typeof vi.fn>;
 };
+
+type OrderRepoMock = CrudMock;
 
 type InventoryRepoMock = {
   list: any[];
@@ -14,33 +20,24 @@ type PortfolioRepoMock = {
   list: any[];
 };
 
-type ClientRepoMock = {
-  list: any[];
-  save: ReturnType<typeof vi.fn>;
-};
+type ClientRepoMock = CrudMock;
 
 type OrderPartRepoMock = {
   list: any[];
   saveForOrder: ReturnType<typeof vi.fn>;
 };
 
-type ExpenseRepoMock = {
-  list: any[];
-  save: ReturnType<typeof vi.fn>;
-};
+type ExpenseRepoMock = CrudMock;
 
-type InsumoRepoMock = {
-  list: any[];
-  save: ReturnType<typeof vi.fn>;
-};
+type InsumoRepoMock = CrudMock;
 
 type InsumoPaymentRepoMock = {
   list: any[];
   insert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
-  attachToInsumo: ReturnType<typeof vi.fn>;
-  detachFromInsumo: ReturnType<typeof vi.fn>;
+  attach: ReturnType<typeof vi.fn>;
+  detach: ReturnType<typeof vi.fn>;
 };
 
 type InsumoInstallmentRepoMock = {
@@ -51,11 +48,18 @@ type InsumoInstallmentRepoMock = {
   removeMany: ReturnType<typeof vi.fn>;
 };
 
-type LeadRepoMock = {
-  list: any[];
-  save: ReturnType<typeof vi.fn>;
-  insert: ReturnType<typeof vi.fn>;
-};
+type LeadRepoMock = CrudMock;
+
+function crudMock(list: any[] = []): CrudMock {
+  return {
+    list,
+    insert: vi.fn(async (row: any) => row),
+    update: vi.fn(async (row: any) => row),
+    updateMany: vi.fn(async () => undefined),
+    remove: vi.fn(async () => undefined),
+    removeMany: vi.fn(async () => undefined),
+  };
+}
 
 let ordersRepoMock: OrderRepoMock;
 let inventoryRepoMock: InventoryRepoMock;
@@ -96,9 +100,9 @@ vi.mock("../server/repositories.server", () => ({
     removeMany: vi.fn(),
   })),
   filamentoPaymentEventsRepo: vi.fn(async () => ({ list: [], insert: vi.fn() })),
-  filamentoPaymentsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
-  filamentosHistoryRepo: vi.fn(async () => ({ list: [], save: vi.fn(), archive: vi.fn() })),
-  filamentosRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
+  filamentoPaymentsRepo: vi.fn(async () => crudMock()),
+  filamentosHistoryRepo: vi.fn(async () => ({ ...crudMock(), archive: vi.fn() })),
+  filamentosRepo: vi.fn(async () => crudMock()),
   insumoInstallmentsRepo: vi.fn(async () => insumoInstallmentsRepoMock),
   insumoPaymentEventsRepo: vi.fn(async () => ({ list: [], insert: vi.fn() })),
   insumoPaymentsRepo: vi.fn(async () => insumoPaymentsRepoMock),
@@ -113,7 +117,7 @@ vi.mock("../server/repositories.server", () => ({
   portfolioVideosRepo: vi.fn(async () => ({ list: [] })),
   savedReportsRepo: vi.fn(async () => ({ list: [] })),
   settingsRepo: vi.fn(async () => ({ settings: {}, save: vi.fn() })),
-  vendasRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
+  vendasRepo: vi.fn(async () => crudMock()),
 }));
 
 vi.mock("../server/require-session.server", () => ({
@@ -152,10 +156,7 @@ vi.mock("../server/mutation-guard.server", () => ({
 
 describe("removeOrder", () => {
   beforeEach(() => {
-    ordersRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
+    ordersRepoMock = crudMock();
     inventoryRepoMock = {
       list: [],
       append: vi.fn(async () => undefined),
@@ -163,10 +164,7 @@ describe("removeOrder", () => {
     portfolioRepoMock = {
       list: [],
     };
-    clientsRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
+    clientsRepoMock = crudMock();
     orderPartsRepoMock = {
       list: [],
       saveForOrder: vi.fn(async () => undefined),
@@ -210,7 +208,7 @@ describe("removeOrder", () => {
       type: "release",
       grams: 30,
     });
-    expect(ordersRepoMock.save).toHaveBeenCalledWith([]);
+    expect(ordersRepoMock.remove).toHaveBeenCalledWith("order-1");
   });
 
   it("nao libera estoque ao excluir pedido fora de andamento", async () => {
@@ -244,16 +242,13 @@ describe("removeOrder", () => {
     await removeOrder({ data: { orderId: "order-2", reason: "cancelado" } });
 
     expect(inventoryRepoMock.append).not.toHaveBeenCalled();
-    expect(ordersRepoMock.save).toHaveBeenCalledWith([]);
+    expect(ordersRepoMock.remove).toHaveBeenCalledWith("order-2");
   });
 });
 
 describe("client linking", () => {
   beforeEach(() => {
-    ordersRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
+    ordersRepoMock = crudMock();
     inventoryRepoMock = {
       list: [],
       append: vi.fn(async () => undefined),
@@ -261,29 +256,20 @@ describe("client linking", () => {
     portfolioRepoMock = {
       list: [],
     };
-    clientsRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
+    clientsRepoMock = crudMock();
     orderPartsRepoMock = {
       list: [],
       saveForOrder: vi.fn(async () => undefined),
     };
-    expensesRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
-    insumosRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
+    expensesRepoMock = crudMock();
+    insumosRepoMock = crudMock();
     insumoPaymentsRepoMock = {
       list: [],
       insert: vi.fn(async () => undefined),
       update: vi.fn(async () => undefined),
       remove: vi.fn(async () => undefined),
-      attachToInsumo: vi.fn(async () => undefined),
-      detachFromInsumo: vi.fn(async () => undefined),
+      attach: vi.fn(async () => undefined),
+      detach: vi.fn(async () => undefined),
     };
     insumoInstallmentsRepoMock = {
       list: [],
@@ -292,11 +278,7 @@ describe("client linking", () => {
       deleteByPayment: vi.fn(async () => undefined),
       removeMany: vi.fn(async () => undefined),
     };
-    leadsRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-      insert: vi.fn(async () => undefined),
-    };
+    leadsRepoMock = crudMock();
   });
 
   it("grava clientId estavel ao criar pedido com cliente selecionado", async () => {
@@ -321,8 +303,8 @@ describe("client linking", () => {
       },
     });
 
-    expect(ordersRepoMock.save).toHaveBeenCalledTimes(1);
-    const savedOrders = ordersRepoMock.save.mock.calls[0][0];
+    expect(ordersRepoMock.insert).toHaveBeenCalledTimes(1);
+    const savedOrders = [ordersRepoMock.insert.mock.calls[0][0]];
     expect(savedOrders[0].client).toBe("Nome digitado");
     expect(savedOrders[0].clientId).toBe("client-1");
   });
@@ -373,8 +355,8 @@ describe("client linking", () => {
       },
     });
 
-    expect(ordersRepoMock.save).toHaveBeenCalledTimes(1);
-    const savedOrders = ordersRepoMock.save.mock.calls[0][0];
+    expect(ordersRepoMock.insert).toHaveBeenCalledTimes(1);
+    const savedOrders = [ordersRepoMock.insert.mock.calls[0][0]];
     expect(savedOrders[0]).toMatchObject({
       client: "Cliente Multi",
       projectName: "Batman 28cm",
@@ -437,7 +419,7 @@ describe("client linking", () => {
     const snapshot = await listSnapshot();
 
     expect(snapshot.orders[0].clientId).toBe("client-legacy");
-    expect(ordersRepoMock.save).not.toHaveBeenCalled();
+    expect(ordersRepoMock.insert).not.toHaveBeenCalled();
   });
 
   it("retorna apenas dados publicos no snapshot da landing", async () => {
@@ -575,10 +557,7 @@ describe("client linking", () => {
 
 describe("insumos e leads", () => {
   beforeEach(() => {
-    ordersRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
+    ordersRepoMock = crudMock();
     inventoryRepoMock = {
       list: [],
       append: vi.fn(async () => undefined),
@@ -586,27 +565,14 @@ describe("insumos e leads", () => {
     portfolioRepoMock = {
       list: [],
     };
-    clientsRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
+    clientsRepoMock = crudMock();
     orderPartsRepoMock = {
       list: [],
       saveForOrder: vi.fn(async () => undefined),
     };
-    expensesRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
-    insumosRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-    };
-    leadsRepoMock = {
-      list: [],
-      save: vi.fn(async () => undefined),
-      insert: vi.fn(async () => undefined),
-    };
+    expensesRepoMock = crudMock();
+    insumosRepoMock = crudMock();
+    leadsRepoMock = crudMock();
   });
 
   it("atualiza o insumo e a despesa espelhada sem perder o vinculo", async () => {
@@ -647,10 +613,10 @@ describe("insumos e leads", () => {
       },
     });
 
-    expect(insumosRepoMock.save).toHaveBeenCalledTimes(1);
-    expect(expensesRepoMock.save).toHaveBeenCalledTimes(1);
-    const savedInsumos = insumosRepoMock.save.mock.calls[0][0];
-    const savedExpenses = expensesRepoMock.save.mock.calls[0][0];
+    expect(insumosRepoMock.update).toHaveBeenCalledTimes(1);
+    expect(expensesRepoMock.update).toHaveBeenCalledTimes(1);
+    const savedInsumos = [insumosRepoMock.update.mock.calls[0][0]];
+    const savedExpenses = [expensesRepoMock.update.mock.calls[0][0]];
     expect(savedInsumos[0]).toMatchObject({
       id: "ins-1",
       nome: "Bico 0.6",
@@ -687,17 +653,17 @@ describe("insumos e leads", () => {
       },
     });
 
-    expect(insumosRepoMock.save).toHaveBeenCalledTimes(1);
-    expect(expensesRepoMock.save).toHaveBeenCalledTimes(1);
+    expect(insumosRepoMock.insert).toHaveBeenCalledTimes(1);
+    expect(expensesRepoMock.insert).toHaveBeenCalledTimes(1);
     expect(insumoPaymentsRepoMock.insert).toHaveBeenCalledTimes(1);
     expect(insumoInstallmentsRepoMock.insertMany).toHaveBeenCalledTimes(1);
-    const savedInsumo = insumosRepoMock.save.mock.calls[0][0][0];
+    const savedInsumo = insumosRepoMock.insert.mock.calls[0][0];
     expect(savedInsumo).toMatchObject({
       nome: "Impressora Bambu Lab A1",
       paymentId: expect.any(String),
       classificacaoFinanceira: "investimento",
     });
-    expect(expensesRepoMock.save.mock.calls[0][0][0]).toMatchObject({
+    expect(expensesRepoMock.insert.mock.calls[0][0]).toMatchObject({
       categoria: "Investimento / Imobilizado",
     });
     const createdInstallments = insumoInstallmentsRepoMock.insertMany.mock.calls[0][0];
@@ -724,9 +690,9 @@ describe("insumos e leads", () => {
 
     await removeInsumo({ data: { id: "ins-1" } });
 
-    expect(insumosRepoMock.save).toHaveBeenCalledWith([]);
+    expect(insumosRepoMock.remove).toHaveBeenCalledWith("ins-1");
     expect(insumoInstallmentsRepoMock.deleteByPayment).toHaveBeenCalledWith("pay-1");
-    expect(insumoPaymentsRepoMock.detachFromInsumo).toHaveBeenCalledWith("pay-1");
+    expect(insumoPaymentsRepoMock.detach).toHaveBeenCalledWith("pay-1");
     expect(insumoPaymentsRepoMock.remove).toHaveBeenCalledWith("pay-1");
   });
 
@@ -772,15 +738,17 @@ describe("insumos e leads", () => {
     const result = await convertLeadToClient({ data: { leadId: "lead-1" } });
 
     expect(result).toMatchObject({ ok: true, clientId: "client-1", created: false });
-    expect(clientsRepoMock.save).toHaveBeenCalledTimes(1);
-    expect(leadsRepoMock.save).not.toHaveBeenCalled();
+    expect(clientsRepoMock.update).toHaveBeenCalledTimes(1);
+    expect(leadsRepoMock.remove).not.toHaveBeenCalled();
     expect(leadsRepoMock.insert).not.toHaveBeenCalled();
-    const savedClients = clientsRepoMock.save.mock.calls[0][0];
+    const savedClients = [clientsRepoMock.update.mock.calls[0][0]];
     expect(savedClients).toHaveLength(1);
     expect(savedClients[0].whatsapp).toBe("(11) 99999-0000");
     expect(savedClients[0].notas).toContain("Quero 20 chaveiros");
-    expect(ordersRepoMock.save).toHaveBeenCalledTimes(1);
-    const savedOrders = ordersRepoMock.save.mock.calls[0][0];
+    expect(ordersRepoMock.updateMany).toHaveBeenCalledTimes(1);
+    // relinkOrdersToClient agora devolve SO os pedidos alterados
+    const savedOrders = ordersRepoMock.updateMany.mock.calls[0][0];
+    expect(savedOrders).toHaveLength(1);
     expect(savedOrders[0].clientId).toBe("client-1");
   });
 });

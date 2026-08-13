@@ -105,18 +105,15 @@ export const convertLeadToClient = createServerFn({ method: "POST" })
         notas: mergeNotes(existingClient.notas, note),
         updatedAt: now,
       };
-      await clientsData.save(
-        clientsData.list.map((client) =>
-          client.id === existingClient.id ? updatedClient : client,
+      await clientsData.update(updatedClient);
+      await ordersData.updateMany(
+        relinkOrdersToClient(
+          ordersData.list,
+          existingClient.id,
+          [lead.nome, existingClient.nome],
+          now,
         ),
       );
-      const linkedOrders = relinkOrdersToClient(
-        ordersData.list,
-        existingClient.id,
-        [lead.nome, existingClient.nome],
-        now,
-      );
-      await ordersData.save(linkedOrders);
       return { ok: true as const, clientId: existingClient.id, created: false as const };
     }
 
@@ -129,8 +126,7 @@ export const convertLeadToClient = createServerFn({ method: "POST" })
       createdAt: now,
       updatedAt: now,
     };
-    await clientsData.save([client, ...clientsData.list]);
-    const linkedOrders = relinkOrdersToClient(ordersData.list, client.id, [lead.nome], now);
-    await ordersData.save(linkedOrders);
+    await clientsData.insert(client);
+    await ordersData.updateMany(relinkOrdersToClient(ordersData.list, client.id, [lead.nome], now));
     return { ok: true as const, clientId: client.id, created: true as const };
   });

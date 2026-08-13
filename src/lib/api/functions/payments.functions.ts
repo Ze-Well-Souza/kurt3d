@@ -133,7 +133,7 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
       });
     }
     await installmentsRepo.insertMany(items);
-    await paymentsRepo.attachToBatch(data.batchId, paymentId);
+    await paymentsRepo.attach(data.batchId, paymentId);
     return { ok: true, paymentId };
   });
 
@@ -237,7 +237,7 @@ export const deleteFilamentoPayment = createServerFn({ method: "POST" })
     const paymentsRepo = await filamentoPaymentsRepo();
     const installmentsRepo = await filamentoInstallmentsRepo();
     await installmentsRepo.deleteByPayment(data.paymentId);
-    await paymentsRepo.detachFromFilamentos(data.paymentId);
+    await paymentsRepo.detach(data.paymentId);
     await paymentsRepo.remove(data.paymentId);
     return { ok: true };
   });
@@ -552,7 +552,7 @@ export const deleteInsumoPayment = createServerFn({ method: "POST" })
     const paymentsRepo = await insumoPaymentsRepo();
     const installmentsRepo = await insumoInstallmentsRepo();
     await installmentsRepo.deleteByPayment(data.paymentId);
-    await paymentsRepo.detachFromInsumo(data.paymentId);
+    await paymentsRepo.detach(data.paymentId);
     await paymentsRepo.remove(data.paymentId);
     return { ok: true };
   });

@@ -1,44 +1,37 @@
+import type { Filamento, FilamentoHistory } from "../../domain/types";
 import { nowIso } from "../db.server";
-import { getSupabaseAdminClient } from "../supabase.server";
+import { createCrudRepo } from "./crud-repo";
 import { filamentosRepo } from "./filamentos.repo";
 import { fromFilamentoHistoryRow, toFilamentoHistoryRow } from "./mappers";
-import { replaceById, unwrapResult } from "./shared";
+
+const baseRepo = createCrudRepo({
+  table: "filamentos_history",
+  fromRow: fromFilamentoHistoryRow,
+  toRow: toFilamentoHistoryRow,
+  order: [{ column: "arquivado_at", ascending: false }],
+});
 
 export async function filamentosHistoryRepo() {
-  const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(
-    await supabase
-      .from("filamentos_history")
-      .select("*")
-      .order("arquivado_at", { ascending: false }),
-    {
-      table: "filamentos_history",
-      operation: "list",
-      query: "select(*).order(arquivado_at desc)",
-    },
-  );
-  const list = (rows as any[]).map(fromFilamentoHistoryRow);
+  const repo = await baseRepo();
+
   return {
-    list,
-    async save(next: ReturnType<typeof fromFilamentoHistoryRow>[]) {
-      await replaceById("filamentos_history", next.map(toFilamentoHistoryRow));
-    },
-    async archive(filamento: Awaited<ReturnType<typeof filamentosRepo>>["list"][number]) {
-      const historyRow = {
-        ...filamento,
-        arquivadoAt: nowIso(),
-      };
-      unwrapResult(
-        await supabase.from("filamentos_history").insert(toFilamentoHistoryRow(historyRow)),
-        {
-          table: "filamentos_history",
-          operation: "archiveInsert",
-          query: "insert(historyRow)",
-          metadata: { filamentoId: filamento.id },
-        },
-      );
+    ...repo,
+
+    /**
+     * Move um rolo do estoque ativo para o histórico.
+     *
+     * A ordem importa e é deliberada: grava no histórico ANTES de remover do
+     * ativo. Não há transação entre as duas tabelas via PostgREST, então se a
+     * segunda operação falhar o rolo aparece duplicado (visível e corrigível)
+     * em vez de desaparecer das duas tabelas (perda de dado irrecuperável).
+     */
+    async archive(filamento: Filamento): Promise<FilamentoHistory> {
+      const historyRow: FilamentoHistory = { ...filamento, arquivadoAt: nowIso() };
+      await repo.insert(historyRow);
+
       const activeRepo = await filamentosRepo();
-      await activeRepo.save(activeRepo.list.filter((item) => item.id !== filamento.id));
+      await activeRepo.remove(filamento.id);
+
       return historyRow;
     },
   };

@@ -81,18 +81,24 @@ export function assertExplicitClientIdExists(clients: Client[], explicitClientId
   }
 }
 
+/**
+ * Pedidos antigos, gravados antes de existir vínculo por id, que passam a
+ * apontar para este cliente por coincidência de nome.
+ *
+ * Devolve APENAS os pedidos alterados — antes devolvia a lista inteira, que ia
+ * direto para um `save()` que reescrevia a tabela de pedidos por completo. Com
+ * gravação granular só as linhas realmente afetadas são atualizadas.
+ */
 export function relinkOrdersToClient(
   orders: Order[],
   clientId: string,
   namesToMatch: string[],
   updatedAt: string,
-) {
+): Order[] {
   const normalizedNames = new Set(namesToMatch.map(normalizeClientName).filter(Boolean));
-  return orders.map((order) =>
-    !order.clientId && normalizedNames.has(normalizeClientName(order.client))
-      ? { ...order, clientId, updatedAt }
-      : order,
-  );
+  return orders
+    .filter((order) => !order.clientId && normalizedNames.has(normalizeClientName(order.client)))
+    .map((order) => ({ ...order, clientId, updatedAt }));
 }
 
 export function hydrateOrderClientLinks(orders: Order[], clients: Client[]) {
