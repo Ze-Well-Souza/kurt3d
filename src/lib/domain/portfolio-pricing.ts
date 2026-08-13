@@ -2,8 +2,20 @@ import type { AppSettings, CalculatorFilamentoInput, CalculatorExtraCost } from 
 import { DEFAULT_APP_SETTINGS } from "./types";
 
 export const BAMBU_PRESETS = [
-  { id: "A1", label: "Bambu Lab A1 + AMS Combo", watts: 150, defaultVidaUtilHoras: 2000, defaultPreco: 2999 },
-  { id: "A1_MINI", label: "Bambu Lab A1 Mini", watts: 100, defaultVidaUtilHoras: 2000, defaultPreco: 1699 },
+  {
+    id: "A1",
+    label: "Bambu Lab A1 + AMS Combo",
+    watts: 150,
+    defaultVidaUtilHoras: 2000,
+    defaultPreco: 2999,
+  },
+  {
+    id: "A1_MINI",
+    label: "Bambu Lab A1 Mini",
+    watts: 100,
+    defaultVidaUtilHoras: 2000,
+    defaultPreco: 1699,
+  },
 ] as const;
 
 export type BambuPresetId = (typeof BAMBU_PRESETS)[number]["id"];
@@ -89,9 +101,13 @@ function sumExtraCosts(custos: CalculatorExtraCost[]): number {
   return total;
 }
 
-export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorInput): PortfolioCalculatorResult {
+export function calcAdvancedPortfolioPricing(
+  input: AdvancedPortfolioCalculatorInput,
+): PortfolioCalculatorResult {
   const s = input.settings ?? DEFAULT_APP_SETTINGS;
-  const preset = input.modeloPreset ? BAMBU_PRESETS.find((m) => m.id === input.modeloPreset) : undefined;
+  const preset = input.modeloPreset
+    ? BAMBU_PRESETS.find((m) => m.id === input.modeloPreset)
+    : undefined;
   const consumoKw = input.consumoKwOverride ?? (preset ? preset.watts / 1000 : s.consumoKw);
   const amortHoraCalc =
     input.precoImpressora && input.vidaUtilHoras && input.vidaUtilHoras > 0
@@ -100,12 +116,21 @@ export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorI
 
   const entryMode = input.entryMode ?? "unit";
   const quantidade = Math.max(0, clampNumber(input.quantidade));
-  const unidadesPorImpressao = Math.max(1, Math.round(clampNumber(input.unidadesPorImpressao || 1)));
+  const unidadesPorImpressao = Math.max(
+    1,
+    Math.round(clampNumber(input.unidadesPorImpressao || 1)),
+  );
   const pesoEntrada = Math.max(0, clampNumber(input.pesoEntrada));
   const tempoEntradaMin = Math.max(0, clampNumber(input.tempoEntradaMin));
   const pesoUnitario = entryMode === "slicer" ? pesoEntrada / unidadesPorImpressao : pesoEntrada;
-  const tempoUnitario = entryMode === "slicer" ? tempoEntradaMin / unidadesPorImpressao : tempoEntradaMin;
-  const impressoesLote = quantidade > 0 ? (entryMode === "slicer" ? Math.ceil(quantidade / unidadesPorImpressao) : quantidade) : 0;
+  const tempoUnitario =
+    entryMode === "slicer" ? tempoEntradaMin / unidadesPorImpressao : tempoEntradaMin;
+  const impressoesLote =
+    quantidade > 0
+      ? entryMode === "slicer"
+        ? Math.ceil(quantidade / unidadesPorImpressao)
+        : quantidade
+      : 0;
 
   // Tarifa pode ser sobrescrita pelo projeto
   const tarifaKwh = input.custoKwhOverride ?? s.tarifaEnergiaKwh;
@@ -115,7 +140,10 @@ export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorI
   if (input.filamentos && input.filamentos.length > 0) {
     custoFilamentoLote = sumFilamentosCost(input.filamentos);
   } else {
-    const custoPorGrama = input.pesoRolo > 0 ? Math.max(0, clampNumber(input.custoRolo)) / Math.max(1, clampNumber(input.pesoRolo)) : 0;
+    const custoPorGrama =
+      input.pesoRolo > 0
+        ? Math.max(0, clampNumber(input.custoRolo)) / Math.max(1, clampNumber(input.pesoRolo))
+        : 0;
     custoFilamentoLote = custoPorGrama * pesoUnitario * quantidade;
   }
 
@@ -130,11 +158,17 @@ export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorI
 
   // Labor cost
   const custoTrabalho =
-    (input.custoTrabalhoHoras && input.custoTrabalhoValorHora)
+    input.custoTrabalhoHoras && input.custoTrabalhoValorHora
       ? input.custoTrabalhoHoras * input.custoTrabalhoValorHora
       : 0;
 
-  const custoBaseLote = custoFilamentoLote + custoEnergiaLote + custoDepreciacaoLote + custoFixoLote + custoExtraTotal + custoTrabalho;
+  const custoBaseLote =
+    custoFilamentoLote +
+    custoEnergiaLote +
+    custoDepreciacaoLote +
+    custoFixoLote +
+    custoExtraTotal +
+    custoTrabalho;
   const perdaPercent = Math.max(0, Math.min(100, clampNumber(input.perdaPercent ?? 0)));
   const custoPerda = custoBaseLote * (perdaPercent / 100);
   const custoLote = custoBaseLote + custoPerda;
@@ -146,14 +180,12 @@ export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorI
   const margem = Math.max(0, Math.min(1000, clampNumber(input.margemPercent ?? 0)));
   const taxaGateway = Math.max(0, Math.min(100, clampNumber(input.taxaGateway ?? 0)));
   const precoComMargem = custoUnidade * (1 + margem / 100);
-  const precoSugerido = taxaGateway > 0
-    ? precoComMargem / (1 - taxaGateway / 100)
-    : precoComMargem;
+  const precoSugerido = taxaGateway > 0 ? precoComMargem / (1 - taxaGateway / 100) : precoComMargem;
   const taxaGatewayAplicada = precoSugerido - precoComMargem;
 
   // Lucro liquido efetivo: usa precoVenda se informado, caso contrario usa precoSugerido
   const effectivePrice = input.precoVenda > 0 ? input.precoVenda : precoSugerido;
-  const lucroLiquidoEfetivo = (effectivePrice * quantidade) - custoLote;
+  const lucroLiquidoEfetivo = effectivePrice * quantidade - custoLote;
 
   return {
     custoUnidade,
@@ -184,7 +216,9 @@ export function calcAdvancedPortfolioPricing(input: AdvancedPortfolioCalculatorI
 
 export function calcPortfolioPricing(input: PortfolioCalculatorInput): PortfolioCalculatorResult {
   const s = input.settings ?? DEFAULT_APP_SETTINGS;
-  const preset = input.modeloPreset ? BAMBU_PRESETS.find((m) => m.id === input.modeloPreset) : undefined;
+  const preset = input.modeloPreset
+    ? BAMBU_PRESETS.find((m) => m.id === input.modeloPreset)
+    : undefined;
   const consumoKw = preset ? preset.watts / 1000 : s.consumoKw;
   const amortHoraCalc =
     input.precoImpressora && input.vidaUtilHoras && input.vidaUtilHoras > 0
@@ -193,28 +227,42 @@ export function calcPortfolioPricing(input: PortfolioCalculatorInput): Portfolio
 
   const entryMode = input.entryMode ?? "unit";
   const quantidade = Math.max(0, clampNumber(input.quantidade));
-  const unidadesPorImpressao = Math.max(1, Math.round(clampNumber(input.unidadesPorImpressao || 1)));
+  const unidadesPorImpressao = Math.max(
+    1,
+    Math.round(clampNumber(input.unidadesPorImpressao || 1)),
+  );
   const pesoEntrada = Math.max(0, clampNumber(input.pesoEntrada));
   const tempoEntradaMin = Math.max(0, clampNumber(input.tempoEntradaMin));
   const pesoUnitario = entryMode === "slicer" ? pesoEntrada / unidadesPorImpressao : pesoEntrada;
-  const tempoUnitario = entryMode === "slicer" ? tempoEntradaMin / unidadesPorImpressao : tempoEntradaMin;
-  const impressoesLote = quantidade > 0 ? (entryMode === "slicer" ? Math.ceil(quantidade / unidadesPorImpressao) : quantidade) : 0;
+  const tempoUnitario =
+    entryMode === "slicer" ? tempoEntradaMin / unidadesPorImpressao : tempoEntradaMin;
+  const impressoesLote =
+    quantidade > 0
+      ? entryMode === "slicer"
+        ? Math.ceil(quantidade / unidadesPorImpressao)
+        : quantidade
+      : 0;
 
-  const custoPorGrama = input.pesoRolo > 0 ? Math.max(0, clampNumber(input.custoRolo)) / Math.max(1, clampNumber(input.pesoRolo)) : 0;
+  const custoPorGrama =
+    input.pesoRolo > 0
+      ? Math.max(0, clampNumber(input.custoRolo)) / Math.max(1, clampNumber(input.pesoRolo))
+      : 0;
   const custoFilamentoLote = custoPorGrama * pesoUnitario * quantidade;
   const custoEnergiaPorImpressao = (tempoEntradaMin / 60) * consumoKw * s.tarifaEnergiaKwh;
   const custoDepreciacaoPorImpressao = (tempoEntradaMin / 60) * amortHoraCalc;
   const custoEnergiaLote = impressoesLote * custoEnergiaPorImpressao;
   const custoDepreciacaoLote = impressoesLote * custoDepreciacaoPorImpressao;
   const custoFixoLote = s.custoFixoUnidade * quantidade;
-  const custoBaseLote = custoFilamentoLote + custoEnergiaLote + custoDepreciacaoLote + custoFixoLote;
+  const custoBaseLote =
+    custoFilamentoLote + custoEnergiaLote + custoDepreciacaoLote + custoFixoLote;
   const perdaPercent = Math.max(0, Math.min(100, clampNumber(input.perdaPercent ?? 0)));
   const custoPerda = custoBaseLote * (perdaPercent / 100);
   const custoLote = custoBaseLote + custoPerda;
   const custoUnidade = quantidade > 0 ? custoLote / quantidade : 0;
   const receitaTotal = Math.max(0, clampNumber(input.precoVenda)) * quantidade;
   const lucroLiquido = receitaTotal - custoLote;
-  const precoSugerido = custoUnidade * (1 + Math.max(0, Math.min(1000, clampNumber(input.margemPercent ?? 0))) / 100);
+  const precoSugerido =
+    custoUnidade * (1 + Math.max(0, Math.min(1000, clampNumber(input.margemPercent ?? 0))) / 100);
 
   return {
     custoUnidade,

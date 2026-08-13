@@ -72,7 +72,12 @@ export const updateClient = createServerFn({ method: "POST" })
     };
     await repo.save(repo.list.map((client) => (client.id === data.id ? updated : client)));
     const ordersData = await ordersRepo();
-    const linkedOrders = relinkOrdersToClient(ordersData.list, updated.id, [existing.nome, updated.nome], now);
+    const linkedOrders = relinkOrdersToClient(
+      ordersData.list,
+      updated.id,
+      [existing.nome, updated.nome],
+      now,
+    );
     await ordersData.save(linkedOrders);
     return { ok: true as const };
   });

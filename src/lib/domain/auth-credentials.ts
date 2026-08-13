@@ -16,10 +16,7 @@ export function buildWhatsAppUrl(phone: string, message: string): string {
   return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`;
 }
 
-export function buildCredentialsMessage(
-  creds: CredentialsPayload,
-  loginUrl: string,
-): string {
+export function buildCredentialsMessage(creds: CredentialsPayload, loginUrl: string): string {
   const login = creds.phone || creds.username;
   return (
     `Ola ${creds.nome || "admin"}! Seu acesso ao painel da Kurti 3D foi criado.\n\n` +

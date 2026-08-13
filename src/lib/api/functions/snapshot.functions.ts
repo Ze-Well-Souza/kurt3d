@@ -61,13 +61,17 @@ export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(asyn
 
   const publicPortfolio = portfolioRows
     .map((row) => {
-      const filamento = row.filamento_id ? filamentoRows.find((candidate) => candidate.id === row.filamento_id) : null;
+      const filamento = row.filamento_id
+        ? filamentoRows.find((candidate) => candidate.id === row.filamento_id)
+        : null;
       return {
         id: row.id as string,
         nome: row.nome as string,
         categoria: row.categoria as string,
         imageUrl: (row.image_url ?? null) as string | null,
-        imageUrls: safeParseJsonArray(row.image_urls).filter((v): v is string => typeof v === "string"),
+        imageUrls: safeParseJsonArray(row.image_urls).filter(
+          (v): v is string => typeof v === "string",
+        ),
         publishedAt: (row.published_at ?? null) as string | null,
         filamentoMaterial: (filamento?.material ?? null) as string | null,
         filamentoCor: (filamento?.cor ?? null) as string | null,
@@ -143,10 +147,13 @@ export const listSnapshot = createServerFn({ method: "GET" }).handler(async () =
     label: buildFilamentoLabel(filamento),
   }));
 
-  const partsByOrderId = orderParts.list.reduce<Record<string, typeof orderParts.list>>((acc, part) => {
-    (acc[part.orderId] ??= []).push(part);
-    return acc;
-  }, {});
+  const partsByOrderId = orderParts.list.reduce<Record<string, typeof orderParts.list>>(
+    (acc, part) => {
+      (acc[part.orderId] ??= []).push(part);
+      return acc;
+    },
+    {},
+  );
 
   const ordersView = hydrateOrderClientLinks(orders.list, clients.list).map((order) => ({
     ...order,

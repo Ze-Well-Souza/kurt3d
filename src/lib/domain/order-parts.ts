@@ -1,13 +1,17 @@
 import type { OrderPart } from "./types";
 
 export function normalizeOrderParts(parts: OrderPart[]) {
-  return [...parts].sort((a, b) => a.position - b.position).map((part, index) => ({
-    ...part,
-    position: index,
-  }));
+  return [...parts]
+    .sort((a, b) => a.position - b.position)
+    .map((part, index) => ({
+      ...part,
+      position: index,
+    }));
 }
 
-export function computeOrderTotalsFromParts(parts: Pick<OrderPart, "quantity" | "timeMinutes" | "gramsPerUnit">[]) {
+export function computeOrderTotalsFromParts(
+  parts: Pick<OrderPart, "quantity" | "timeMinutes" | "gramsPerUnit">[],
+) {
   return parts.reduce(
     (acc, part) => {
       acc.timeMinutes += part.timeMinutes * part.quantity;

@@ -6,11 +6,17 @@ import { replaceById, unwrapResult } from "./shared";
 
 export async function filamentosHistoryRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("filamentos_history").select("*").order("arquivado_at", { ascending: false }), {
-    table: "filamentos_history",
-    operation: "list",
-    query: "select(*).order(arquivado_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase
+      .from("filamentos_history")
+      .select("*")
+      .order("arquivado_at", { ascending: false }),
+    {
+      table: "filamentos_history",
+      operation: "list",
+      query: "select(*).order(arquivado_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromFilamentoHistoryRow);
   return {
     list,
@@ -22,12 +28,15 @@ export async function filamentosHistoryRepo() {
         ...filamento,
         arquivadoAt: nowIso(),
       };
-      unwrapResult(await supabase.from("filamentos_history").insert(toFilamentoHistoryRow(historyRow)), {
-        table: "filamentos_history",
-        operation: "archiveInsert",
-        query: "insert(historyRow)",
-        metadata: { filamentoId: filamento.id },
-      });
+      unwrapResult(
+        await supabase.from("filamentos_history").insert(toFilamentoHistoryRow(historyRow)),
+        {
+          table: "filamentos_history",
+          operation: "archiveInsert",
+          query: "insert(historyRow)",
+          metadata: { filamentoId: filamento.id },
+        },
+      );
       const activeRepo = await filamentosRepo();
       await activeRepo.save(activeRepo.list.filter((item) => item.id !== filamento.id));
       return historyRow;

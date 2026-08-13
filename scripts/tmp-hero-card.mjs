@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from "fs";
 
-const path = 'src/routes/admin.finances.tsx';
-let content = readFileSync(path, 'utf8');
+const path = "src/routes/admin.finances.tsx";
+let content = readFileSync(path, "utf8");
 
 const oldHeroCard = `      {/* \u2550\u2550\u2550 Hero: TOTAL A PAGAR ESTE M\u00caS \u2550\u2550\u2550 */}
       <Card className="overflow-hidden border-2 border-amber-500/40 bg-gradient-to-br from-amber-50/50 to-card">
@@ -118,16 +118,16 @@ const newHeroCard = `      {/* \u2550\u2550\u2550 Hero: TOTAL A PAGAR ESTE M\u00
       </Card>`;
 
 if (!content.includes(oldHeroCard)) {
-  console.error('ERROR: old hero card not found in file');
+  console.error("ERROR: old hero card not found in file");
   // Try to find similar content for debugging
-  const idx = content.indexOf('Hero: TOTAL A PAGAR');
+  const idx = content.indexOf("Hero: TOTAL A PAGAR");
   if (idx >= 0) {
-    console.log('Found at index', idx);
-    console.log('Context:', JSON.stringify(content.slice(idx, idx + 100)));
+    console.log("Found at index", idx);
+    console.log("Context:", JSON.stringify(content.slice(idx, idx + 100)));
   }
   process.exit(1);
 }
 
 content = content.replace(oldHeroCard, newHeroCard);
-writeFileSync(path, content, 'utf8');
-console.log('Hero card replaced successfully');
+writeFileSync(path, content, "utf8");
+console.log("Hero card replaced successfully");

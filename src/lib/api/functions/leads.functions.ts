@@ -78,7 +78,11 @@ export const convertLeadToClient = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const [leadsData, clientsData, ordersData] = await Promise.all([leadsRepo(), clientsRepo(), ordersRepo()]);
+    const [leadsData, clientsData, ordersData] = await Promise.all([
+      leadsRepo(),
+      clientsRepo(),
+      ordersRepo(),
+    ]);
     const lead = leadsData.list.find((item) => item.id === data.leadId);
     if (!lead) return { ok: false as const, reason: "not_found" as const };
 
@@ -88,7 +92,8 @@ export const convertLeadToClient = createServerFn({ method: "POST" })
     const now = nowIso();
 
     const existingClient = clientsData.list.find((client) => {
-      const samePhone = normalizedLeadPhone && normalizePhone(client.whatsapp) === normalizedLeadPhone;
+      const samePhone =
+        normalizedLeadPhone && normalizePhone(client.whatsapp) === normalizedLeadPhone;
       const sameName = normalizeClientName(client.nome) === normalizedLeadName;
       return samePhone || sameName;
     });
@@ -100,8 +105,17 @@ export const convertLeadToClient = createServerFn({ method: "POST" })
         notas: mergeNotes(existingClient.notas, note),
         updatedAt: now,
       };
-      await clientsData.save(clientsData.list.map((client) => (client.id === existingClient.id ? updatedClient : client)));
-      const linkedOrders = relinkOrdersToClient(ordersData.list, existingClient.id, [lead.nome, existingClient.nome], now);
+      await clientsData.save(
+        clientsData.list.map((client) =>
+          client.id === existingClient.id ? updatedClient : client,
+        ),
+      );
+      const linkedOrders = relinkOrdersToClient(
+        ordersData.list,
+        existingClient.id,
+        [lead.nome, existingClient.nome],
+        now,
+      );
       await ordersData.save(linkedOrders);
       return { ok: true as const, clientId: existingClient.id, created: false as const };
     }

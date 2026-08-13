@@ -99,4 +99,3 @@ export async function deleteLeadImages(leadImages: Array<{ storagePath?: string 
     logger.warn("cleanup.lead_delete_exception", { error: String(error) });
   }
 }
-

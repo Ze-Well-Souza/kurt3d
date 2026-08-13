@@ -16,9 +16,10 @@ const buckets = new Map<string, RateLimitBucket>();
 
 export function getClientIp(request?: Request | null) {
   if (!request) return "unknown";
-  const forwarded = request.headers.get("cf-connecting-ip")
-    ?? request.headers.get("x-forwarded-for")
-    ?? request.headers.get("x-real-ip");
+  const forwarded =
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for") ??
+    request.headers.get("x-real-ip");
 
   if (forwarded) return forwarded.split(",")[0].trim();
 

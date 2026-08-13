@@ -42,7 +42,9 @@ export function getOrderTrackingStep(status: Status) {
   return 3;
 }
 
-export function getOrderEstimatedDeliveryDate(order: Pick<Order, "status" | "createdAt" | "updatedAt" | "timeMinutes" | "quantity">) {
+export function getOrderEstimatedDeliveryDate(
+  order: Pick<Order, "status" | "createdAt" | "updatedAt" | "timeMinutes" | "quantity">,
+) {
   if (order.status === "falha") return null;
   if (order.status === "done" || order.status === "vendido" || order.status === "presente") {
     return order.updatedAt || order.createdAt;
@@ -56,7 +58,9 @@ export function getOrderEstimatedDeliveryDate(order: Pick<Order, "status" | "cre
   return baseDate.toISOString();
 }
 
-export function getOrderTrackingSummary(order: Pick<Order, "id" | "status" | "createdAt" | "updatedAt" | "timeMinutes" | "quantity">) {
+export function getOrderTrackingSummary(
+  order: Pick<Order, "id" | "status" | "createdAt" | "updatedAt" | "timeMinutes" | "quantity">,
+) {
   return {
     trackingCode: getOrderTrackingCode(order.id),
     statusLabel: getOrderStatusLabel(order.status),

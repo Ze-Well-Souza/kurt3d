@@ -1,17 +1,43 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Calendar as CalendarIcon, Clock, Printer, Plus, Trash2, Edit2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  Printer,
+  Plus,
+  Trash2,
+  Edit2,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "@/lib/api/data.functions";
+import {
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+} from "@/lib/api/data.functions";
 import type { ProductionCalendarEvent } from "@/lib/domain/types";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useCalendarEvents } from "@/lib/hooks/use-calendar-events";
@@ -40,7 +66,7 @@ function Calendar() {
   const { data: calendarEventsData } = useCalendarEvents();
   const orders = ordersData ?? [];
   const calendarEvents = (calendarEventsData ?? []) as ProductionCalendarEvent[];
-  
+
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ProductionCalendarEvent | null>(null);
@@ -135,7 +161,7 @@ function Calendar() {
     e.preventDefault();
     const startDateTime = `${eventForm.startDate}T${eventForm.startTime}:00`;
     const endDateTime = `${eventForm.endDate}T${eventForm.endTime}:00`;
-    
+
     const data = {
       orderId: eventForm.orderId || "manual",
       title: eventForm.title,
@@ -183,8 +209,10 @@ function Calendar() {
     });
   };
 
-  const prevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-  const nextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  const prevMonth = () =>
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  const nextMonth = () =>
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   const goToToday = () => setCurrentMonth(new Date());
 
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -208,11 +236,17 @@ function Calendar() {
       <Card className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="outline" size="sm" onClick={prevMonth}>◀</Button>
+            <Button variant="outline" size="sm" onClick={prevMonth}>
+              ◀
+            </Button>
             <h2 className="text-lg font-semibold capitalize">{monthName}</h2>
-            <Button variant="outline" size="sm" onClick={nextMonth}>▶</Button>
+            <Button variant="outline" size="sm" onClick={nextMonth}>
+              ▶
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={goToToday}>Hoje</Button>
+          <Button variant="outline" size="sm" onClick={goToToday}>
+            Hoje
+          </Button>
         </div>
       </Card>
 
@@ -220,7 +254,10 @@ function Calendar() {
       <Card className="overflow-hidden">
         <div className="grid grid-cols-7 border-b border-border bg-muted/50">
           {weekDays.map((day) => (
-            <div key={day} className="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div
+              key={day}
+              className="px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               {day}
             </div>
           ))}
@@ -237,7 +274,9 @@ function Calendar() {
               >
                 {date && (
                   <>
-                    <div className={`mb-1 text-sm font-medium ${isToday ? "rounded-full bg-filament-green px-2 py-0.5 text-white" : "text-muted-foreground"}`}>
+                    <div
+                      className={`mb-1 text-sm font-medium ${isToday ? "rounded-full bg-filament-green px-2 py-0.5 text-white" : "text-muted-foreground"}`}
+                    >
                       {date.getDate()}
                     </div>
                     <div className="space-y-1">
@@ -252,7 +291,9 @@ function Calendar() {
                         </button>
                       ))}
                       {dayEvents.length > 3 && (
-                        <div className="text-xs text-muted-foreground">+{dayEvents.length - 3} mais</div>
+                        <div className="text-xs text-muted-foreground">
+                          +{dayEvents.length - 3} mais
+                        </div>
                       )}
                     </div>
                   </>
@@ -286,7 +327,8 @@ function Calendar() {
                       <div className="font-medium">{event.title}</div>
                       <div className="text-xs text-muted-foreground">
                         <Clock className="inline h-3 w-3 mr-1" />
-                        {new Date(event.startDate).toLocaleString("pt-BR")} - {new Date(event.endDate).toLocaleString("pt-BR")}
+                        {new Date(event.startDate).toLocaleString("pt-BR")} -{" "}
+                        {new Date(event.endDate).toLocaleString("pt-BR")}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         <Printer className="inline h-3 w-3 mr-1" />
@@ -324,12 +366,19 @@ function Calendar() {
             </div>
             <div className="grid gap-2">
               <Label>Pedido (opcional)</Label>
-              <Select value={eventForm.orderId} onValueChange={(v) => setEventForm((s) => ({ ...s, orderId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecione um pedido" /></SelectTrigger>
+              <Select
+                value={eventForm.orderId}
+                onValueChange={(v) => setEventForm((s) => ({ ...s, orderId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um pedido" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="manual">Manual (sem pedido)</SelectItem>
                   {orders.map((order) => (
-                    <SelectItem key={order.id} value={order.id}>{order.projectName}</SelectItem>
+                    <SelectItem key={order.id} value={order.id}>
+                      {order.projectName}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -337,21 +386,39 @@ function Calendar() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Data início *</Label>
-                <Input type="date" value={eventForm.startDate} onChange={(e) => setEventForm((s) => ({ ...s, startDate: e.target.value }))} required />
+                <Input
+                  type="date"
+                  value={eventForm.startDate}
+                  onChange={(e) => setEventForm((s) => ({ ...s, startDate: e.target.value }))}
+                  required
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Hora início</Label>
-                <Input type="time" value={eventForm.startTime} onChange={(e) => setEventForm((s) => ({ ...s, startTime: e.target.value }))} />
+                <Input
+                  type="time"
+                  value={eventForm.startTime}
+                  onChange={(e) => setEventForm((s) => ({ ...s, startTime: e.target.value }))}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Data fim *</Label>
-                <Input type="date" value={eventForm.endDate} onChange={(e) => setEventForm((s) => ({ ...s, endDate: e.target.value }))} required />
+                <Input
+                  type="date"
+                  value={eventForm.endDate}
+                  onChange={(e) => setEventForm((s) => ({ ...s, endDate: e.target.value }))}
+                  required
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Hora fim</Label>
-                <Input type="time" value={eventForm.endTime} onChange={(e) => setEventForm((s) => ({ ...s, endTime: e.target.value }))} />
+                <Input
+                  type="time"
+                  value={eventForm.endTime}
+                  onChange={(e) => setEventForm((s) => ({ ...s, endTime: e.target.value }))}
+                />
               </div>
             </div>
             <div className="grid gap-2">
@@ -364,8 +431,13 @@ function Calendar() {
             </div>
             <div className="grid gap-2">
               <Label>Status</Label>
-              <Select value={eventForm.status} onValueChange={(v: any) => setEventForm((s) => ({ ...s, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={eventForm.status}
+                onValueChange={(v: any) => setEventForm((s) => ({ ...s, status: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="scheduled">Agendado</SelectItem>
                   <SelectItem value="in_progress">Imprimindo</SelectItem>
@@ -392,8 +464,14 @@ function Calendar() {
                   <Trash2 className="h-4 w-4 mr-2" /> Excluir
                 </Button>
               )}
-              <Button type="button" variant="outline" onClick={() => setShowEventDialog(false)}>Cancelar</Button>
-              <Button type="submit" className="btn-filament" disabled={mutateCreate.isPending || mutateUpdate.isPending}>
+              <Button type="button" variant="outline" onClick={() => setShowEventDialog(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="btn-filament"
+                disabled={mutateCreate.isPending || mutateUpdate.isPending}
+              >
                 {editingEvent ? "Atualizar" : "Criar"}
               </Button>
             </DialogFooter>

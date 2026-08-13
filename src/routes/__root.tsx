@@ -88,7 +88,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "Kurti 3D — Impressão 3D Multicor" },
-      { name: "description", content: "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS. Protótipos, peças personalizadas e projetos criativos." },
+      {
+        name: "description",
+        content:
+          "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS. Protótipos, peças personalizadas e projetos criativos.",
+      },
       { name: "author", content: "Kurti 3D" },
       // PWA
       { name: "theme-color", content: "#c96f4a" },
@@ -99,16 +103,32 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-title", content: "Kurti 3D" },
       // Open Graph
       { property: "og:title", content: "Kurti 3D — Impressão 3D Multicor" },
-      { property: "og:description", content: "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS. Protótipos, peças personalizadas e projetos criativos." },
+      {
+        property: "og:description",
+        content:
+          "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS. Protótipos, peças personalizadas e projetos criativos.",
+      },
       { property: "og:type", content: "website" },
       // Twitter
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@kurti3d" },
       { name: "twitter:title", content: "Kurti 3D — Impressão 3D Multicor" },
-      { name: "twitter:description", content: "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS. Protótipos, peças personalizadas e projetos criativos." },
+      {
+        name: "twitter:description",
+        content:
+          "Impressão 3D de alta qualidade com tecnologia Bambu Lab AMS. Protótipos, peças personalizadas e projetos criativos.",
+      },
       // Social images
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/9cAaIrflosRYRy5XP4Un88Idxq93/social-images/social-1782322392457-Gemini_Generated_Image_6t1dld6t1dld6t1d_(1).webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/9cAaIrflosRYRy5XP4Un88Idxq93/social-images/social-1782322392457-Gemini_Generated_Image_6t1dld6t1dld6t1d_(1).webp" },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/9cAaIrflosRYRy5XP4Un88Idxq93/social-images/social-1782322392457-Gemini_Generated_Image_6t1dld6t1dld6t1d_(1).webp",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/9cAaIrflosRYRy5XP4Un88Idxq93/social-images/social-1782322392457-Gemini_Generated_Image_6t1dld6t1dld6t1d_(1).webp",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

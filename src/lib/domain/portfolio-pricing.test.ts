@@ -12,11 +12,13 @@ const s: AppSettings = {
   ...DEFAULT_APP_SETTINGS,
   consumoKw: 0.095,
   tarifaEnergiaKwh: 0.75,
-  depreciacaoHora: 0.70,
-  custoFixoUnidade: 0.20,
+  depreciacaoHora: 0.7,
+  custoFixoUnidade: 0.2,
 };
 
-function makeFilamento(overrides: Partial<CalculatorFilamentoInput> = {}): CalculatorFilamentoInput {
+function makeFilamento(
+  overrides: Partial<CalculatorFilamentoInput> = {},
+): CalculatorFilamentoInput {
   return {
     id: crypto.randomUUID(),
     source: "manual",
@@ -72,7 +74,7 @@ describe("calcAdvancedPortfolioPricing", () => {
   it("CASO 2 — multi-filamento 4 itens total 792g a R$20/kg = R$15,85", () => {
     const filamentos: CalculatorFilamentoInput[] = [
       { ...makeFilamento(), id: "f1", pesoUsado: 214.14, precoRolo: 20, pesoRolo: 1000 },
-      { ...makeFilamento(), id: "f2", pesoUsado: 35.50, precoRolo: 20, pesoRolo: 1000 },
+      { ...makeFilamento(), id: "f2", pesoUsado: 35.5, precoRolo: 20, pesoRolo: 1000 },
       { ...makeFilamento(), id: "f3", pesoUsado: 288.31, precoRolo: 20, pesoRolo: 1000 },
       { ...makeFilamento(), id: "f4", pesoUsado: 254.59, precoRolo: 20, pesoRolo: 1000 },
     ];
@@ -120,9 +122,9 @@ describe("calcAdvancedPortfolioPricing", () => {
       settings: s,
     });
 
-    expect(r.pesoUnitario).toBeCloseTo(100, 1);   // 400/4
-    expect(r.tempoUnitario).toBeCloseTo(120, 1);   // 480/4
-    expect(r.impressoesLote).toBe(6);               // ceil(24/4)
+    expect(r.pesoUnitario).toBeCloseTo(100, 1); // 400/4
+    expect(r.tempoUnitario).toBeCloseTo(120, 1); // 480/4
+    expect(r.impressoesLote).toBe(6); // ceil(24/4)
   });
 
   // ─── CASO 4: Desperdício 10% ──────────────────────────────────────────────
@@ -146,9 +148,9 @@ describe("calcAdvancedPortfolioPricing", () => {
 
     // custoBaseLote = filamento(10) + energia + depreciação + fixo(0.20)
     // custoPerda = custoBaseLote × 0.10
-    expect(r.custoPerda).toBeGreaterThan(1);       // pelo menos R$ 1 de perda
+    expect(r.custoPerda).toBeGreaterThan(1); // pelo menos R$ 1 de perda
     expect(r.custoLote).toBeGreaterThan(r.custoBaseLote!);
-    expect(r.custoLote).toBeCloseTo(r.custoBaseLote! * 1.10, 0);
+    expect(r.custoLote).toBeCloseTo(r.custoBaseLote! * 1.1, 0);
   });
 
   // ─── CASO 5: Taxa gateway 10% + margem 50% ──────────────────────────────
@@ -173,8 +175,8 @@ describe("calcAdvancedPortfolioPricing", () => {
 
     // custoUnidade × 1.50 = precoComMargem
     // precoSugerido = precoComMargem / (1 - 0.10) = precoComMargem / 0.90
-    const precoComMargem = r.custoUnidade * 1.50;
-    expect(r.precoSugerido).toBeCloseTo(precoComMargem / 0.90, 2);
+    const precoComMargem = r.custoUnidade * 1.5;
+    expect(r.precoSugerido).toBeCloseTo(precoComMargem / 0.9, 2);
     expect(r.taxaGatewayAplicada).toBeGreaterThan(0);
   });
 
@@ -199,7 +201,7 @@ describe("calcAdvancedPortfolioPricing", () => {
     });
 
     expect(r.taxaGatewayAplicada).toBe(0);
-    expect(r.precoSugerido).toBeCloseTo(r.custoUnidade * 1.50, 1);
+    expect(r.precoSugerido).toBeCloseTo(r.custoUnidade * 1.5, 1);
   });
 
   // ─── CASO 7: Mão de obra 2h × R$25 ────────────────────────────────────────

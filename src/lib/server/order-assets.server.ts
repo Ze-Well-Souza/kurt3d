@@ -66,14 +66,12 @@ export async function uploadOrderAssetToStorage(input: {
 
   const client = await ensureOrderAssetsBucket();
   const path = `orders/${new Date().toISOString().slice(0, 10)}/${randomUUID()}-${sanitizeFileName(input.fileName)}`;
-  const { error } = await client.storage
-    .from(ORDER_ASSETS_BUCKET)
-    .upload(path, bytes, {
-      contentType: input.contentType || "application/octet-stream",
-      upsert: false,
-      // Caminho contém UUID (imutável): cache de 1 ano no CDN reduz egress do Storage.
-      cacheControl: "31536000",
-    });
+  const { error } = await client.storage.from(ORDER_ASSETS_BUCKET).upload(path, bytes, {
+    contentType: input.contentType || "application/octet-stream",
+    upsert: false,
+    // Caminho contém UUID (imutável): cache de 1 ano no CDN reduz egress do Storage.
+    cacheControl: "31536000",
+  });
 
   if (error) {
     logger.error("orders.assets.upload_failed", {
@@ -94,7 +92,9 @@ export async function createOrderAssetSignedUrl(reference: string) {
   }
 
   const client = await ensureOrderAssetsBucket();
-  const { data, error } = await client.storage.from(parsed.bucket).createSignedUrl(parsed.path, 60 * 60);
+  const { data, error } = await client.storage
+    .from(parsed.bucket)
+    .createSignedUrl(parsed.path, 60 * 60);
   if (error || !data?.signedUrl) {
     logger.error("orders.assets.signed_url_failed", {
       reference,

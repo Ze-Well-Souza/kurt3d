@@ -23,7 +23,9 @@ const redactedKeys = new Set([
 
 function getMinLevel(): LogLevel {
   const candidate = (process.env.LOG_LEVEL ?? "info").toLowerCase();
-  return candidate === "error" || candidate === "warn" || candidate === "debug" ? candidate : "info";
+  return candidate === "error" || candidate === "warn" || candidate === "debug"
+    ? candidate
+    : "info";
 }
 
 function shouldLog(level: LogLevel) {
@@ -45,7 +47,8 @@ function redactValue(value: unknown, key?: string): unknown {
       name: value.name,
       message: sanitizeText(value.message),
       stack: value.stack ? sanitizeText(value.stack) : undefined,
-      cause: "cause" in value ? redactValue((value as Error & { cause?: unknown }).cause) : undefined,
+      cause:
+        "cause" in value ? redactValue((value as Error & { cause?: unknown }).cause) : undefined,
     };
   }
   if (Array.isArray(value)) return value.map((item) => redactValue(item));

@@ -58,9 +58,7 @@ export function DetailRow({
 }) {
   return (
     <div className="space-y-1">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className={`text-sm font-semibold text-foreground ${mono ? "font-mono" : ""}`}>
         {value}
       </div>

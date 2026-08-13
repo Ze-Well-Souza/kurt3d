@@ -118,7 +118,8 @@ export const createFilamentoPayment = createServerFn({ method: "POST" })
     const lastParcelDiff = +(data.custoTotal - perParcel * data.parcelas).toFixed(2);
     const items: FilamentoPaymentInstallment[] = [];
     for (let i = 0; i < data.parcelas; i++) {
-      const valor = i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+      const valor =
+        i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
       items.push({
         id: randomUUID(),
         paymentId,
@@ -163,9 +164,13 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
     };
     await paymentsRepo.update(updated);
 
-    const existingInstallments = installmentsRepo.list.filter((installment) => installment.paymentId === data.paymentId);
+    const existingInstallments = installmentsRepo.list.filter(
+      (installment) => installment.paymentId === data.paymentId,
+    );
     const progressed = existingInstallments.filter(
-      (installment) => installment.paymentId === data.paymentId && ((installment.valorPago ?? 0) > 0 || installment.pago),
+      (installment) =>
+        installment.paymentId === data.paymentId &&
+        ((installment.valorPago ?? 0) > 0 || installment.pago),
     );
 
     const perParcel = Math.round((data.custoTotal / data.parcelas) * 100) / 100;
@@ -173,7 +178,8 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
     const newItems: FilamentoPaymentInstallment[] = [];
     for (let i = 0; i < data.parcelas; i++) {
       const numero = i + 1;
-      const valor = i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+      const valor =
+        i === data.parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
       const existingProgressed = progressed.find((installment) => installment.numero === numero);
       if (existingProgressed) {
         const paidAmount = Math.min(existingProgressed.valorPago ?? 0, valor);
@@ -199,7 +205,9 @@ export const updateFilamentoPayment = createServerFn({ method: "POST" })
         observacao: null,
       });
     }
-    const existingById = new Map(existingInstallments.map((installment) => [installment.id, installment]));
+    const existingById = new Map(
+      existingInstallments.map((installment) => [installment.id, installment]),
+    );
     const itemsToUpdate = newItems.filter((item) => existingById.has(item.id));
     const itemsToInsert = newItems.filter((item) => !existingById.has(item.id));
     const nextIds = new Set(newItems.map((item) => item.id));
@@ -353,7 +361,10 @@ export const settlePayment = createServerFn({ method: "POST" })
     if (pending.length === 0) return { ok: true };
 
     const today = data.dataPagamento ?? todayIso();
-    const totalRemaining = pending.reduce((sum, installment) => sum + getInstallmentRemainingAmount(installment), 0);
+    const totalRemaining = pending.reduce(
+      (sum, installment) => sum + getInstallmentRemainingAmount(installment),
+      0,
+    );
     let remaining = data.totalPago ?? totalRemaining;
     if (remaining <= 0) throw new Error("Informe um valor maior que zero para quitar.");
     if (remaining - totalRemaining > 0.001) {
@@ -378,7 +389,10 @@ export const settlePayment = createServerFn({ method: "POST" })
     }
     for (const update of updates) {
       await installmentsRepo.update(update);
-      const amountAdded = roundMoney((update.valorPago ?? 0) - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
+      const amountAdded = roundMoney(
+        (update.valorPago ?? 0) -
+          getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!),
+      );
       if (amountAdded > 0) {
         await recordFilamentoEvent({
           id: randomUUID(),
@@ -514,7 +528,10 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
     if (pending.length === 0) return { ok: true };
 
     const paymentDate = data.dataPagamento ?? todayIso();
-    const totalRemaining = pending.reduce((sum, installment) => sum + getInstallmentRemainingAmount(installment), 0);
+    const totalRemaining = pending.reduce(
+      (sum, installment) => sum + getInstallmentRemainingAmount(installment),
+      0,
+    );
     let remaining = data.totalPago ?? totalRemaining;
     if (remaining <= 0) throw new Error("Informe um valor maior que zero para quitar.");
     if (remaining - totalRemaining > 0.001) {
@@ -539,7 +556,10 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
     }
     for (const update of updates) {
       await installmentsRepo.update(update);
-      const amountAdded = roundMoney((update.valorPago ?? 0) - getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!));
+      const amountAdded = roundMoney(
+        (update.valorPago ?? 0) -
+          getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!),
+      );
       if (amountAdded > 0) {
         await recordInsumoEvent({
           id: randomUUID(),
@@ -599,13 +619,15 @@ export const rescheduleInstallments = createServerFn({ method: "POST" })
       if (item.kind === "filamento") {
         const inst = filamentoRepo.list.find((i) => i.id === item.installmentId);
         if (!inst) throw new Error(`Parcela de filamento ${item.installmentId} não encontrada.`);
-        if (inst.pago) throw new Error(`Parcela ${inst.numero} já está quitada e não pode ser reagendada.`);
+        if (inst.pago)
+          throw new Error(`Parcela ${inst.numero} já está quitada e não pode ser reagendada.`);
         const updated = { ...inst, vencimento: item.newVencimento };
         await filamentoRepo.update(updated);
       } else {
         const inst = insumoRepo.list.find((i) => i.id === item.installmentId);
         if (!inst) throw new Error(`Parcela de insumo ${item.installmentId} não encontrada.`);
-        if (inst.pago) throw new Error(`Parcela ${inst.numero} já está quitada e não pode ser reagendada.`);
+        if (inst.pago)
+          throw new Error(`Parcela ${inst.numero} já está quitada e não pode ser reagendada.`);
         const updated = { ...inst, vencimento: item.newVencimento };
         await insumoRepo.update(updated);
       }

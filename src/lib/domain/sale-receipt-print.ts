@@ -130,11 +130,11 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   const discountValue = subtotal * (discountPercent / 100);
   const grandTotal = subtotal - discountValue;
 
-  const productSummary = input.items
-    .slice(0, 2)
-    .map((i) => i.description)
-    .join(", ")
-    + (input.items.length > 2 ? " + mais" : "");
+  const productSummary =
+    input.items
+      .slice(0, 2)
+      .map((i) => i.description)
+      .join(", ") + (input.items.length > 2 ? " + mais" : "");
 
   const itemsHtml = input.items
     .map(
@@ -194,7 +194,8 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
   const clientWhatsappDigits = (input.clientPhone ?? "").replace(/\D/g, "");
   const clientWhatsappRow = clientWhatsappDigits
     ? (() => {
-        const full = clientWhatsappDigits.length <= 11 ? `55${clientWhatsappDigits}` : clientWhatsappDigits;
+        const full =
+          clientWhatsappDigits.length <= 11 ? `55${clientWhatsappDigits}` : clientWhatsappDigits;
         const link = `https://wa.me/${full}`;
         const disp = formatPhoneDisplay(input.clientPhone!);
         return `<div class="info-row"><span class="info-label">WhatsApp</span><span class="info-value"><a href="${link}" style="color:#5fa8a3">${escapeHtml(disp)}</a></span></div>`;
@@ -488,9 +489,7 @@ export function buildSaleReceiptWhatsAppMessage(input: SaleReceiptInput): string
   const total = subtotal - discountValue;
   const issueDate = formatDate(new Date());
   const docTypeLabel = input.docType === "cnpj" ? "CNPJ" : "CPF";
-  const docDisplay = input.docNumber
-    ? formatDocNumber(input.docType, input.docNumber)
-    : "";
+  const docDisplay = input.docNumber ? formatDocNumber(input.docType, input.docNumber) : "";
   const studioDocTypeLabel = input.studioDocType === "cnpj" ? "CNPJ" : "CPF";
   const studioDocDisplay = input.studioDocNumber
     ? formatDocNumber(input.studioDocType, input.studioDocNumber)

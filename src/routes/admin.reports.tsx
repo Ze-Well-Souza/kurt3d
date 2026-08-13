@@ -2,13 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { brl } from "@/lib/utils";
-import { 
-  BarChart3, 
-  TrendingUp, 
-  DollarSign, 
-  Package, 
-  Download, 
-  FileText, 
+import {
+  BarChart3,
+  TrendingUp,
+  DollarSign,
+  Package,
+  Download,
+  FileText,
   Calendar as CalendarIcon,
   Clock,
   Users,
@@ -16,7 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -86,15 +86,19 @@ function Reports() {
   const budgetQuotes = budgetQuotesData ?? [];
 
   const [periodPreset, setPeriodPreset] = useState<ReportPeriodPreset>("30d");
-  const [reportType, setReportType] = useState<"overview" | "revenue" | "performance" | "inventory">("overview");
-  const [startDate, setStartDate] = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [reportType, setReportType] = useState<
+    "overview" | "revenue" | "performance" | "inventory"
+  >("overview");
+  const [startDate, setStartDate] = useState(() =>
+    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  );
   const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   // Filter dates based on period preset
   const getFilteredDates = () => {
     const now = new Date();
     let start = new Date();
-    
+
     switch (periodPreset) {
       case "7d":
         start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -112,7 +116,7 @@ function Reports() {
       default:
         return { start: null, end: null };
     }
-    
+
     return {
       start: start.toISOString().slice(0, 10),
       end: now.toISOString().slice(0, 10),
@@ -133,38 +137,43 @@ function Reports() {
     const filteredOrders = orders.filter((o) => isInPeriod(o.createdAt));
     const filteredVendas = vendas.filter((v) => isInPeriod(v.data));
     const filteredExpenses = expenses.filter((e) => isInPeriod(e.data));
-    
+
     const totalOrders = filteredOrders.length;
     const completedOrders = filteredOrders.filter((o) => o.status === "vendido").length;
     const failedOrders = filteredOrders.filter((o) => o.status === "falha").length;
     const successRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
-    
-    const avgProductionTimeHours = filteredOrders.length > 0
-      ? filteredOrders.reduce((sum, o) => sum + o.timeMinutes, 0) / filteredOrders.length / 60
-      : 0;
-    
+
+    const avgProductionTimeHours =
+      filteredOrders.length > 0
+        ? filteredOrders.reduce((sum, o) => sum + o.timeMinutes, 0) / filteredOrders.length / 60
+        : 0;
+
     const totalRevenue = filteredVendas.reduce((sum, v) => sum + v.valor, 0);
     const totalCost = filteredVendas.reduce((sum, v) => sum + v.custo, 0);
     const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.valor, 0);
     const totalProfit = totalRevenue - totalCost - totalExpenses;
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     const avgTicketValue = completedOrders > 0 ? totalRevenue / completedOrders : 0;
-    
+
     // Calculate filament consumption from inventory transactions
-    const filamentConsumedGrams = filamentos.reduce((sum, f) => sum + (f.pesoInicial - f.pesoAtual), 0);
-    
+    const filamentConsumedGrams = filamentos.reduce(
+      (sum, f) => sum + (f.pesoInicial - f.pesoAtual),
+      0,
+    );
+
     // Active clients (those with orders in period)
     const activeClients = new Set(filteredOrders.map((o) => o.clientId).filter(Boolean)).size;
-    
+
     // Average delivery time (estimate based on created_at to now for completed orders)
     const completedOrdersList = filteredOrders.filter((o) => o.status === "vendido");
-    const avgDeliveryDays = completedOrdersList.length > 0
-      ? completedOrdersList.reduce((sum, o) => {
-          const created = new Date(o.createdAt).getTime();
-          const now = Date.now();
-          return sum + ((now - created) / (1000 * 60 * 60 * 24));
-        }, 0) / completedOrdersList.length
-      : 0;
+    const avgDeliveryDays =
+      completedOrdersList.length > 0
+        ? completedOrdersList.reduce((sum, o) => {
+            const created = new Date(o.createdAt).getTime();
+            const now = Date.now();
+            return sum + (now - created) / (1000 * 60 * 60 * 24);
+          }, 0) / completedOrdersList.length
+        : 0;
 
     return {
       totalOrders,
@@ -217,7 +226,7 @@ function Reports() {
   // Top clients by revenue
   const topClients = useMemo(() => {
     const clientRevenue: Record<string, { name: string; revenue: number; orders: number }> = {};
-    
+
     vendas.forEach((v) => {
       if (!clientRevenue[v.client]) {
         clientRevenue[v.client] = { name: v.client, revenue: 0, orders: 0 };
@@ -254,10 +263,11 @@ function Reports() {
         columns
           .map((col) => {
             const value = row[col] ?? "";
-            const text = typeof value === "number" ? value.toFixed(2).replace(".", ",") : String(value);
+            const text =
+              typeof value === "number" ? value.toFixed(2).replace(".", ",") : String(value);
             return `"${text.replaceAll('"', '""')}"`;
           })
-          .join(";")
+          .join(";"),
       ),
     ];
     const blob = new Blob(["\uFEFF" + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
@@ -350,7 +360,9 @@ function Reports() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight">Relatórios & Performance</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">
+            Relatórios & Performance
+          </h1>
           <p className="text-sm text-muted-foreground">
             Métricas de faturamento, performance operacional e exportação de dados.
           </p>
@@ -380,7 +392,10 @@ function Reports() {
         <div className="flex flex-wrap items-end gap-4">
           <div className="grid gap-2">
             <Label>Período</Label>
-            <Select value={periodPreset} onValueChange={(v) => setPeriodPreset(v as ReportPeriodPreset)}>
+            <Select
+              value={periodPreset}
+              onValueChange={(v) => setPeriodPreset(v as ReportPeriodPreset)}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue />
               </SelectTrigger>
@@ -397,7 +412,11 @@ function Reports() {
             <>
               <div className="grid gap-2">
                 <Label>Data início</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Data fim</Label>
@@ -451,7 +470,11 @@ function Reports() {
           icon={<TrendingUp className="h-4 w-4" />}
           label="Lucro Líquido"
           value={brl(performanceMetrics.totalProfit)}
-          color={performanceMetrics.totalProfit >= 0 ? "var(--filament-green)" : "var(--filament-magenta)"}
+          color={
+            performanceMetrics.totalProfit >= 0
+              ? "var(--filament-green)"
+              : "var(--filament-magenta)"
+          }
           trend={performanceMetrics.totalProfit >= 0 ? "up" : "down"}
         />
         <KpiCard
@@ -465,7 +488,11 @@ function Reports() {
           icon={<CheckCircle2 className="h-4 w-4" />}
           label="Taxa de Sucesso"
           value={`${performanceMetrics.successRate.toFixed(1)}%`}
-          color={performanceMetrics.successRate >= 90 ? "var(--filament-green)" : "var(--filament-yellow)"}
+          color={
+            performanceMetrics.successRate >= 90
+              ? "var(--filament-green)"
+              : "var(--filament-yellow)"
+          }
           trend={performanceMetrics.successRate >= 90 ? "up" : "neutral"}
         />
         <KpiCard
@@ -499,7 +526,9 @@ function Reports() {
       {(reportType === "overview" || reportType === "revenue") && (
         <Card>
           <div className="border-b border-border px-6 py-4">
-            <h2 className="font-display text-lg font-semibold">Receita Mensal (Últimos 12 meses)</h2>
+            <h2 className="font-display text-lg font-semibold">
+              Receita Mensal (Últimos 12 meses)
+            </h2>
           </div>
           <div className="p-6">
             <div className="h-[300px] flex items-end gap-2">
@@ -549,7 +578,9 @@ function Reports() {
                   <TableRow key={client.name}>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell className="text-right">{client.orders}</TableCell>
-                    <TableCell className="text-right font-semibold">{brl(client.revenue)}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {brl(client.revenue)}
+                    </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {brl(client.revenue / client.orders)}
                     </TableCell>
@@ -609,7 +640,9 @@ function Reports() {
                   <div className="text-xl font-bold text-foreground">
                     {quotesStats[item.key as keyof typeof quotesStats] as number}
                   </div>
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">{item.label}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    {item.label}
+                  </div>
                 </div>
               ))}
             </div>
@@ -640,7 +673,10 @@ function KpiCard({
   return (
     <Card className="p-5">
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-        <span className="grid h-6 w-6 place-items-center rounded-md text-white" style={{ background: color }}>
+        <span
+          className="grid h-6 w-6 place-items-center rounded-md text-white"
+          style={{ background: color }}
+        >
           {icon}
         </span>
         {label}
@@ -650,8 +686,20 @@ function KpiCard({
           {value}
         </div>
         {trend && (
-          <span className={trend === "up" ? "text-green-500" : trend === "down" ? "text-red-500" : "text-muted-foreground"}>
-            {trend === "up" ? <ArrowUpRight className="h-4 w-4" /> : trend === "down" ? <ArrowDownRight className="h-4 w-4" /> : null}
+          <span
+            className={
+              trend === "up"
+                ? "text-green-500"
+                : trend === "down"
+                  ? "text-red-500"
+                  : "text-muted-foreground"
+            }
+          >
+            {trend === "up" ? (
+              <ArrowUpRight className="h-4 w-4" />
+            ) : trend === "down" ? (
+              <ArrowDownRight className="h-4 w-4" />
+            ) : null}
           </span>
         )}
       </div>

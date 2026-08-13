@@ -13,7 +13,13 @@ const env = Object.fromEntries(
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => {
       const eq = line.indexOf("=");
-      return [line.slice(0, eq).trim(), line.slice(eq + 1).trim().replace(/^["']|["']$/g, "")];
+      return [
+        line.slice(0, eq).trim(),
+        line
+          .slice(eq + 1)
+          .trim()
+          .replace(/^["']|["']$/g, ""),
+      ];
     }),
 );
 
@@ -35,14 +41,10 @@ async function main() {
   const byPhone = data.filter((u) => u.phone && u.phone.includes("11941044187"));
 
   // Busca por nome contendo "Leandro"
-  const byName = data.filter(
-    (u) => u.nome && u.nome.toLowerCase().includes("leandro"),
-  );
+  const byName = data.filter((u) => u.nome && u.nome.toLowerCase().includes("leandro"));
 
   // Busca por username contendo "Leandro"
-  const byUsername = data.filter(
-    (u) => u.username && u.username.toLowerCase().includes("leandro"),
-  );
+  const byUsername = data.filter((u) => u.username && u.username.toLowerCase().includes("leandro"));
 
   console.log("--- Por telefone 11941044187 ---");
   if (byPhone.length === 0) {
@@ -92,7 +94,9 @@ async function main() {
   // Mostra todos os usuários para referência
   console.log("=== TODOS OS USUÁRIOS ===");
   data.forEach((u) => {
-    console.log(`  [${u.role}] nome="${u.nome ?? ""}" username="${u.username}" phone="${u.phone ?? ""}" mustChange=${u.must_change_password}`);
+    console.log(
+      `  [${u.role}] nome="${u.nome ?? ""}" username="${u.username}" phone="${u.phone ?? ""}" mustChange=${u.must_change_password}`,
+    );
   });
 }
 

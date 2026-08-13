@@ -96,9 +96,18 @@ export function fromFilamentoRow(row: any): Filamento {
     pesoInicial: row.peso_inicial,
     pesoAtual: row.peso_atual,
     precoPago: row.preco_pago,
-    dataCompra: typeof row.data_compra === "string" ? row.data_compra : String(row.data_compra ?? ""),
-    dataEntrega: row.data_entrega ? (typeof row.data_entrega === "string" ? row.data_entrega : String(row.data_entrega)) : null,
-    dataFim: row.data_fim ? (typeof row.data_fim === "string" ? row.data_fim : String(row.data_fim)) : null,
+    dataCompra:
+      typeof row.data_compra === "string" ? row.data_compra : String(row.data_compra ?? ""),
+    dataEntrega: row.data_entrega
+      ? typeof row.data_entrega === "string"
+        ? row.data_entrega
+        : String(row.data_entrega)
+      : null,
+    dataFim: row.data_fim
+      ? typeof row.data_fim === "string"
+        ? row.data_fim
+        : String(row.data_fim)
+      : null,
     qualidade: normalizeFilamentoQualidade(row.qualidade),
     observacao: row.observacao ?? null,
     comentario: row.observacao ?? null,
@@ -140,9 +149,18 @@ export function fromFilamentoHistoryRow(row: any): FilamentoHistory {
     pesoInicial: row.peso_inicial,
     pesoAtual: row.peso_atual,
     precoPago: row.preco_pago,
-    dataCompra: typeof row.data_compra === "string" ? row.data_compra : String(row.data_compra ?? ""),
-    dataEntrega: row.data_entrega ? (typeof row.data_entrega === "string" ? row.data_entrega : String(row.data_entrega)) : null,
-    dataFim: row.data_fim ? (typeof row.data_fim === "string" ? row.data_fim : String(row.data_fim)) : null,
+    dataCompra:
+      typeof row.data_compra === "string" ? row.data_compra : String(row.data_compra ?? ""),
+    dataEntrega: row.data_entrega
+      ? typeof row.data_entrega === "string"
+        ? row.data_entrega
+        : String(row.data_entrega)
+      : null,
+    dataFim: row.data_fim
+      ? typeof row.data_fim === "string"
+        ? row.data_fim
+        : String(row.data_fim)
+      : null,
     qualidade: normalizeFilamentoQualidade(row.qualidade),
     observacao: row.observacao ?? null,
     comentario: row.observacao ?? null,
@@ -267,7 +285,9 @@ export function safeParseJsonArray(value: unknown): any[] {
   if (typeof value === "string" && value) {
     try {
       return JSON.parse(value);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   return [];
 }
@@ -294,8 +314,12 @@ export function fromPortfolioRow(row: any): PortfolioProject {
     imageUrls: safeParseJsonArray(row.image_urls).filter((v): v is string => typeof v === "string"),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    filamentos: filamentosRaw.length > 0 ? filamentosRaw as PortfolioProject["filamentos"] : undefined,
-    custosExtras: custosExtrasRaw.length > 0 ? custosExtrasRaw as PortfolioProject["custosExtras"] : undefined,
+    filamentos:
+      filamentosRaw.length > 0 ? (filamentosRaw as PortfolioProject["filamentos"]) : undefined,
+    custosExtras:
+      custosExtrasRaw.length > 0
+        ? (custosExtrasRaw as PortfolioProject["custosExtras"])
+        : undefined,
     custoKwh: row.custo_kwh ?? null,
     custoKwOverride: row.consumo_kw ?? null,
     custoTrabalhoHoras: row.custo_mao_obra_horas ?? null,
@@ -680,7 +704,8 @@ export function fromSettingsRow(row: any): AppSettings {
     defaultPesoRolo: row.default_peso_rolo ?? DEFAULT_APP_SETTINGS.defaultPesoRolo,
     defaultQuantidade: row.default_quantidade ?? DEFAULT_APP_SETTINGS.defaultQuantidade,
     whatsappNumero: row.whatsapp_numero ?? DEFAULT_APP_SETTINGS.whatsappNumero,
-    selectedPrinterPreset: row.selected_printer_preset ?? DEFAULT_APP_SETTINGS.selectedPrinterPreset,
+    selectedPrinterPreset:
+      row.selected_printer_preset ?? DEFAULT_APP_SETTINGS.selectedPrinterPreset,
     printerPrices: row.printer_prices ?? DEFAULT_APP_SETTINGS.printerPrices,
     printerVidaUtil: row.printer_vida_util ?? DEFAULT_APP_SETTINGS.printerVidaUtil,
   };

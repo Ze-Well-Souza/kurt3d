@@ -35,8 +35,13 @@ export const pingKeepAlive = createServerFn({ method: "GET" }).handler(async () 
 
     // Retenção: buckets sem atualização há mais de 7 dias já expiraram (janela e
     // bloqueio duram minutos) e são só lixo histórico. Falha aqui não derruba o ping.
-    const cutoff = new Date(Date.now() - RATE_LIMIT_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const { error: cleanupError } = await supabase.from("login_rate_limits").delete().lt("updated_at", cutoff);
+    const cutoff = new Date(
+      Date.now() - RATE_LIMIT_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const { error: cleanupError } = await supabase
+      .from("login_rate_limits")
+      .delete()
+      .lt("updated_at", cutoff);
     if (cleanupError) {
       logger.warn("keep_alive.rate_limit_cleanup_failed", { error: cleanupError.message });
     }

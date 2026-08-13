@@ -2,8 +2,22 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  FileText, Plus, Pencil, Trash2, CheckCircle2, XCircle, Clock,
-  Send, Ban, ArrowRightLeft, Percent, Hash, DollarSign, Printer, MessageCircle, ScrollText,
+  FileText,
+  Plus,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Send,
+  Ban,
+  ArrowRightLeft,
+  Percent,
+  Hash,
+  DollarSign,
+  Printer,
+  MessageCircle,
+  ScrollText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,15 +25,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { brl, formatPhoneDisplay } from "@/lib/utils";
 import {
-  createBudgetQuote, updateBudgetQuote, deleteBudgetQuote,
-  convertQuoteToOrder, saveReceipt,
+  createBudgetQuote,
+  updateBudgetQuote,
+  deleteBudgetQuote,
+  convertQuoteToOrder,
+  saveReceipt,
 } from "@/lib/api/data.functions";
 import { useBudgetQuotes } from "@/lib/hooks/use-budget-quotes";
 import { useOrders } from "@/lib/hooks/use-orders";
@@ -243,7 +264,11 @@ function OrcamentosPage() {
       if (result.ok) {
         toast.success("Orçamento convertido em pedido!");
       } else {
-        toast.error(result.reason === "not_approved" ? "Aprove o orçamento antes de converter." : "Erro ao converter.");
+        toast.error(
+          result.reason === "not_approved"
+            ? "Aprove o orçamento antes de converter."
+            : "Erro ao converter.",
+        );
       }
     },
     onError: () => toast.error("Erro ao converter orçamento."),
@@ -332,7 +357,8 @@ function OrcamentosPage() {
             className="w-[220px]"
           />
           <Button onClick={openCreate} className="btn-filament gap-2">
-            <Plus className="h-4 w-4" />Novo Orçamento
+            <Plus className="h-4 w-4" />
+            Novo Orçamento
           </Button>
         </div>
       </div>
@@ -373,7 +399,8 @@ function OrcamentosPage() {
         <div className="grid gap-3">
           {filtered.map((quote) => {
             const StatusIcon = STATUS_ICONS[quote.status] ?? FileText;
-            const isConverted = quote.convertedToOrderId && orders.some((o) => o.id === quote.convertedToOrderId);
+            const isConverted =
+              quote.convertedToOrderId && orders.some((o) => o.id === quote.convertedToOrderId);
             return (
               <Card key={quote.id} className="overflow-hidden border-border">
                 <CardHeader className="pb-2">
@@ -381,15 +408,18 @@ function OrcamentosPage() {
                     <div className="space-y-1">
                       <CardTitle className="text-base">{quote.clientName}</CardTitle>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        {quote.clientContact && <span>{formatPhoneDisplay(quote.clientContact)}</span>}
+                        {quote.clientContact && (
+                          <span>{formatPhoneDisplay(quote.clientContact)}</span>
+                        )}
                         {quote.clientEmail && <span>{quote.clientEmail}</span>}
-                        <span>
-                          {new Date(quote.createdAt).toLocaleDateString("pt-BR")}
-                        </span>
+                        <span>{new Date(quote.createdAt).toLocaleDateString("pt-BR")}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={`gap-1 text-xs ${STATUS_COLORS[quote.status]}`}>
+                      <Badge
+                        variant="outline"
+                        className={`gap-1 text-xs ${STATUS_COLORS[quote.status]}`}
+                      >
                         <StatusIcon className="h-3 w-3" />
                         {STATUS_LABELS[quote.status]}
                       </Badge>
@@ -408,7 +438,9 @@ function OrcamentosPage() {
                         <span className="truncate flex-1">
                           <span className="font-medium">{item.description}</span>
                           {item.quantity > 1 && (
-                            <span className="ml-1 text-xs text-muted-foreground">x{item.quantity}</span>
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              x{item.quantity}
+                            </span>
                           )}
                         </span>
                         <span className="ml-2 shrink-0 text-muted-foreground">
@@ -438,7 +470,8 @@ function OrcamentosPage() {
                     {/* Draft → Sent */}
                     {quote.status === "draft" && (
                       <Button
-                        size="sm" variant="ghost"
+                        size="sm"
+                        variant="ghost"
                         onClick={() => mutateStatus.mutate({ quoteId: quote.id, status: "sent" })}
                         className="gap-1 text-xs"
                       >
@@ -449,15 +482,21 @@ function OrcamentosPage() {
                     {quote.status === "sent" && (
                       <>
                         <Button
-                          size="sm" variant="ghost"
-                          onClick={() => mutateStatus.mutate({ quoteId: quote.id, status: "approved" })}
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            mutateStatus.mutate({ quoteId: quote.id, status: "approved" })
+                          }
                           className="gap-1 text-xs text-green-600"
                         >
                           <CheckCircle2 className="h-3 w-3" /> Aprovar
                         </Button>
                         <Button
-                          size="sm" variant="ghost"
-                          onClick={() => mutateStatus.mutate({ quoteId: quote.id, status: "rejected" })}
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            mutateStatus.mutate({ quoteId: quote.id, status: "rejected" })
+                          }
                           className="gap-1 text-xs text-red-600"
                         >
                           <XCircle className="h-3 w-3" /> Rejeitar
@@ -467,7 +506,8 @@ function OrcamentosPage() {
                     {/* Approved → Convert */}
                     {quote.status === "approved" && (
                       <Button
-                        size="sm" variant="ghost"
+                        size="sm"
+                        variant="ghost"
                         onClick={() => mutateConvert.mutate(quote.id)}
                         className="gap-1 text-xs text-purple-600"
                         disabled={mutateConvert.isPending}
@@ -478,7 +518,8 @@ function OrcamentosPage() {
                     {/* Expired/Rejected → Draft (reopen) */}
                     {(quote.status === "expired" || quote.status === "rejected") && (
                       <Button
-                        size="sm" variant="ghost"
+                        size="sm"
+                        variant="ghost"
                         onClick={() => mutateStatus.mutate({ quoteId: quote.id, status: "draft" })}
                         className="gap-1 text-xs"
                       >
@@ -486,22 +527,32 @@ function OrcamentosPage() {
                       </Button>
                     )}
                     {isConverted && (
-                      <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 bg-purple-50">
+                      <Badge
+                        variant="outline"
+                        className="text-xs text-purple-600 border-purple-300 bg-purple-50"
+                      >
                         Pedido #{quote.convertedToOrderId!.slice(0, 8)}
                       </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
-                      size="sm" variant="ghost"
-                      onClick={() => openQuoteWhatsApp(quoteToShareInput(quote, settingsData), quote.clientContact)}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        openQuoteWhatsApp(
+                          quoteToShareInput(quote, settingsData),
+                          quote.clientContact,
+                        )
+                      }
                       className="gap-1 text-xs text-green-700"
                       title="Enviar orçamento por WhatsApp"
                     >
                       <MessageCircle className="h-3 w-3" /> WhatsApp
                     </Button>
                     <Button
-                      size="sm" variant="ghost"
+                      size="sm"
+                      variant="ghost"
                       onClick={() => openPrintQuote(quoteToShareInput(quote, settingsData))}
                       className="gap-1 text-xs"
                       title="Gerar PDF do orçamento (imprimir/salvar)"
@@ -509,19 +560,22 @@ function OrcamentosPage() {
                       <Printer className="h-3 w-3" /> PDF
                     </Button>
                     <Button
-                      size="sm" variant="ghost"
-                      onClick={() => setReceiptDialog({
-                        open: true,
-                        quote,
-                        docType: "cnpj",
-                        docNumber: "",
-                        studioDocType: "cnpj",
-                        studioDocNumber: "",
-                        clientPhone: quote.clientContact ?? "",
-                        formaPagamento: "",
-                        dataRecebimento: new Date().toISOString().slice(0, 10),
-                        paid: false,
-                      })}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setReceiptDialog({
+                          open: true,
+                          quote,
+                          docType: "cnpj",
+                          docNumber: "",
+                          studioDocType: "cnpj",
+                          studioDocNumber: "",
+                          clientPhone: quote.clientContact ?? "",
+                          formaPagamento: "",
+                          dataRecebimento: new Date().toISOString().slice(0, 10),
+                          paid: false,
+                        })
+                      }
                       className="gap-1 text-xs"
                       title="Gerar recibo de venda"
                     >
@@ -530,13 +584,16 @@ function OrcamentosPage() {
                     {quote.status !== "converted" && (
                       <>
                         <Button
-                          size="icon" variant="ghost" className="h-8 w-8"
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
                           onClick={() => openEdit(quote)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
-                          size="icon" variant="ghost"
+                          size="icon"
+                          variant="ghost"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={() => setDeleteId(quote.id)}
                         >
@@ -553,7 +610,15 @@ function OrcamentosPage() {
       )}
 
       {/* ── Create/Edit Dialog ── */}
-      <Dialog open={showForm} onOpenChange={(open) => { if (!open) { setShowForm(false); setEditQuote(null); } }}>
+      <Dialog
+        open={showForm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowForm(false);
+            setEditQuote(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editQuote ? "Editar Orçamento" : "Novo Orçamento"}</DialogTitle>
@@ -603,13 +668,22 @@ function OrcamentosPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Itens</Label>
-                <Button type="button" variant="outline" size="sm" onClick={addItem} className="gap-1 text-xs">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addItem}
+                  className="gap-1 text-xs"
+                >
                   <Plus className="h-3 w-3" /> Adicionar Item
                 </Button>
               </div>
               <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
                 {items.map((item, idx) => (
-                  <div key={item.id} className="grid gap-2 rounded-md border border-border bg-card p-3 sm:grid-cols-12">
+                  <div
+                    key={item.id}
+                    className="grid gap-2 rounded-md border border-border bg-card p-3 sm:grid-cols-12"
+                  >
                     <div className="sm:col-span-4">
                       <Label className="text-xs">Descrição *</Label>
                       <Input
@@ -646,18 +720,24 @@ function OrcamentosPage() {
                         type="number"
                         min={0}
                         value={item.timeMinutes || ""}
-                        onChange={(e) => updateItem(idx, "timeMinutes", Number(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateItem(idx, "timeMinutes", Number(e.target.value) || 0)
+                        }
                         className="mt-1"
                       />
                     </div>
                     <div className="flex items-end justify-between sm:col-span-2">
                       <div>
                         <Label className="text-xs">Subtotal</Label>
-                        <p className="mt-1 text-sm font-medium filament-text">{brl(item.subtotal)}</p>
+                        <p className="mt-1 text-sm font-medium filament-text">
+                          {brl(item.subtotal)}
+                        </p>
                       </div>
                       {items.length > 1 && (
                         <Button
-                          type="button" variant="ghost" size="icon"
+                          type="button"
+                          variant="ghost"
+                          size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={() => removeItem(idx)}
                         >
@@ -691,7 +771,8 @@ function OrcamentosPage() {
                 </div>
                 {discountPercent > 0 && (
                   <div className="text-xs text-green-600">
-                    Desconto: {discountPercent}% (-{brl(computedSubtotal * discountPercent / 100)})
+                    Desconto: {discountPercent}% (-{brl((computedSubtotal * discountPercent) / 100)}
+                    )
                   </div>
                 )}
                 <div className="font-display text-xl font-bold filament-text">
@@ -712,10 +793,21 @@ function OrcamentosPage() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setEditQuote(null); }}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditQuote(null);
+                }}
+              >
                 Cancelar
               </Button>
-              <Button type="submit" className="btn-filament" disabled={mutateCreate.isPending || mutateUpdate.isPending}>
+              <Button
+                type="submit"
+                className="btn-filament"
+                disabled={mutateCreate.isPending || mutateUpdate.isPending}
+              >
                 {editQuote ? "Salvar Alterações" : "Criar Orçamento"}
               </Button>
             </DialogFooter>
@@ -724,12 +816,23 @@ function OrcamentosPage() {
       </Dialog>
 
       {/* ── Delete Dialog ── */}
-      <Dialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+      <Dialog
+        open={!!deleteId}
+        onOpenChange={(open) => {
+          if (!open) setDeleteId(null);
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Remover Orçamento</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">Tem certeza? Esta ação não pode ser desfeita.</p>
+          <DialogHeader>
+            <DialogTitle>Remover Orçamento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Tem certeza? Esta ação não pode ser desfeita.
+          </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>
+              Cancelar
+            </Button>
             <Button
               variant="destructive"
               onClick={() => deleteId && mutateDelete.mutate(deleteId)}
@@ -742,7 +845,10 @@ function OrcamentosPage() {
       </Dialog>
 
       {/* ── Receipt Dialog ── */}
-      <Dialog open={receiptDialog.open} onOpenChange={(open) => setReceiptDialog((prev) => ({ ...prev, open }))}>
+      <Dialog
+        open={receiptDialog.open}
+        onOpenChange={(open) => setReceiptDialog((prev) => ({ ...prev, open }))}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -750,247 +856,289 @@ function OrcamentosPage() {
               Gerar Recibo de Venda
             </DialogTitle>
           </DialogHeader>
-          {receiptDialog.quote && (() => {
-            const q = receiptDialog.quote;
-            const total = q.total;
-            return (
-              <div className="space-y-4">
-                {/* Read-only summary */}
-                <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Cliente</span>
-                    <span className="font-semibold">{q.clientName}</span>
+          {receiptDialog.quote &&
+            (() => {
+              const q = receiptDialog.quote;
+              const total = q.total;
+              return (
+                <div className="space-y-4">
+                  {/* Read-only summary */}
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cliente</span>
+                      <span className="font-semibold">{q.clientName}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-muted-foreground">Itens</span>
+                      <span className="font-medium">{q.items.length} item(ns)</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-muted-foreground">Total</span>
+                      <span className="font-display text-lg font-bold filament-text">
+                        {brl(total)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-muted-foreground">Itens</span>
-                    <span className="font-medium">{q.items.length} item(ns)</span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-muted-foreground">Total</span>
-                    <span className="font-display text-lg font-bold filament-text">{brl(total)}</span>
-                  </div>
-                </div>
 
-                {/* Document type */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Tipo de Documento</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={receiptDialog.docType === "cnpj" ? "default" : "outline"}
-                      className="flex-1"
-                      onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cnpj" }))}
-                    >
-                      CNPJ
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={receiptDialog.docType === "cpf" ? "default" : "outline"}
-                      className="flex-1"
-                      onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cpf" }))}
-                    >
-                      CPF
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Document number */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">
-                    Número do {receiptDialog.docType === "cnpj" ? "CNPJ" : "CPF"}
-                  </Label>
-                  <Input
-                    value={receiptDialog.docNumber}
-                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, docNumber: e.target.value }))}
-                    placeholder={receiptDialog.docType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}
-                  />
-                </div>
-
-                {/* Kurt3D document info */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Documento da Kurti 3D (Vendedor)</Label>
-                  <div className="flex gap-2 mb-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={receiptDialog.studioDocType === "cnpj" ? "default" : "outline"}
-                      className="flex-1"
-                      onClick={() => setReceiptDialog((prev) => ({ ...prev, studioDocType: "cnpj" }))}
-                    >
-                      CNPJ
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={receiptDialog.studioDocType === "cpf" ? "default" : "outline"}
-                      className="flex-1"
-                      onClick={() => setReceiptDialog((prev) => ({ ...prev, studioDocType: "cpf" }))}
-                    >
-                      CPF
-                    </Button>
-                  </div>
-                  <Input
-                    value={receiptDialog.studioDocNumber}
-                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, studioDocNumber: e.target.value }))}
-                    placeholder={receiptDialog.studioDocType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}
-                  />
-                </div>
-
-                {/* Payment info */}
-                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* Document type */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Forma de Pagamento</Label>
+                    <Label className="text-xs">Tipo de Documento</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={receiptDialog.docType === "cnpj" ? "default" : "outline"}
+                        className="flex-1"
+                        onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cnpj" }))}
+                      >
+                        CNPJ
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={receiptDialog.docType === "cpf" ? "default" : "outline"}
+                        className="flex-1"
+                        onClick={() => setReceiptDialog((prev) => ({ ...prev, docType: "cpf" }))}
+                      >
+                        CPF
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Document number */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">
+                      Número do {receiptDialog.docType === "cnpj" ? "CNPJ" : "CPF"}
+                    </Label>
                     <Input
-                      value={receiptDialog.formaPagamento}
-                      onChange={(e) => setReceiptDialog((prev) => ({ ...prev, formaPagamento: e.target.value }))}
-                      placeholder="PIX, Dinheiro..."
+                      value={receiptDialog.docNumber}
+                      onChange={(e) =>
+                        setReceiptDialog((prev) => ({ ...prev, docNumber: e.target.value }))
+                      }
+                      placeholder={
+                        receiptDialog.docType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"
+                      }
                     />
                   </div>
+
+                  {/* Kurt3D document info */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Data do Recebimento</Label>
+                    <Label className="text-xs">Documento da Kurti 3D (Vendedor)</Label>
+                    <div className="flex gap-2 mb-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={receiptDialog.studioDocType === "cnpj" ? "default" : "outline"}
+                        className="flex-1"
+                        onClick={() =>
+                          setReceiptDialog((prev) => ({ ...prev, studioDocType: "cnpj" }))
+                        }
+                      >
+                        CNPJ
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={receiptDialog.studioDocType === "cpf" ? "default" : "outline"}
+                        className="flex-1"
+                        onClick={() =>
+                          setReceiptDialog((prev) => ({ ...prev, studioDocType: "cpf" }))
+                        }
+                      >
+                        CPF
+                      </Button>
+                    </div>
                     <Input
-                      type="date"
-                      value={receiptDialog.dataRecebimento}
-                      onChange={(e) => setReceiptDialog((prev) => ({ ...prev, dataRecebimento: e.target.value }))}
+                      value={receiptDialog.studioDocNumber}
+                      onChange={(e) =>
+                        setReceiptDialog((prev) => ({ ...prev, studioDocNumber: e.target.value }))
+                      }
+                      placeholder={
+                        receiptDialog.studioDocType === "cnpj"
+                          ? "00.000.000/0000-00"
+                          : "000.000.000-00"
+                      }
                     />
                   </div>
-                </div>
 
-                {/* Client phone */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Telefone do Cliente (WhatsApp)</Label>
-                  <Input
-                    value={receiptDialog.clientPhone}
-                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, clientPhone: e.target.value }))}
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
+                  {/* Payment info */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Forma de Pagamento</Label>
+                      <Input
+                        value={receiptDialog.formaPagamento}
+                        onChange={(e) =>
+                          setReceiptDialog((prev) => ({ ...prev, formaPagamento: e.target.value }))
+                        }
+                        placeholder="PIX, Dinheiro..."
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Data do Recebimento</Label>
+                      <Input
+                        type="date"
+                        value={receiptDialog.dataRecebimento}
+                        onChange={(e) =>
+                          setReceiptDialog((prev) => ({ ...prev, dataRecebimento: e.target.value }))
+                        }
+                      />
+                    </div>
+                  </div>
 
-                {/* Paid toggle */}
-                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
-                  <input
-                    type="checkbox"
-                    id="rcpt-paid"
-                    checked={receiptDialog.paid}
-                    onChange={(e) => setReceiptDialog((prev) => ({ ...prev, paid: e.target.checked }))}
-                    className="h-4 w-4 rounded accent-green-600"
-                  />
-                  <Label htmlFor="rcpt-paid" className="text-sm cursor-pointer">
-                    Pagamento já recebido (exibe carimbo PAGO)
-                  </Label>
-                </div>
+                  {/* Client phone */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Telefone do Cliente (WhatsApp)</Label>
+                    <Input
+                      value={receiptDialog.clientPhone}
+                      onChange={(e) =>
+                        setReceiptDialog((prev) => ({ ...prev, clientPhone: e.target.value }))
+                      }
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
 
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}>
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1 text-xs text-green-700"
-                    onClick={async () => {
-                      if (!receiptDialog.quote) return;
-                      const items = q.items.map((item) => ({
-                        description: item.description,
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice,
-                        subtotal: item.subtotal,
-                      }));
-                      const total = items.reduce((s, i) => s + i.subtotal, 0) * (1 - (q.discountPercent ?? 0) / 100);
-                      const result = await saveReceipt({ data: {
-                        type: "sale",
-                        clientName: q.clientName,
-                        items,
-                        total,
-                        docType: receiptDialog.docType,
-                        docNumber: receiptDialog.docNumber || undefined,
-                        studioDocType: receiptDialog.studioDocType,
-                        studioDocNumber: receiptDialog.studioDocNumber || undefined,
-                        formaPagamento: receiptDialog.formaPagamento || undefined,
-                        observacao: q.notes || undefined,
-                        paid: receiptDialog.paid,
-                        sourceType: "quote",
-                        sourceId: q.id,
-                        discountPercent: q.discountPercent ?? undefined,
-                      }});
-                      if (!result.ok) { toast.error("Erro ao salvar recibo."); return; }
-                      openSaleReceiptWhatsApp({
-                        clientName: q.clientName,
-                        items,
-                        docType: receiptDialog.docType,
-                        docNumber: receiptDialog.docNumber,
-                        studioDocType: receiptDialog.studioDocType,
-                        studioDocNumber: receiptDialog.studioDocNumber,
-                        formaPagamento: receiptDialog.formaPagamento || undefined,
-                        dataRecebimento: receiptDialog.dataRecebimento || undefined,
-                        discountPercent: q.discountPercent ?? undefined,
-                        observacao: q.notes ?? undefined,
-                        studioNome: settingsData?.studioNome ?? "Kurti 3D",
-                        whatsappNumero: settingsData?.whatsappNumero ?? "",
-                        clientPhone: receiptDialog.clientPhone || undefined,
-                        paid: receiptDialog.paid || undefined,
-                        receiptNumber: result.receiptNumber,
-                      });
-                    }}
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                  </Button>
-                  <Button
-                    className="btn-filament gap-2"
-                    onClick={async () => {
-                      if (!receiptDialog.quote) return;
-                      const items = q.items.map((item) => ({
-                        description: item.description,
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice,
-                        subtotal: item.subtotal,
-                      }));
-                      const total = items.reduce((s, i) => s + i.subtotal, 0) * (1 - (q.discountPercent ?? 0) / 100);
-                      const result = await saveReceipt({ data: {
-                        type: "sale",
-                        clientName: q.clientName,
-                        items,
-                        total,
-                        docType: receiptDialog.docType,
-                        docNumber: receiptDialog.docNumber || undefined,
-                        studioDocType: receiptDialog.studioDocType,
-                        studioDocNumber: receiptDialog.studioDocNumber || undefined,
-                        formaPagamento: receiptDialog.formaPagamento || undefined,
-                        observacao: q.notes || undefined,
-                        paid: receiptDialog.paid,
-                        sourceType: "quote",
-                        sourceId: q.id,
-                        discountPercent: q.discountPercent ?? undefined,
-                      }});
-                      if (!result.ok) { toast.error("Erro ao salvar recibo."); return; }
-                      openPrintSaleReceipt({
-                        clientName: q.clientName,
-                        items,
-                        docType: receiptDialog.docType,
-                        docNumber: receiptDialog.docNumber,
-                        studioDocType: receiptDialog.studioDocType,
-                        studioDocNumber: receiptDialog.studioDocNumber,
-                        formaPagamento: receiptDialog.formaPagamento || undefined,
-                        dataRecebimento: receiptDialog.dataRecebimento || undefined,
-                        discountPercent: q.discountPercent ?? undefined,
-                        observacao: q.notes ?? undefined,
-                        studioNome: settingsData?.studioNome ?? "Kurti 3D",
-                        whatsappNumero: settingsData?.whatsappNumero ?? "",
-                        clientPhone: receiptDialog.clientPhone || undefined,
-                        paid: receiptDialog.paid || undefined,
-                        receiptNumber: result.receiptNumber,
-                      });
-                      setReceiptDialog((prev) => ({ ...prev, open: false }));
-                    }}
-                  >
-                    <Printer className="h-4 w-4" /> Gerar Recibo
-                  </Button>
-                </DialogFooter>
-              </div>
-            );
-          })()}
+                  {/* Paid toggle */}
+                  <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                    <input
+                      type="checkbox"
+                      id="rcpt-paid"
+                      checked={receiptDialog.paid}
+                      onChange={(e) =>
+                        setReceiptDialog((prev) => ({ ...prev, paid: e.target.checked }))
+                      }
+                      className="h-4 w-4 rounded accent-green-600"
+                    />
+                    <Label htmlFor="rcpt-paid" className="text-sm cursor-pointer">
+                      Pagamento já recebido (exibe carimbo PAGO)
+                    </Label>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setReceiptDialog((prev) => ({ ...prev, open: false }))}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 text-xs text-green-700"
+                      onClick={async () => {
+                        if (!receiptDialog.quote) return;
+                        const items = q.items.map((item) => ({
+                          description: item.description,
+                          quantity: item.quantity,
+                          unitPrice: item.unitPrice,
+                          subtotal: item.subtotal,
+                        }));
+                        const total =
+                          items.reduce((s, i) => s + i.subtotal, 0) *
+                          (1 - (q.discountPercent ?? 0) / 100);
+                        const result = await saveReceipt({
+                          data: {
+                            type: "sale",
+                            clientName: q.clientName,
+                            items,
+                            total,
+                            docType: receiptDialog.docType,
+                            docNumber: receiptDialog.docNumber || undefined,
+                            studioDocType: receiptDialog.studioDocType,
+                            studioDocNumber: receiptDialog.studioDocNumber || undefined,
+                            formaPagamento: receiptDialog.formaPagamento || undefined,
+                            observacao: q.notes || undefined,
+                            paid: receiptDialog.paid,
+                            sourceType: "quote",
+                            sourceId: q.id,
+                            discountPercent: q.discountPercent ?? undefined,
+                          },
+                        });
+                        if (!result.ok) {
+                          toast.error("Erro ao salvar recibo.");
+                          return;
+                        }
+                        openSaleReceiptWhatsApp({
+                          clientName: q.clientName,
+                          items,
+                          docType: receiptDialog.docType,
+                          docNumber: receiptDialog.docNumber,
+                          studioDocType: receiptDialog.studioDocType,
+                          studioDocNumber: receiptDialog.studioDocNumber,
+                          formaPagamento: receiptDialog.formaPagamento || undefined,
+                          dataRecebimento: receiptDialog.dataRecebimento || undefined,
+                          discountPercent: q.discountPercent ?? undefined,
+                          observacao: q.notes ?? undefined,
+                          studioNome: settingsData?.studioNome ?? "Kurti 3D",
+                          whatsappNumero: settingsData?.whatsappNumero ?? "",
+                          clientPhone: receiptDialog.clientPhone || undefined,
+                          paid: receiptDialog.paid || undefined,
+                          receiptNumber: result.receiptNumber,
+                        });
+                      }}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                    </Button>
+                    <Button
+                      className="btn-filament gap-2"
+                      onClick={async () => {
+                        if (!receiptDialog.quote) return;
+                        const items = q.items.map((item) => ({
+                          description: item.description,
+                          quantity: item.quantity,
+                          unitPrice: item.unitPrice,
+                          subtotal: item.subtotal,
+                        }));
+                        const total =
+                          items.reduce((s, i) => s + i.subtotal, 0) *
+                          (1 - (q.discountPercent ?? 0) / 100);
+                        const result = await saveReceipt({
+                          data: {
+                            type: "sale",
+                            clientName: q.clientName,
+                            items,
+                            total,
+                            docType: receiptDialog.docType,
+                            docNumber: receiptDialog.docNumber || undefined,
+                            studioDocType: receiptDialog.studioDocType,
+                            studioDocNumber: receiptDialog.studioDocNumber || undefined,
+                            formaPagamento: receiptDialog.formaPagamento || undefined,
+                            observacao: q.notes || undefined,
+                            paid: receiptDialog.paid,
+                            sourceType: "quote",
+                            sourceId: q.id,
+                            discountPercent: q.discountPercent ?? undefined,
+                          },
+                        });
+                        if (!result.ok) {
+                          toast.error("Erro ao salvar recibo.");
+                          return;
+                        }
+                        openPrintSaleReceipt({
+                          clientName: q.clientName,
+                          items,
+                          docType: receiptDialog.docType,
+                          docNumber: receiptDialog.docNumber,
+                          studioDocType: receiptDialog.studioDocType,
+                          studioDocNumber: receiptDialog.studioDocNumber,
+                          formaPagamento: receiptDialog.formaPagamento || undefined,
+                          dataRecebimento: receiptDialog.dataRecebimento || undefined,
+                          discountPercent: q.discountPercent ?? undefined,
+                          observacao: q.notes ?? undefined,
+                          studioNome: settingsData?.studioNome ?? "Kurti 3D",
+                          whatsappNumero: settingsData?.whatsappNumero ?? "",
+                          clientPhone: receiptDialog.clientPhone || undefined,
+                          paid: receiptDialog.paid || undefined,
+                          receiptNumber: result.receiptNumber,
+                        });
+                        setReceiptDialog((prev) => ({ ...prev, open: false }));
+                      }}
+                    >
+                      <Printer className="h-4 w-4" /> Gerar Recibo
+                    </Button>
+                  </DialogFooter>
+                </div>
+              );
+            })()}
         </DialogContent>
       </Dialog>
     </div>

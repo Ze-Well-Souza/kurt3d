@@ -13,4 +13,3 @@ export * from "./functions/extended.functions";
 export * from "./functions/cleanup.functions";
 export * from "./functions/vendas.functions";
 export * from "./functions/keep-alive.functions";
-

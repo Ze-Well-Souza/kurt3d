@@ -93,4 +93,3 @@ describe("formatIsoDatePtBr", () => {
     expect(formatIsoDatePtBr("2026-06-24")).toBe("24/06/2026");
   });
 });
-

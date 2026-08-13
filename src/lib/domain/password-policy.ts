@@ -1,8 +1,4 @@
-export type PasswordPolicyIssue =
-  | "min_length"
-  | "uppercase"
-  | "lowercase"
-  | "number";
+export type PasswordPolicyIssue = "min_length" | "uppercase" | "lowercase" | "number";
 
 export const PASSWORD_POLICY_MIN_LENGTH = 8;
 

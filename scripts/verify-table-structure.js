@@ -31,7 +31,7 @@ ORDER BY table_name, ordinal_position;
           query: verifyQuery,
           read_only: true,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -41,32 +41,31 @@ ORDER BY table_name, ordinal_position;
     }
 
     const result = await response.json();
-    
+
     let currentTable = null;
-    
+
     if (result && Array.isArray(result) && result.length > 0) {
       for (const row of result) {
         if (row.table_name !== currentTable) {
           if (currentTable !== null) console.log("");
           currentTable = row.table_name;
           const tableDesc = {
-            'production_calendar': '📅 Calendário de Produção',
-            'portfolio_videos': '🎬 Vídeos/Reels',
-            'budget_quotes': '💰 Orçamentos',
-            'saved_reports': '📊 Relatórios Salvos'
+            production_calendar: "📅 Calendário de Produção",
+            portfolio_videos: "🎬 Vídeos/Reels",
+            budget_quotes: "💰 Orçamentos",
+            saved_reports: "📊 Relatórios Salvos",
           };
           console.log(`\n${tableDesc[currentTable] || currentTable}:`);
           console.log("─".repeat(50));
         }
-        
-        const nullable = row.is_nullable === 'YES' ? '?' : '!';
+
+        const nullable = row.is_nullable === "YES" ? "?" : "!";
         console.log(`   ${row.column_name.padEnd(20)} ${row.data_type.padEnd(15)} ${nullable}`);
       }
       console.log("\n✅ Estrutura verificada com sucesso!");
     } else {
       console.log("⚠️ Nenhum resultado retornado");
     }
-
   } catch (error) {
     console.error("❌ Erro:", error.message);
     process.exit(1);

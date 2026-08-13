@@ -1,10 +1,6 @@
 // Kurti 3D Service Worker — Offline-first PWA
 const CACHE_NAME = "kurti3d-v1";
-const PRECACHE_URLS = [
-  "/",
-  "/login",
-  "/favicon.ico",
-];
+const PRECACHE_URLS = ["/", "/login", "/favicon.ico"];
 
 // Install: pre-cache core assets
 self.addEventListener("install", (event) => {
@@ -23,9 +19,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)),
-      );
+      return Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
     }),
   );
   // Claim all clients so the new SW controls pages immediately

@@ -11,11 +11,7 @@ export function KurtiLogo({ className = "" }: { className?: string }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       {/* Thumbs-up: 5 layered colored strokes racing in */}
-      <svg
-        viewBox="0 0 56 56"
-        className="h-9 w-9 drop-shadow-sm"
-        aria-label="Kurti 3D"
-      >
+      <svg viewBox="0 0 56 56" className="h-9 w-9 drop-shadow-sm" aria-label="Kurti 3D">
         {colors.map((c, i) => (
           <path
             key={c}
@@ -60,8 +56,7 @@ export function KurtiLogo({ className = "" }: { className?: string }) {
             key={i}
             className="inline-block"
             style={{
-              backgroundImage:
-                "linear-gradient(90deg,#c96f4a,#e0a93b,#8aab6e,#5fa8a3,#8a3a52)",
+              backgroundImage: "linear-gradient(90deg,#c96f4a,#e0a93b,#8aab6e,#5fa8a3,#8a3a52)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               color: "transparent",

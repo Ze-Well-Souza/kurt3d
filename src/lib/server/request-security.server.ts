@@ -65,9 +65,11 @@ export function createHttpsRedirect(request: Request) {
 }
 
 export function isCorsPreflightRequest(request: Request) {
-  return request.method === "OPTIONS"
-    && request.headers.has("origin")
-    && request.headers.has("access-control-request-method");
+  return (
+    request.method === "OPTIONS" &&
+    request.headers.has("origin") &&
+    request.headers.has("access-control-request-method")
+  );
 }
 
 export function createCorsPreflightResponse(request: Request) {

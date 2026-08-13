@@ -22,9 +22,13 @@ export const Route = createFileRoute("/login")({
 
 const setupSchema = z.object({
   username: z.string().min(1).max(50),
-  password: z.string().min(8).max(200).refine((value) => !getPasswordPolicyMessage(value), {
-    message: "A senha deve ter 8+ caracteres, letra maiuscula, minuscula e numero.",
-  }),
+  password: z
+    .string()
+    .min(8)
+    .max(200)
+    .refine((value) => !getPasswordPolicyMessage(value), {
+      message: "A senha deve ter 8+ caracteres, letra maiuscula, minuscula e numero.",
+    }),
   phone: z.string().min(1).max(20),
   nome: z.string().min(1).max(100),
 });
@@ -65,7 +69,11 @@ function LoginPage() {
       }
       const res = await login({ data: parsed.data });
       if (!res.ok) {
-        toast.error(res.reason === "rate_limited" ? "Muitas tentativas. Aguarde alguns minutos e tente novamente." : "Telefone ou senha inválidos.");
+        toast.error(
+          res.reason === "rate_limited"
+            ? "Muitas tentativas. Aguarde alguns minutos e tente novamente."
+            : "Telefone ou senha inválidos.",
+        );
         return;
       }
       toast.success("Bem-vindo.");
@@ -95,11 +103,20 @@ function LoginPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone-setup">Telefone</Label>
-                <Input id="phone-setup" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefone com DDD" />
+                <Input
+                  id="phone-setup"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Telefone com DDD"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="username">Usuário (login alternativo)</Label>
-                <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
@@ -127,7 +144,12 @@ function LoginPage() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefone com DDD" />
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Telefone com DDD"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
@@ -159,4 +181,3 @@ function LoginPage() {
     </div>
   );
 }
-

@@ -35,7 +35,7 @@ try {
         query: verifyQuery,
         read_only: true,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -45,10 +45,10 @@ try {
   }
 
   const result = await response.json();
-  
+
   console.log("📊 Tabelas encontradas no banco de dados:");
   console.log("");
-  
+
   if (result && Array.isArray(result) && result.length > 0) {
     for (const row of result) {
       console.log(`   ✓ ${row.table_name.padEnd(20)} - ${row.descricao}`);
@@ -58,10 +58,9 @@ try {
   } else {
     console.log("   ⚠️ Nenhuma tabela encontrada (pode ser um problema de permissão na query)");
   }
-  
+
   console.log("");
   console.log("🎉 Verificação concluída!");
-
 } catch (error) {
   console.error("❌ Erro:", error.message);
   process.exit(1);

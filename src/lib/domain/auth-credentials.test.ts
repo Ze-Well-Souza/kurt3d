@@ -60,18 +60,12 @@ describe("auth-credentials: buildCredentialsMessage", () => {
   });
 
   it("usa username como login quando phone esta vazio", () => {
-    const msg = buildCredentialsMessage(
-      { ...baseCreds, phone: "" },
-      "https://kurti3d.com/login",
-    );
+    const msg = buildCredentialsMessage({ ...baseCreds, phone: "" }, "https://kurti3d.com/login");
     expect(msg).toContain("Login: maria");
   });
 
   it("usa fallback 'admin' quando nome esta vazio", () => {
-    const msg = buildCredentialsMessage(
-      { ...baseCreds, nome: "" },
-      "https://x.com",
-    );
+    const msg = buildCredentialsMessage({ ...baseCreds, nome: "" }, "https://x.com");
     expect(msg).toContain("Ola admin");
   });
 

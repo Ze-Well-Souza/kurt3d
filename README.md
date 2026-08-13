@@ -49,17 +49,17 @@ APP_SESSION_SECRET=<string aleatória com 32+ caracteres>
 
 ## Estrutura das telas
 
-| Rota | Função |
-|---|---|
-| `/` | Landing page pública (conteúdo editável em Configurações → Conteúdo do Site) |
-| `/login` | Login por telefone + senha. Primeiro acesso cria o admin inicial. |
-| `/admin` | **Painel** — KPIs do mês ou total: trabalhos ativos, receita, lucro líquido, despesas |
-| `/admin/stock` | **Estoque** — filamentos (SKU único, marca, cor, material, peso, parcelamento) + insumos |
+| Rota               | Função                                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `/`                | Landing page pública (conteúdo editável em Configurações → Conteúdo do Site)                                         |
+| `/login`           | Login por telefone + senha. Primeiro acesso cria o admin inicial.                                                    |
+| `/admin`           | **Painel** — KPIs do mês ou total: trabalhos ativos, receita, lucro líquido, despesas                                |
+| `/admin/stock`     | **Estoque** — filamentos (SKU único, marca, cor, material, peso, parcelamento) + insumos                             |
 | `/admin/portfolio` | **Calculadora e Pedidos** — calculadora de custo por lote + kanban (Pendente → Imprimindo → Concluído → finalização) |
-| `/admin/clients` | **Clientes** — CRM básico (nome, whatsapp, e-mail, notas) |
-| `/admin/leads` | **Leads** — mensagens recebidas pela landing page |
-| `/admin/finances` | **Finanças** — receita, despesas (manuais/insumos/falhas), lucro, parcelas de filamento, manual financeiro |
-| `/admin/settings` | **Configurações** — perfil do estúdio, parâmetros de custo, senha, usuários admin, conteúdo da landing |
+| `/admin/clients`   | **Clientes** — CRM básico (nome, whatsapp, e-mail, notas)                                                            |
+| `/admin/leads`     | **Leads** — mensagens recebidas pela landing page                                                                    |
+| `/admin/finances`  | **Finanças** — receita, despesas (manuais/insumos/falhas), lucro, parcelas de filamento, manual financeiro           |
+| `/admin/settings`  | **Configurações** — perfil do estúdio, parâmetros de custo, senha, usuários admin, conteúdo da landing               |
 
 ## Multi-administrador — como adicionar outro usuário
 
@@ -76,6 +76,7 @@ Você usa o sistema em conjunto com outro admin. Cada um tem login próprio, mas
 5. Clique em **Criar**. O novo admin já pode logar em `/login` com telefone + senha.
 
 Você pode remover qualquer admin pelo ícone de lixeira, exceto:
+
 - a si mesmo (proteção contra trancar a própria conta);
 - o último admin restante (o sistema sempre exige pelo menos um).
 
@@ -85,18 +86,20 @@ A troca de senha do usuário logado fica no mesmo card de Configurações.
 
 Tudo o que aparece em Finanças é alimentado automaticamente — você só lança despesas manuais (aluguel, internet etc.) quando precisar.
 
-| Evento | Efeito financeiro |
-|---|---|
-| Comprar um insumo (Estoque → Insumos) | Despesa automática categoria "Insumo" |
-| Comprar filamento parcelado | Cria parcelas; ao marcar parcela como paga, gera despesa |
-| Finalizar pedido como **Kurtido e Vendido** com valor recebido | Receita + custo de produção calculados |
-| Finalizar pedido como **Falha de Impressão** | Despesa automática "Perda de Material" com o custo do filamento desperdiçado |
-| Finalizar pedido como **Dado de Presente** | Nada (custo já foi abatido do estoque) |
+| Evento                                                         | Efeito financeiro                                                            |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Comprar um insumo (Estoque → Insumos)                          | Despesa automática categoria "Insumo"                                        |
+| Comprar filamento parcelado                                    | Cria parcelas; ao marcar parcela como paga, gera despesa                     |
+| Finalizar pedido como **Kurtido e Vendido** com valor recebido | Receita + custo de produção calculados                                       |
+| Finalizar pedido como **Falha de Impressão**                   | Despesa automática "Perda de Material" com o custo do filamento desperdiçado |
+| Finalizar pedido como **Dado de Presente**                     | Nada (custo já foi abatido do estoque)                                       |
 
 **Fórmula do lucro líquido:**
+
 ```
 Lucro = Receita − Custo de Produção − Despesas
 ```
+
 O custo de produção de cada venda é calculado no momento da finalização usando filamento real consumido + energia (kWh × tarifa) + depreciação (R$/h) + custo fixo por unidade, parâmetros definidos em Configurações.
 
 ## Calculadora de custos

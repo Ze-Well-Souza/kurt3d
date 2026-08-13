@@ -9,7 +9,23 @@ import { Badge } from "@/components/ui/badge";
 import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { ArrowRight, Cpu, Layers, Zap, Instagram, Youtube, Play, MessageCircle, Upload, ImagePlus, X, Link as LinkIcon, ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import {
+  ArrowRight,
+  Cpu,
+  Layers,
+  Zap,
+  Instagram,
+  Youtube,
+  Play,
+  MessageCircle,
+  Upload,
+  ImagePlus,
+  X,
+  Link as LinkIcon,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+} from "lucide-react";
 import { submitLead } from "@/lib/api/data.functions";
 import { getSiteContent } from "@/lib/api/auth.functions";
 import { KurtiLogo } from "@/components/KurtiLogo";
@@ -28,9 +44,16 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Kurti 3D — Impressão 3D multicor de alta qualidade" },
-      { name: "description", content: "Sociedade Zé & Kurt. Tecnologia Bambu Lab com AMS. Impressão 3D multicor rápida, colorida e perfeita." },
+      {
+        name: "description",
+        content:
+          "Sociedade Zé & Kurt. Tecnologia Bambu Lab com AMS. Impressão 3D multicor rápida, colorida e perfeita.",
+      },
       { property: "og:title", content: "Kurti 3D — Rápido. Colorido. Perfeito." },
-      { property: "og:description", content: "Impressão 3D multicor com Bambu Lab AMS. Faça seu orçamento." },
+      {
+        property: "og:description",
+        content: "Impressão 3D multicor com Bambu Lab AMS. Faça seu orçamento.",
+      },
     ],
   }),
   component: Landing,
@@ -65,11 +88,41 @@ function Nav() {
 
   const navLinks = (
     <>
-      <a href="#work" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Portfólio</a>
-      <a href="#testimonials" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Depoimentos</a>
-      <a href="#services" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Serviços</a>
-      <a href="#contact" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Contato</a>
-      <Link to="/acompanhar" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Acompanhar pedido</Link>
+      <a
+        href="#work"
+        className="transition-colors hover:text-foreground"
+        onClick={() => setMobileOpen(false)}
+      >
+        Portfólio
+      </a>
+      <a
+        href="#testimonials"
+        className="transition-colors hover:text-foreground"
+        onClick={() => setMobileOpen(false)}
+      >
+        Depoimentos
+      </a>
+      <a
+        href="#services"
+        className="transition-colors hover:text-foreground"
+        onClick={() => setMobileOpen(false)}
+      >
+        Serviços
+      </a>
+      <a
+        href="#contact"
+        className="transition-colors hover:text-foreground"
+        onClick={() => setMobileOpen(false)}
+      >
+        Contato
+      </a>
+      <Link
+        to="/acompanhar"
+        className="transition-colors hover:text-foreground"
+        onClick={() => setMobileOpen(false)}
+      >
+        Acompanhar pedido
+      </Link>
     </>
   );
 
@@ -88,9 +141,14 @@ function Nav() {
         <div className="flex items-center gap-2">
           <SocialIcons className="hidden md:flex" />
           <Link to="/admin">
-            <Button variant="ghost" size="sm" className="hidden sm:inline-flex">Painel</Button>
+            <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+              Painel
+            </Button>
           </Link>
-          <a href="#contact" className="btn-filament hidden h-10 items-center px-5 text-sm font-semibold sm:inline-flex">
+          <a
+            href="#contact"
+            className="btn-filament hidden h-10 items-center px-5 text-sm font-semibold sm:inline-flex"
+          >
             Faça seu Orçamento
           </a>
 
@@ -107,8 +165,18 @@ function Nav() {
               </SheetHeader>
               <nav className="flex flex-col gap-4 text-base font-medium">
                 {navLinks}
-                <Link to="/admin" className="transition-colors hover:text-foreground" onClick={() => setMobileOpen(false)}>Painel Admin</Link>
-                <a href="#contact" className="btn-filament mt-2 inline-flex h-10 items-center justify-center px-5 text-sm font-semibold" onClick={() => setMobileOpen(false)}>
+                <Link
+                  to="/admin"
+                  className="transition-colors hover:text-foreground"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Painel Admin
+                </Link>
+                <a
+                  href="#contact"
+                  className="btn-filament mt-2 inline-flex h-10 items-center justify-center px-5 text-sm font-semibold"
+                  onClick={() => setMobileOpen(false)}
+                >
                   Faça seu Orçamento
                 </a>
               </nav>
@@ -135,11 +203,19 @@ function Hero() {
       <div className="mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center lg:py-28">
         <div>
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full" style={{ background: "var(--filament-green)" }} />
+            <span
+              className="h-1.5 w-1.5 animate-pulse rounded-full"
+              style={{ background: "var(--filament-green)" }}
+            />
             Tecnologia Bambu Lab com AMS
           </div>
           <h1 className="font-display text-5xl font-extrabold leading-[1.05] tracking-tighter md:text-7xl">
-            {heroLines[0]}{heroLines.length > 1 ? <><br /></> : null}
+            {heroLines[0]}
+            {heroLines.length > 1 ? (
+              <>
+                <br />
+              </>
+            ) : null}
             {heroLines.length > 1 && (
               <span
                 style={{
@@ -152,22 +228,46 @@ function Hero() {
                 {heroLines[1]}
               </span>
             )}
-            {heroLines.length > 2 && <>{" "}<span className="text-foreground">{heroLines.slice(2).join(" ")}</span></>}
+            {heroLines.length > 2 && (
+              <>
+                {" "}
+                <span className="text-foreground">{heroLines.slice(2).join(" ")}</span>
+              </>
+            )}
           </h1>
-          <p className="mt-6 max-w-lg text-lg text-muted-foreground">
-            {c.heroSubtitulo}
-          </p>
+          <p className="mt-6 max-w-lg text-lg text-muted-foreground">{c.heroSubtitulo}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="#contact" className="btn-filament inline-flex h-12 items-center gap-2 px-6 text-sm font-semibold">
+            <a
+              href="#contact"
+              className="btn-filament inline-flex h-12 items-center gap-2 px-6 text-sm font-semibold"
+            >
               Faça seu Orçamento <ArrowRight className="h-4 w-4" />
             </a>
-            <a href="#work"><Button size="lg" variant="outline">Ver portfólio</Button></a>
+            <a href="#work">
+              <Button size="lg" variant="outline">
+                Ver portfólio
+              </Button>
+            </a>
           </div>
           <div className="mt-12 grid grid-cols-3 gap-6 pt-6">
             {c.heroStats.map((s) => (
               <div key={s.label}>
-                <div className="font-display text-2xl font-extrabold" style={{ color: s.label === "Camada" ? "var(--filament-cyan)" : s.label === "Entrega" ? "var(--filament-pink)" : "var(--filament-yellow)" }}>{s.valor}</div>
-                <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</div>
+                <div
+                  className="font-display text-2xl font-extrabold"
+                  style={{
+                    color:
+                      s.label === "Camada"
+                        ? "var(--filament-cyan)"
+                        : s.label === "Entrega"
+                          ? "var(--filament-pink)"
+                          : "var(--filament-yellow)",
+                  }}
+                >
+                  {s.valor}
+                </div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {s.label}
+                </div>
               </div>
             ))}
           </div>
@@ -202,8 +302,14 @@ function Features() {
           const Icon = icons[i] ?? Cpu;
           const color = colors[i] ?? "var(--filament-cyan)";
           return (
-            <div key={f.titulo} className="group rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-lg">
-              <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl text-white" style={{ background: color }}>
+            <div
+              key={f.titulo}
+              className="group rounded-2xl border border-border bg-card p-6 transition-all hover:shadow-lg"
+            >
+              <div
+                className="mb-4 grid h-11 w-11 place-items-center rounded-xl text-white"
+                style={{ background: color }}
+              >
                 <Icon className="h-5 w-5" />
               </div>
               <h3 className="text-lg font-semibold">{f.titulo}</h3>
@@ -231,22 +337,44 @@ function Gallery() {
   );
 
   const categories = useMemo(
-    () => ["Todos", ...Array.from(new Set(portfolioWithImages.map((p) => p.categoria).filter(Boolean)))],
+    () => [
+      "Todos",
+      ...Array.from(new Set(portfolioWithImages.map((p) => p.categoria).filter(Boolean))),
+    ],
     [portfolioWithImages],
   );
   const materials = useMemo(
-    () => ["Todos", ...Array.from(new Set(portfolioWithImages.map((p) => p.filamentoMaterial).filter((v): v is string => v !== null && v !== undefined)))],
+    () => [
+      "Todos",
+      ...Array.from(
+        new Set(
+          portfolioWithImages
+            .map((p) => p.filamentoMaterial)
+            .filter((v): v is string => v !== null && v !== undefined),
+        ),
+      ),
+    ],
     [portfolioWithImages],
   );
   const colors = useMemo(
-    () => ["Todas", ...Array.from(new Set(portfolioWithImages.map((p) => p.filamentoCor).filter((v): v is string => v !== null && v !== undefined)))],
+    () => [
+      "Todas",
+      ...Array.from(
+        new Set(
+          portfolioWithImages
+            .map((p) => p.filamentoCor)
+            .filter((v): v is string => v !== null && v !== undefined),
+        ),
+      ),
+    ],
     [portfolioWithImages],
   );
   const filteredPortfolio = useMemo(
     () =>
       portfolioWithImages.filter((p) => {
         const categoryMatches = categoryFilter === "Todos" || p.categoria === categoryFilter;
-        const materialMatches = materialFilter === "Todos" || p.filamentoMaterial === materialFilter;
+        const materialMatches =
+          materialFilter === "Todos" || p.filamentoMaterial === materialFilter;
         const colorMatches = colorFilter === "Todas" || p.filamentoCor === colorFilter;
         return categoryMatches && materialMatches && colorMatches;
       }),
@@ -260,8 +388,15 @@ function Gallery() {
     <section id="work" className="mx-auto max-w-7xl px-6 py-24">
       <div className="mb-12 flex items-end justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-magenta)" }}>Portfólio</div>
-          <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">Nossos trabalhos</h2>
+          <div
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ color: "var(--filament-magenta)" }}
+          >
+            Portfólio
+          </div>
+          <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
+            Nossos trabalhos
+          </h2>
         </div>
         <p className="hidden max-w-sm text-sm text-muted-foreground md:block">
           Uma amostra das peças, modelos e protótipos impressos no nosso estúdio.
@@ -270,8 +405,18 @@ function Gallery() {
 
       {hasProjects ? (
         <div className="mb-8 flex flex-wrap gap-3">
-          <FilterGroup label="Categoria" options={categories} value={categoryFilter} onChange={setCategoryFilter} />
-          <FilterGroup label="Material" options={materials} value={materialFilter} onChange={setMaterialFilter} />
+          <FilterGroup
+            label="Categoria"
+            options={categories}
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+          />
+          <FilterGroup
+            label="Material"
+            options={materials}
+            value={materialFilter}
+            onChange={setMaterialFilter}
+          />
           <FilterGroup label="Cor" options={colors} value={colorFilter} onChange={setColorFilter} />
         </div>
       ) : null}
@@ -386,8 +531,16 @@ function ProjectCard({ project }: { project: PublicProject }) {
 
       <figcaption className="absolute inset-x-0 bottom-0 z-10 p-4">
         <div className="mb-1 flex flex-wrap gap-1">
-          {project.filamentoMaterial ? <Badge variant="outline" className="text-[10px]">{project.filamentoMaterial}</Badge> : null}
-          {project.filamentoCor ? <Badge variant="outline" className="text-[10px]">{project.filamentoCor}</Badge> : null}
+          {project.filamentoMaterial ? (
+            <Badge variant="outline" className="text-[10px]">
+              {project.filamentoMaterial}
+            </Badge>
+          ) : null}
+          {project.filamentoCor ? (
+            <Badge variant="outline" className="text-[10px]">
+              {project.filamentoCor}
+            </Badge>
+          ) : null}
         </div>
         <p className="font-display text-base font-bold leading-tight">{project.nome}</p>
       </figcaption>
@@ -402,18 +555,28 @@ function Testimonials() {
   return (
     <section id="testimonials" className="mx-auto max-w-7xl px-6 py-24">
       <div className="mb-10">
-        <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-yellow)" }}>Depoimentos</div>
+        <div
+          className="text-xs font-semibold uppercase tracking-widest"
+          style={{ color: "var(--filament-yellow)" }}
+        >
+          Depoimentos
+        </div>
         <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
           O que os clientes dizem
         </h2>
       </div>
       <div className="grid gap-6 md:grid-cols-3">
         {testimonials.map((testimonial) => (
-          <div key={`${testimonial.nome}-${testimonial.cargo}`} className="rounded-2xl border border-border bg-card p-6">
+          <div
+            key={`${testimonial.nome}-${testimonial.cargo}`}
+            className="rounded-2xl border border-border bg-card p-6"
+          >
             <p className="text-sm leading-6 text-muted-foreground">"{testimonial.texto}"</p>
             <div className="mt-5">
               <div className="font-semibold">{testimonial.nome}</div>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">{testimonial.cargo}</div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                {testimonial.cargo}
+              </div>
             </div>
           </div>
         ))}
@@ -435,7 +598,9 @@ function FilterGroup({
 }) {
   return (
     <div className="space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (
           <Button
@@ -593,7 +758,12 @@ function Contact() {
       <div className="filament-divider" />
       <div className="mx-auto max-w-2xl px-6 py-24">
         <div className="mb-10 text-center">
-          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--filament-cyan)" }}>Contato</div>
+          <div
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ color: "var(--filament-cyan)" }}
+          >
+            Contato
+          </div>
           <h2 className="mt-2 font-display text-4xl font-extrabold tracking-tight md:text-5xl">
             Tem uma peça em mente?
           </h2>
@@ -612,19 +782,32 @@ function Contact() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input id="whatsapp" name="whatsapp" type="tel" required placeholder="(11) 99999-9999" />
+              <Input
+                id="whatsapp"
+                name="whatsapp"
+                type="tel"
+                required
+                placeholder="(11) 99999-9999"
+              />
             </div>
           </div>
           <div className="mt-4 space-y-2">
             <Label htmlFor="project">Mensagem</Label>
-            <Textarea id="project" name="project" required rows={5} placeholder="Conte sobre a peça, material, quantidade…" />
+            <Textarea
+              id="project"
+              name="project"
+              required
+              rows={5}
+              placeholder="Conte sobre a peça, material, quantidade…"
+            />
           </div>
 
           {/* Link do projeto (MakerWorld, Thingiverse, etc.) */}
           <div className="mt-4 space-y-2">
             <Label htmlFor="linkProjeto" className="flex items-center gap-1.5">
               <LinkIcon className="h-3.5 w-3.5" />
-              Link de referência <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+              Link de referência{" "}
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
             </Label>
             <Input
               id="linkProjeto"
@@ -643,7 +826,8 @@ function Contact() {
           <div className="mt-4 space-y-2">
             <Label className="flex items-center gap-1.5">
               <ImagePlus className="h-3.5 w-3.5" />
-              Imagens de referência <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
+              Imagens de referência{" "}
+              <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
             </Label>
             <label
               htmlFor="contact-images"
@@ -696,8 +880,19 @@ function Contact() {
             )}
           </div>
 
-          <button type="submit" disabled={loading} className="btn-filament mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-sm font-semibold disabled:opacity-60">
-            {loading ? "Enviando…" : <><MessageCircle className="h-4 w-4" />Enviar mensagem</>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-filament mt-6 inline-flex h-12 w-full items-center justify-center gap-2 text-sm font-semibold disabled:opacity-60"
+          >
+            {loading ? (
+              "Enviando…"
+            ) : (
+              <>
+                <MessageCircle className="h-4 w-4" />
+                Enviar mensagem
+              </>
+            )}
           </button>
         </form>
       </div>
@@ -714,7 +909,8 @@ function Footer() {
       <div className="filament-divider" />
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-6 py-8 md:flex-row">
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Kurti 3D — Sociedade Zé &amp; Kurt. Todos os direitos reservados.
+          © {new Date().getFullYear()} Kurti 3D — Sociedade Zé &amp; Kurt. Todos os direitos
+          reservados.
         </p>
         <div className="flex items-center gap-4">
           <a
@@ -724,7 +920,12 @@ function Footer() {
             aria-label="Siga a Kurti 3D no Instagram"
             className="block overflow-hidden rounded-xl border border-border bg-white p-1.5 shadow-sm transition-transform hover:scale-105"
           >
-            <img src={instagramQr} alt="QR code do Instagram @kurti3d" className="h-28 w-auto" loading="lazy" />
+            <img
+              src={instagramQr}
+              alt="QR code do Instagram @kurti3d"
+              className="h-28 w-auto"
+              loading="lazy"
+            />
           </a>
           <p className="max-w-[10rem] text-xs text-muted-foreground">
             Aponte a câmera e siga a gente no Instagram. Feito com filamento multicor.
@@ -767,13 +968,14 @@ function SocialIcons({ className = "" }: { className?: string }) {
 function VideoCard() {
   return (
     <figure className="group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/60 p-6 text-center transition-all duration-300 hover:border-solid hover:shadow-lg">
-      <div className="grid h-14 w-14 place-items-center rounded-full transition-all duration-300 group-hover:scale-110" style={{ background: "var(--gradient-filament)", backgroundSize: "200% 100%" }}>
+      <div
+        className="grid h-14 w-14 place-items-center rounded-full transition-all duration-300 group-hover:scale-110"
+        style={{ background: "var(--gradient-filament)", backgroundSize: "200% 100%" }}
+      >
         <Play className="h-6 w-6 text-white fill-white" />
       </div>
       <p className="mt-3 text-sm font-semibold text-foreground">Vídeo em breve</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Reels da Bambu Lab A1 trabalhando
-      </p>
+      <p className="mt-1 text-xs text-muted-foreground">Reels da Bambu Lab A1 trabalhando</p>
       {/* Kurtido hover overlay */}
       <div className="pointer-events-none absolute inset-0 flex items-end justify-center bg-gradient-to-t from-background/80 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100">
         <div className="pb-5">

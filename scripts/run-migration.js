@@ -9,7 +9,9 @@ const SUPABASE_PROJECT_REF = process.env.SUPABASE_PROJECT_REF;
 
 if (!SUPABASE_PROJECT_REF) {
   console.error("Erro: SUPABASE_PROJECT_REF não definido.");
-  console.error("Por favor, defina a variável de ambiente SUPABASE_PROJECT_REF com o ID do seu projeto Supabase.");
+  console.error(
+    "Por favor, defina a variável de ambiente SUPABASE_PROJECT_REF com o ID do seu projeto Supabase.",
+  );
   console.error("Exemplo: export SUPABASE_PROJECT_REF=xxxxxxxxxxxxxx");
   process.exit(1);
 }
@@ -21,7 +23,7 @@ try {
   // Ler o arquivo de migration
   const migrationQuery = await readFile(
     new URL("../supabase/migrations/20240630_new_features.sql", import.meta.url),
-    "utf-8"
+    "utf-8",
   );
 
   console.log("📄 Arquivo de migration lido com sucesso");
@@ -30,7 +32,7 @@ try {
 
   // Executar a migration via API do Supabase
   console.log("🔗 Conectando à API do Supabase...");
-  
+
   const response = await fetch(
     `https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query`,
     {
@@ -43,7 +45,7 @@ try {
         query: migrationQuery,
         read_only: false,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -62,13 +64,13 @@ try {
   }
 
   const result = await response.json();
-  
+
   console.log("");
   console.log("✅ Migration aplicada com sucesso!");
   console.log("");
   console.log("📊 Resultado:");
   console.log(`   Status: ${response.status}`);
-  if (result && typeof result === 'object') {
+  if (result && typeof result === "object") {
     console.log(`   Resposta: ${JSON.stringify(result).substring(0, 200)}...`);
   }
   console.log("");
@@ -85,7 +87,6 @@ try {
   console.log("   2. Acesse /admin/reports para visualizar relatórios");
   console.log("   3. Use a função de exportação CSV em Finanças e Pedidos");
   console.log("");
-
 } catch (error) {
   console.error("");
   console.error("❌ Erro durante a migração:");

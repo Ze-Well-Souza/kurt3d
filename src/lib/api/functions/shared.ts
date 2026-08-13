@@ -67,7 +67,9 @@ export function resolveClientId(
   }
 
   const normalizedClientName = normalizeClientName(clientName);
-  const matchedClient = clients.find((client) => normalizeClientName(client.nome) === normalizedClientName);
+  const matchedClient = clients.find(
+    (client) => normalizeClientName(client.nome) === normalizedClientName,
+  );
   return matchedClient?.id ?? null;
 }
 

@@ -51,16 +51,16 @@ export function TimeInput({ totalMinutes, onChange, label, tip, error, disabled 
       <div className="flex items-center gap-2">
         <Label>{label ?? "Tempo de Impressão"}</Label>
         {(tip || label === undefined) && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{tip ?? "Informe o tempo estimado de impressão"}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{tip ?? "Informe o tempo estimado de impressão"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
 

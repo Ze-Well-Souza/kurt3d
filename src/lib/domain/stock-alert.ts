@@ -16,9 +16,11 @@ export function extractQuantityNumber(value?: string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function getFilamentoAlertLevel(input: Pick<Filamento, "pesoInicial" | "pesoAtual"> & {
-  disponivelGrams?: number;
-}) {
+export function getFilamentoAlertLevel(
+  input: Pick<Filamento, "pesoInicial" | "pesoAtual"> & {
+    disponivelGrams?: number;
+  },
+) {
   const baseGrams = input.disponivelGrams ?? input.pesoAtual;
   const availableGrams = Number.isFinite(baseGrams) ? Math.max(0, baseGrams) : 0;
   const percent = input.pesoInicial > 0 ? (availableGrams / input.pesoInicial) * 100 : 0;

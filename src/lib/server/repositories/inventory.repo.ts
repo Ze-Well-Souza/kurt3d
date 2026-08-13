@@ -6,11 +6,14 @@ import { replaceById, unwrapResult } from "./shared";
 
 export async function inventoryRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("inventory_txns").select("*").order("created_at", { ascending: false }), {
-    table: "inventory_txns",
-    operation: "list",
-    query: "select(*).order(created_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("inventory_txns").select("*").order("created_at", { ascending: false }),
+    {
+      table: "inventory_txns",
+      operation: "list",
+      query: "select(*).order(created_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromInventoryRow);
   return {
     list,

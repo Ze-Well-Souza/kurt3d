@@ -9,10 +9,7 @@ interface VisibilityBadgeProps {
 
 export function VisibilityBadge({ isPublic, className }: VisibilityBadgeProps) {
   return (
-    <Badge
-      variant={isPublic ? "default" : "secondary"}
-      className={cn("gap-1", className)}
-    >
+    <Badge variant={isPublic ? "default" : "secondary"} className={cn("gap-1", className)}>
       {isPublic ? (
         <>
           <Globe className="h-3 w-3" />

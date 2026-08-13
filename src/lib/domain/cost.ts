@@ -61,8 +61,11 @@ export function calcCostFromInputs(input: {
   };
 }
 
-export function estimateOrderMaterialGrams(order: Order, portfolio?: PortfolioProject): number | null {
-  const gramsPerUnit = order.gramsPerUnit ?? (portfolio?.pesoPeca ?? null);
+export function estimateOrderMaterialGrams(
+  order: Order,
+  portfolio?: PortfolioProject,
+): number | null {
+  const gramsPerUnit = order.gramsPerUnit ?? portfolio?.pesoPeca ?? null;
   if (gramsPerUnit === null || gramsPerUnit === undefined) return null;
   if (!Number.isFinite(gramsPerUnit) || gramsPerUnit <= 0) return null;
   return gramsPerUnit * order.quantity;
@@ -87,15 +90,17 @@ export function calcOrderCostHybrid(input: {
   const precoVenda = input.precoVendaUnit ?? 0;
 
   const cpf = costPerGramFromFilamento(filamento);
-  const custoFilamento = cpf ? cpf * pesoPeca : calcCostFromInputs({
-    custoRolo: portfolio?.custoRolo ?? 120,
-    pesoRolo: portfolio?.pesoRolo ?? 1000,
-    pesoPeca,
-    tempoMin: 0,
-    quantidade: 1,
-    precoVenda: 0,
-    settings: s,
-  }).custoFilamento;
+  const custoFilamento = cpf
+    ? cpf * pesoPeca
+    : calcCostFromInputs({
+        custoRolo: portfolio?.custoRolo ?? 120,
+        pesoRolo: portfolio?.pesoRolo ?? 1000,
+        pesoPeca,
+        tempoMin: 0,
+        quantidade: 1,
+        precoVenda: 0,
+        settings: s,
+      }).custoFilamento;
 
   const custoEnergia = (tempoMin / 60) * s.consumoKw * s.tarifaEnergiaKwh;
   const custoDepreciacao = (tempoMin / 60) * s.depreciacaoHora;
@@ -119,4 +124,3 @@ export function calcOrderCostHybrid(input: {
 
   return { breakdown, depreciacao: custoDepreciacao * quantidade, total: custoLote };
 }
-

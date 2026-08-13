@@ -2,9 +2,21 @@ import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { addCalendarMonthsIso } from "../../domain/installments";
-import type { Expense, FormaPagamento, Insumo, InsumoClassificacaoFinanceira, InsumoPayment, InsumoPaymentInstallment } from "../../domain/types";
+import type {
+  Expense,
+  FormaPagamento,
+  Insumo,
+  InsumoClassificacaoFinanceira,
+  InsumoPayment,
+  InsumoPaymentInstallment,
+} from "../../domain/types";
 import { nowIso } from "../../server/db.server";
-import { expensesRepo, insumoInstallmentsRepo, insumoPaymentsRepo, insumosRepo } from "../../server/repositories.server";
+import {
+  expensesRepo,
+  insumoInstallmentsRepo,
+  insumoPaymentsRepo,
+  insumosRepo,
+} from "../../server/repositories.server";
 import { requireSession } from "../../server/require-session.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 
@@ -20,8 +32,12 @@ const paymentFields = {
   dataParaPagamento: z.string().min(1).max(30).optional(),
 };
 
-function buildInsumoExpenseCategory(classificacaoFinanceira: InsumoClassificacaoFinanceira): string {
-  return classificacaoFinanceira === "investimento" ? "Investimento / Imobilizado" : "Despesa Operacional";
+function buildInsumoExpenseCategory(
+  classificacaoFinanceira: InsumoClassificacaoFinanceira,
+): string {
+  return classificacaoFinanceira === "investimento"
+    ? "Investimento / Imobilizado"
+    : "Despesa Operacional";
 }
 
 function roundMoney(value: number) {
@@ -61,7 +77,8 @@ async function createOrUpdateInsumoPayment(input: {
     const lastParcelDiff = +(input.custoTotal - perParcel * parcelas).toFixed(2);
     const items: InsumoPaymentInstallment[] = [];
     for (let i = 0; i < parcelas; i++) {
-      const valor = i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+      const valor =
+        i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
       items.push({
         id: randomUUID(),
         paymentId,
@@ -93,9 +110,13 @@ async function createOrUpdateInsumoPayment(input: {
   };
   await paymentsRepo.update(updated);
 
-  const existingInstallments = installmentsRepo.list.filter((installment) => installment.paymentId === input.paymentId);
+  const existingInstallments = installmentsRepo.list.filter(
+    (installment) => installment.paymentId === input.paymentId,
+  );
   const progressed = existingInstallments.filter(
-    (installment) => installment.paymentId === input.paymentId && ((installment.valorPago ?? 0) > 0 || installment.pago),
+    (installment) =>
+      installment.paymentId === input.paymentId &&
+      ((installment.valorPago ?? 0) > 0 || installment.pago),
   );
 
   const perParcel = Math.round((input.custoTotal / parcelas) * 100) / 100;
@@ -103,7 +124,8 @@ async function createOrUpdateInsumoPayment(input: {
   const newItems: InsumoPaymentInstallment[] = [];
   for (let i = 0; i < parcelas; i++) {
     const numero = i + 1;
-    const valor = i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+    const valor =
+      i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
     const existingProgressed = progressed.find((installment) => installment.numero === numero);
     if (existingProgressed) {
       const paidAmount = Math.min(roundMoney(existingProgressed.valorPago ?? 0), valor);
@@ -129,7 +151,9 @@ async function createOrUpdateInsumoPayment(input: {
       observacao: null,
     });
   }
-  const existingById = new Map(existingInstallments.map((installment) => [installment.id, installment]));
+  const existingById = new Map(
+    existingInstallments.map((installment) => [installment.id, installment]),
+  );
   const itemsToUpdate = newItems.filter((item) => existingById.has(item.id));
   const itemsToInsert = newItems.filter((item) => !existingById.has(item.id));
   const nextIds = new Set(newItems.map((item) => item.id));
@@ -167,7 +191,8 @@ export const addInsumo = createServerFn({ method: "POST" })
     await checkMutationRateLimit();
     await requireSession();
     const repo = await insumosRepo();
-    const provisionalPaymentId = data.formaPagamento && data.dataParaPagamento ? randomUUID() : null;
+    const provisionalPaymentId =
+      data.formaPagamento && data.dataParaPagamento ? randomUUID() : null;
     const insumo: Insumo = {
       id: randomUUID(),
       nome: data.nome,
@@ -199,7 +224,8 @@ export const addInsumo = createServerFn({ method: "POST" })
       const lastParcelDiff = +(data.precoTotal - perParcel * parcelas).toFixed(2);
       const items: InsumoPaymentInstallment[] = [];
       for (let i = 0; i < parcelas; i++) {
-        const valor = i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
+        const valor =
+          i === parcelas - 1 ? Math.round((perParcel + lastParcelDiff) * 100) / 100 : perParcel;
         items.push({
           id: randomUUID(),
           paymentId: provisionalPaymentId,
@@ -238,9 +264,14 @@ export const removeInsumo = createServerFn({ method: "POST" })
     const current = repo.list.find((insumo) => insumo.id === data.id) ?? null;
     await repo.save(repo.list.filter((insumo) => insumo.id !== data.id));
     const expRepo = await expensesRepo();
-    await expRepo.save(expRepo.list.filter((expense) => !(expense.source === "insumo" && expense.refId === data.id)));
+    await expRepo.save(
+      expRepo.list.filter((expense) => !(expense.source === "insumo" && expense.refId === data.id)),
+    );
     if (current?.paymentId) {
-      const [paymentsRepo, installmentsRepo] = await Promise.all([insumoPaymentsRepo(), insumoInstallmentsRepo()]);
+      const [paymentsRepo, installmentsRepo] = await Promise.all([
+        insumoPaymentsRepo(),
+        insumoInstallmentsRepo(),
+      ]);
       await installmentsRepo.deleteByPayment(current.paymentId);
       await paymentsRepo.detachFromInsumo(current.paymentId);
       await paymentsRepo.remove(current.paymentId);
@@ -290,7 +321,9 @@ export const updateInsumo = createServerFn({ method: "POST" })
 
     await repo.save(repo.list.map((insumo) => (insumo.id === data.id ? updated : insumo)));
 
-    const linkedExpense = expRepo.list.find((expense) => expense.source === "insumo" && expense.refId === data.id);
+    const linkedExpense = expRepo.list.find(
+      (expense) => expense.source === "insumo" && expense.refId === data.id,
+    );
     const nextExpense: Expense = {
       id: linkedExpense?.id ?? randomUUID(),
       source: "insumo",

@@ -160,9 +160,7 @@ describe("addPortfolioProject schema", () => {
   it("accepts optional filamentos array", () => {
     const result = addPortfolioProjectSchema.safeParse(
       validAddProject({
-        filamentos: [
-          { id: "f1", source: "stock", precoRolo: 100, pesoRolo: 1000, pesoUsado: 50 },
-        ],
+        filamentos: [{ id: "f1", source: "stock", precoRolo: 100, pesoRolo: 1000, pesoUsado: 50 }],
       }),
     );
     expect(result.success).toBe(true);

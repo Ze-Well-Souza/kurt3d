@@ -1,4 +1,10 @@
-import type { BudgetQuote, PortfolioVideo, ProductionCalendarEvent, Receipt, SavedReport } from "../../domain/types";
+import type {
+  BudgetQuote,
+  PortfolioVideo,
+  ProductionCalendarEvent,
+  Receipt,
+  SavedReport,
+} from "../../domain/types";
 import { getSupabaseAdminClient } from "../supabase.server";
 import { replaceById, unwrapResult } from "./shared";
 
@@ -136,11 +142,14 @@ function toSavedReportRow(row: SavedReport) {
 
 export async function productionCalendarRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("production_calendar").select("*").order("start_date", { ascending: true }), {
-    table: "production_calendar",
-    operation: "list",
-    query: "select(*).order(start_date asc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("production_calendar").select("*").order("start_date", { ascending: true }),
+    {
+      table: "production_calendar",
+      operation: "list",
+      query: "select(*).order(start_date asc)",
+    },
+  );
   const list = (rows as any[]).map(fromProductionCalendarRow);
   return {
     list,
@@ -149,13 +158,20 @@ export async function productionCalendarRepo() {
       return next;
     },
     async upsert(event: ProductionCalendarEvent) {
-      unwrapResult(await supabase.from("production_calendar").upsert(toProductionCalendarRow(event), { onConflict: "id" }), {
-        table: "production_calendar",
-        operation: "upsert",
-        query: "upsert(onConflict=id)",
-        metadata: { eventId: event.id },
-      });
-      return list.some((item) => item.id === event.id) ? list.map((item) => (item.id === event.id ? event : item)) : [...list, event];
+      unwrapResult(
+        await supabase
+          .from("production_calendar")
+          .upsert(toProductionCalendarRow(event), { onConflict: "id" }),
+        {
+          table: "production_calendar",
+          operation: "upsert",
+          query: "upsert(onConflict=id)",
+          metadata: { eventId: event.id },
+        },
+      );
+      return list.some((item) => item.id === event.id)
+        ? list.map((item) => (item.id === event.id ? event : item))
+        : [...list, event];
     },
     async remove(id: string) {
       unwrapResult(await supabase.from("production_calendar").delete().eq("id", id), {
@@ -171,11 +187,14 @@ export async function productionCalendarRepo() {
 
 export async function budgetQuotesRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("budget_quotes").select("*").order("created_at", { ascending: false }), {
-    table: "budget_quotes",
-    operation: "list",
-    query: "select(*).order(created_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("budget_quotes").select("*").order("created_at", { ascending: false }),
+    {
+      table: "budget_quotes",
+      operation: "list",
+      query: "select(*).order(created_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromBudgetQuoteRow);
   return {
     list,
@@ -184,13 +203,18 @@ export async function budgetQuotesRepo() {
       return next;
     },
     async upsert(quote: BudgetQuote) {
-      unwrapResult(await supabase.from("budget_quotes").upsert(toBudgetQuoteRow(quote), { onConflict: "id" }), {
-        table: "budget_quotes",
-        operation: "upsert",
-        query: "upsert(onConflict=id)",
-        metadata: { quoteId: quote.id },
-      });
-      return list.some((item) => item.id === quote.id) ? list.map((item) => (item.id === quote.id ? quote : item)) : [quote, ...list];
+      unwrapResult(
+        await supabase.from("budget_quotes").upsert(toBudgetQuoteRow(quote), { onConflict: "id" }),
+        {
+          table: "budget_quotes",
+          operation: "upsert",
+          query: "upsert(onConflict=id)",
+          metadata: { quoteId: quote.id },
+        },
+      );
+      return list.some((item) => item.id === quote.id)
+        ? list.map((item) => (item.id === quote.id ? quote : item))
+        : [quote, ...list];
     },
     async remove(id: string) {
       unwrapResult(await supabase.from("budget_quotes").delete().eq("id", id), {
@@ -206,11 +230,14 @@ export async function budgetQuotesRepo() {
 
 export async function portfolioVideosRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("portfolio_videos").select("*").order("created_at", { ascending: false }), {
-    table: "portfolio_videos",
-    operation: "list",
-    query: "select(*).order(created_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("portfolio_videos").select("*").order("created_at", { ascending: false }),
+    {
+      table: "portfolio_videos",
+      operation: "list",
+      query: "select(*).order(created_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromPortfolioVideoRow);
   return {
     list,
@@ -219,13 +246,20 @@ export async function portfolioVideosRepo() {
       return next;
     },
     async upsert(video: PortfolioVideo) {
-      unwrapResult(await supabase.from("portfolio_videos").upsert(toPortfolioVideoRow(video), { onConflict: "id" }), {
-        table: "portfolio_videos",
-        operation: "upsert",
-        query: "upsert(onConflict=id)",
-        metadata: { videoId: video.id },
-      });
-      return list.some((item) => item.id === video.id) ? list.map((item) => (item.id === video.id ? video : item)) : [video, ...list];
+      unwrapResult(
+        await supabase
+          .from("portfolio_videos")
+          .upsert(toPortfolioVideoRow(video), { onConflict: "id" }),
+        {
+          table: "portfolio_videos",
+          operation: "upsert",
+          query: "upsert(onConflict=id)",
+          metadata: { videoId: video.id },
+        },
+      );
+      return list.some((item) => item.id === video.id)
+        ? list.map((item) => (item.id === video.id ? video : item))
+        : [video, ...list];
     },
     async remove(id: string) {
       unwrapResult(await supabase.from("portfolio_videos").delete().eq("id", id), {
@@ -241,11 +275,14 @@ export async function portfolioVideosRepo() {
 
 export async function savedReportsRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("saved_reports").select("*").order("created_at", { ascending: false }), {
-    table: "saved_reports",
-    operation: "list",
-    query: "select(*).order(created_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("saved_reports").select("*").order("created_at", { ascending: false }),
+    {
+      table: "saved_reports",
+      operation: "list",
+      query: "select(*).order(created_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromSavedReportRow);
   return {
     list,
@@ -254,13 +291,18 @@ export async function savedReportsRepo() {
       return next;
     },
     async upsert(report: SavedReport) {
-      unwrapResult(await supabase.from("saved_reports").upsert(toSavedReportRow(report), { onConflict: "id" }), {
-        table: "saved_reports",
-        operation: "upsert",
-        query: "upsert(onConflict=id)",
-        metadata: { reportId: report.id },
-      });
-      return list.some((item) => item.id === report.id) ? list.map((item) => (item.id === report.id ? report : item)) : [report, ...list];
+      unwrapResult(
+        await supabase.from("saved_reports").upsert(toSavedReportRow(report), { onConflict: "id" }),
+        {
+          table: "saved_reports",
+          operation: "upsert",
+          query: "upsert(onConflict=id)",
+          metadata: { reportId: report.id },
+        },
+      );
+      return list.some((item) => item.id === report.id)
+        ? list.map((item) => (item.id === report.id ? report : item))
+        : [report, ...list];
     },
     async remove(id: string) {
       unwrapResult(await supabase.from("saved_reports").delete().eq("id", id), {
@@ -324,11 +366,14 @@ function toReceiptRow(row: Receipt) {
 
 export async function receiptsRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("receipts").select("*").order("created_at", { ascending: false }), {
-    table: "receipts",
-    operation: "list",
-    query: "select(*).order(created_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("receipts").select("*").order("created_at", { ascending: false }),
+    {
+      table: "receipts",
+      operation: "list",
+      query: "select(*).order(created_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromReceiptRow);
 
   /** Gera o próximo número de recibo sequencial para hoje. */
@@ -344,12 +389,15 @@ export async function receiptsRepo() {
     list,
     generateReceiptNumber,
     async upsert(receipt: Receipt) {
-      unwrapResult(await supabase.from("receipts").upsert(toReceiptRow(receipt), { onConflict: "id" }), {
-        table: "receipts",
-        operation: "upsert",
-        query: "upsert(onConflict=id)",
-        metadata: { receiptNumber: receipt.receiptNumber },
-      });
+      unwrapResult(
+        await supabase.from("receipts").upsert(toReceiptRow(receipt), { onConflict: "id" }),
+        {
+          table: "receipts",
+          operation: "upsert",
+          query: "upsert(onConflict=id)",
+          metadata: { receiptNumber: receipt.receiptNumber },
+        },
+      );
       const idx = list.findIndex((item) => item.id === receipt.id);
       if (idx >= 0) list[idx] = receipt;
       else list.unshift(receipt);

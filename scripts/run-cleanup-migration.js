@@ -8,8 +8,11 @@ console.log("");
 
 try {
   const migrationQuery = await readFile(
-    new URL("../supabase/migrations/20260711000000_data_cleanup_and_portfolio_image.sql", import.meta.url),
-    "utf-8"
+    new URL(
+      "../supabase/migrations/20260711000000_data_cleanup_and_portfolio_image.sql",
+      import.meta.url,
+    ),
+    "utf-8",
   );
 
   console.log("📄 Migration file loaded");
@@ -17,7 +20,7 @@ try {
   console.log("");
 
   console.log("🔗 Connecting to Supabase Management API...");
-  
+
   const response = await fetch(
     `https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query`,
     {
@@ -30,7 +33,7 @@ try {
         query: migrationQuery,
         read_only: false,
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -52,7 +55,6 @@ try {
   console.log("   ✓ Created portfolio-images storage bucket");
   console.log("   ✓ Added lead cleanup index");
   console.log("");
-
 } catch (error) {
   console.error("");
   console.error(`❌ Error: ${error.message}`);

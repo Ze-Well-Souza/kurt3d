@@ -47,7 +47,8 @@ function OrderTrackingPage() {
               Acompanhe seu pedido
             </h1>
             <p className="mt-3 text-sm text-muted-foreground">
-              Consulte o andamento usando o codigo de acompanhamento e o WhatsApp informado no pedido.
+              Consulte o andamento usando o codigo de acompanhamento e o WhatsApp informado no
+              pedido.
             </p>
           </div>
           <Link to="/">
@@ -90,7 +91,11 @@ function OrderTrackingPage() {
               />
             </div>
             <div className="md:col-span-2">
-              <Button type="submit" className="btn-filament w-full" disabled={trackingQuery.isPending}>
+              <Button
+                type="submit"
+                className="btn-filament w-full"
+                disabled={trackingQuery.isPending}
+              >
                 {trackingQuery.isPending ? "Consultando..." : "Consultar pedido"}
               </Button>
             </div>
@@ -105,20 +110,37 @@ function OrderTrackingPage() {
                 <h2 className="font-display text-2xl font-bold">{result.projectName}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Codigo {result.trackingCode}</p>
               </div>
-              <Badge variant="secondary" className="text-sm">{result.statusLabel}</Badge>
+              <Badge variant="secondary" className="text-sm">
+                {result.statusLabel}
+              </Badge>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-              <StatusStep active={result.step >= 1} label="Confirmado" icon={<PackageSearch className="h-4 w-4" />} />
-              <StatusStep active={result.step >= 2} label="Em producao" icon={<Clock3 className="h-4 w-4" />} />
-              <StatusStep active={result.step >= 3} label="Pronto / entregue" icon={<Truck className="h-4 w-4" />} />
+              <StatusStep
+                active={result.step >= 1}
+                label="Confirmado"
+                icon={<PackageSearch className="h-4 w-4" />}
+              />
+              <StatusStep
+                active={result.step >= 2}
+                label="Em producao"
+                icon={<Clock3 className="h-4 w-4" />}
+              />
+              <StatusStep
+                active={result.step >= 3}
+                label="Pronto / entregue"
+                icon={<Truck className="h-4 w-4" />}
+              />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <InfoRow label="Quantidade" value={`${result.quantity} un.`} />
               <InfoRow label="Criado em" value={formatDate(result.createdAt)} />
               <InfoRow label="Ultima atualizacao" value={formatDate(result.updatedAt)} />
-              <InfoRow label="Previsao operacional" value={formatDate(result.estimatedDeliveryAt)} />
+              <InfoRow
+                label="Previsao operacional"
+                value={formatDate(result.estimatedDeliveryAt)}
+              />
             </div>
 
             <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
@@ -131,9 +153,19 @@ function OrderTrackingPage() {
   );
 }
 
-function StatusStep({ active, label, icon }: { active: boolean; label: string; icon: React.ReactNode }) {
+function StatusStep({
+  active,
+  label,
+  icon,
+}: {
+  active: boolean;
+  label: string;
+  icon: React.ReactNode;
+}) {
   return (
-    <div className={`rounded-xl border p-4 ${active ? "border-primary bg-primary/5" : "border-border bg-muted/20"}`}>
+    <div
+      className={`rounded-xl border p-4 ${active ? "border-primary bg-primary/5" : "border-border bg-muted/20"}`}
+    >
       <div className="flex items-center gap-2 text-sm font-semibold">
         {icon}
         {label}

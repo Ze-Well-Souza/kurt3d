@@ -4,11 +4,14 @@ import { replaceById, unwrapResult } from "./shared";
 
 export async function filamentosRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("filamentos").select("*").order("created_at", { ascending: false }), {
-    table: "filamentos",
-    operation: "list",
-    query: "select(*).order(created_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("filamentos").select("*").order("created_at", { ascending: false }),
+    {
+      table: "filamentos",
+      operation: "list",
+      query: "select(*).order(created_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromFilamentoRow);
   return {
     list,

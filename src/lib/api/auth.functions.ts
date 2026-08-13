@@ -19,7 +19,11 @@ import {
 } from "../server/auth.server";
 import { logger } from "../server/logger.server";
 import { getClientIp } from "../server/rate-limit.server";
-import { clearLoginRateLimit, inspectLoginRateLimit, recordLoginFailure } from "../server/login-rate-limit.server";
+import {
+  clearLoginRateLimit,
+  inspectLoginRateLimit,
+  recordLoginFailure,
+} from "../server/login-rate-limit.server";
 import { isSecureRequest } from "../server/request-security.server";
 import { siteContentRepo } from "../server/repositories.server";
 import { siteContentSchema } from "../domain/site-content-schema";
@@ -105,7 +109,10 @@ export const login = createServerFn({ method: "POST" })
     // Persistido no Supabase: sobrevive entre instâncias serverless da Vercel.
     const rateLimitState = await inspectLoginRateLimit({ key: rateLimitKey });
     if (!rateLimitState.allowed) {
-      logger.warn("auth.login.rate_limited", { ip: getClientIp(getRequest()), retryAfterMs: rateLimitState.retryAfterMs });
+      logger.warn("auth.login.rate_limited", {
+        ip: getClientIp(getRequest()),
+        retryAfterMs: rateLimitState.retryAfterMs,
+      });
       return { ok: false as const, reason: "rate_limited" as const };
     }
 
@@ -226,10 +233,12 @@ export const editUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const getSiteContent = createServerFn({ method: "GET" }).handler(async (): Promise<SiteContent> => {
-  const repo = await siteContentRepo();
-  return repo.content;
-});
+export const getSiteContent = createServerFn({ method: "GET" }).handler(
+  async (): Promise<SiteContent> => {
+    const repo = await siteContentRepo();
+    return repo.content;
+  },
+);
 
 export const saveSiteContent = createServerFn({ method: "POST" })
   .validator(siteContentSchema)
@@ -239,5 +248,3 @@ export const saveSiteContent = createServerFn({ method: "POST" })
     await repo.save(data as SiteContent);
     return { ok: true };
   });
-
-

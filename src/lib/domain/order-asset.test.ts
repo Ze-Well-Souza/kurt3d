@@ -20,7 +20,9 @@ describe("order asset reference", () => {
 
   it("aceita url externa e referencia interna como fontes validas", () => {
     expect(isValidOrderProjectReference("https://makerworld.com/en/models/123")).toBe(true);
-    expect(isValidOrderProjectReference("storage:order-models/orders/2026-06-26/modelo.stl")).toBe(true);
+    expect(isValidOrderProjectReference("storage:order-models/orders/2026-06-26/modelo.stl")).toBe(
+      true,
+    );
     expect(isValidOrderProjectReference("arquivo-local.stl")).toBe(false);
   });
 });

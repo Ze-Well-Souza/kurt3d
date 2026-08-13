@@ -33,12 +33,12 @@ describe("calcCostFromInputs", () => {
 
   it("inclui custo fixo por unidade", () => {
     const result = calcCostFromInputs({ ...baseInput, settings: DEFAULT_APP_SETTINGS });
-    expect(result.custoFixo).toBe(0.20);
+    expect(result.custoFixo).toBe(0.2);
   });
 
   it("calcula custo por unidade como soma de todos os componentes", () => {
     const result = calcCostFromInputs({ ...baseInput, settings: DEFAULT_APP_SETTINGS });
-    const expected = 5.4 + 0.21375 + 2.1 + 0.20; // ≈ 7.91375
+    const expected = 5.4 + 0.21375 + 2.1 + 0.2; // ≈ 7.91375
     expect(result.custoUnidade).toBeCloseTo(expected, 4);
   });
 
@@ -218,4 +218,3 @@ describe("calcOrderCostHybrid", () => {
     expect(result.breakdown.custoFilamento).toBe(0);
   });
 });
-

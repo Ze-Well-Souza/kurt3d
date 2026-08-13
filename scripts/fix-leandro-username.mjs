@@ -7,10 +7,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const envPath = resolve(__dirname, "..", ".env");
 const envContent = readFileSync(envPath, "utf-8");
 const env = Object.fromEntries(
-  envContent.split("\n").filter((l) => l && !l.startsWith("#")).map((l) => {
-    const i = l.indexOf("=");
-    return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, "")];
-  }),
+  envContent
+    .split("\n")
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => {
+      const i = l.indexOf("=");
+      return [
+        l.slice(0, i).trim(),
+        l
+          .slice(i + 1)
+          .trim()
+          .replace(/^["']|["']$/g, ""),
+      ];
+    }),
 );
 
 const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {

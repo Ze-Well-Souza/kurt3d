@@ -325,16 +325,23 @@ export type SiteContent = {
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
   heroTitulo: "Rápido. Colorido.\nPerfeito.",
-  heroSubtitulo: "Sociedade Zé & Kurt | Tecnologia Bambu Lab com AMS | Impressão multicor de alta qualidade",
+  heroSubtitulo:
+    "Sociedade Zé & Kurt | Tecnologia Bambu Lab com AMS | Impressão multicor de alta qualidade",
   heroStats: [
     { valor: "0,05mm", label: "Camada" },
     { valor: "<24h", label: "Entrega" },
     { valor: "12+", label: "Cores" },
   ],
   features: [
-    { titulo: "Qualidade Bambu", descricao: "Impressoras Bambu Lab com AMS para multicor pixel-perfect." },
+    {
+      titulo: "Qualidade Bambu",
+      descricao: "Impressoras Bambu Lab com AMS para multicor pixel-perfect.",
+    },
     { titulo: "Entrega expressa", descricao: "A maioria dos pedidos sai em até 24 horas." },
-    { titulo: "Multimaterial", descricao: "PLA, PETG, ABS, TPU e filamentos especiais em qualquer cor." },
+    {
+      titulo: "Multimaterial",
+      descricao: "PLA, PETG, ABS, TPU e filamentos especiais em qualquer cor.",
+    },
   ],
   instagramUrl: "https://instagram.com/kurti3d",
   youtubeUrl: "https://youtube.com/@kurti3d",
@@ -383,14 +390,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   impressoraModelo: "Bambu Lab A1",
   consumoKw: 0.095,
   tarifaEnergiaKwh: 0.75,
-  depreciacaoHora: 0.70,
-  custoFixoUnidade: 0.20,
+  depreciacaoHora: 0.7,
+  custoFixoUnidade: 0.2,
   defaultPesoRolo: 1000,
   defaultQuantidade: 10,
   whatsappNumero: "5511999999999",
   selectedPrinterPreset: "A1",
-  printerPrices: { "A1": 2999, "A1_MINI": 1699 },
-  printerVidaUtil: { "A1": 2000, "A1_MINI": 2000 },
+  printerPrices: { A1: 2999, A1_MINI: 1699 },
+  printerVidaUtil: { A1: 2000, A1_MINI: 2000 },
 };
 
 // ═══════════ Extended Types for New Features ═══════════
@@ -418,7 +425,13 @@ export type BudgetQuoteItem = {
   subtotal: number;
 };
 
-export type BudgetQuoteStatus = "draft" | "sent" | "approved" | "rejected" | "expired" | "converted";
+export type BudgetQuoteStatus =
+  | "draft"
+  | "sent"
+  | "approved"
+  | "rejected"
+  | "expired"
+  | "converted";
 
 export type BudgetQuote = {
   id: string;
@@ -498,4 +511,3 @@ export type SavedReport = {
   createdAt: string;
   updatedAt: string;
 };
-

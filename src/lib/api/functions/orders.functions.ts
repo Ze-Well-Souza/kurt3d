@@ -8,7 +8,10 @@ import { clampGrams } from "../../domain/inventory";
 import { getOrderTrackingSummary, matchesOrderTrackingCode } from "../../domain/order-tracking";
 import type { Expense, Order, OrderDestino, OrderPart, Status, Venda } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
-import { createOrderAssetSignedUrl, uploadOrderAssetToStorage } from "../../server/order-assets.server";
+import {
+  createOrderAssetSignedUrl,
+  uploadOrderAssetToStorage,
+} from "../../server/order-assets.server";
 import { notifyOrderStatusChange } from "../../server/order-notifications.server";
 import {
   clientsRepo,
@@ -39,10 +42,13 @@ export const listOrders = createServerFn({ method: "GET" }).handler(async () => 
     clientsRepo(),
   ]);
 
-  const partsByOrderId = orderParts.list.reduce<Record<string, typeof orderParts.list>>((acc, part) => {
-    (acc[part.orderId] ??= []).push(part);
-    return acc;
-  }, {});
+  const partsByOrderId = orderParts.list.reduce<Record<string, typeof orderParts.list>>(
+    (acc, part) => {
+      (acc[part.orderId] ??= []).push(part);
+      return acc;
+    },
+    {},
+  );
 
   const ordersView = hydrateOrderClientLinks(orders.list, clients.list).map((order) => ({
     ...order,
@@ -88,7 +94,11 @@ export const addOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const [repo, clientsData, partsRepo] = await Promise.all([ordersRepo(), clientsRepo(), orderPartsRepo()]);
+    const [repo, clientsData, partsRepo] = await Promise.all([
+      ordersRepo(),
+      clientsRepo(),
+      orderPartsRepo(),
+    ]);
     assertExplicitClientIdExists(clientsData.list, data.clientId);
     const now = nowIso();
     const orderId = randomUUID();
@@ -108,7 +118,8 @@ export const addOrder = createServerFn({ method: "POST" })
         updatedAt: now,
       })),
     );
-    const aggregated = normalizedParts.length > 0 ? computeOrderTotalsFromParts(normalizedParts) : null;
+    const aggregated =
+      normalizedParts.length > 0 ? computeOrderTotalsFromParts(normalizedParts) : null;
     const order: Order = {
       id: orderId,
       status: "todo",
@@ -138,7 +149,12 @@ export const addOrder = createServerFn({ method: "POST" })
   });
 
 export const removeOrder = createServerFn({ method: "POST" })
-  .validator(z.object({ orderId: z.string().min(1), reason: z.string().trim().min(1, "Informe o motivo").max(500) }))
+  .validator(
+    z.object({
+      orderId: z.string().min(1),
+      reason: z.string().trim().min(1, "Informe o motivo").max(500),
+    }),
+  )
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
@@ -169,7 +185,12 @@ export const removeOrder = createServerFn({ method: "POST" })
   });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator(z.object({ orderId: z.string().min(1), status: z.enum(["todo", "printing", "acabamento", "done"]) }))
+  .validator(
+    z.object({
+      orderId: z.string().min(1),
+      status: z.enum(["todo", "printing", "acabamento", "done"]),
+    }),
+  )
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
@@ -187,7 +208,9 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
 
     const now = nowIso();
     const nextOrder: Order = { ...order, status: data.status, updatedAt: now };
-    const project = order.portfolioProjectId ? portfolio.list.find((item) => item.id === order.portfolioProjectId) : undefined;
+    const project = order.portfolioProjectId
+      ? portfolio.list.find((item) => item.id === order.portfolioProjectId)
+      : undefined;
     const gramsTotal = estimateOrderMaterialGrams(order, project);
     const filamentId = order.filamentoId ?? project?.filamentoId ?? null;
 
@@ -212,7 +235,9 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
           const filamento = filamentos.list.find((item) => item.id === filamentId);
           if (filamento) {
             const updatedFilamentos = filamentos.list.map((item) =>
-              item.id === filamento.id ? { ...item, pesoAtual: Math.max(0, item.pesoAtual - toConsume) } : item,
+              item.id === filamento.id
+                ? { ...item, pesoAtual: Math.max(0, item.pesoAtual - toConsume) }
+                : item,
             );
             await filamentos.save(updatedFilamentos);
           }
@@ -278,10 +303,18 @@ export const finalizarDestino = createServerFn({ method: "POST" })
       nextStatus: updatedOrder.status,
     });
 
-    if (destino === "Kurtido e Vendido" && typeof data.valorRecebido === "number" && data.valorRecebido > 0) {
-      const project = order.portfolioProjectId ? portfolio.list.find((item) => item.id === order.portfolioProjectId) : undefined;
+    if (
+      destino === "Kurtido e Vendido" &&
+      typeof data.valorRecebido === "number" &&
+      data.valorRecebido > 0
+    ) {
+      const project = order.portfolioProjectId
+        ? portfolio.list.find((item) => item.id === order.portfolioProjectId)
+        : undefined;
       const filamentoId = order.filamentoId ?? project?.filamentoId ?? null;
-      const filamento = filamentoId ? filamentos.list.find((item) => item.id === filamentoId) : undefined;
+      const filamento = filamentoId
+        ? filamentos.list.find((item) => item.id === filamentoId)
+        : undefined;
       const precoVendaUnit = data.valorRecebido / Math.max(1, order.quantity);
       const cost = calcOrderCostHybrid({ order, portfolio: project, filamento, precoVendaUnit });
       const venda: Venda = {
@@ -298,12 +331,19 @@ export const finalizarDestino = createServerFn({ method: "POST" })
     }
 
     if (destino === "Falha de Impressão") {
-      const project = order.portfolioProjectId ? portfolio.list.find((item) => item.id === order.portfolioProjectId) : undefined;
+      const project = order.portfolioProjectId
+        ? portfolio.list.find((item) => item.id === order.portfolioProjectId)
+        : undefined;
       const filamentoId = order.filamentoId ?? project?.filamentoId ?? null;
-      const filamento = filamentoId ? filamentos.list.find((item) => item.id === filamentoId) : undefined;
-      const custoFilamento = project && filamento
-        ? (filamento.precoPago / filamento.pesoInicial) * (order.gramsPerUnit ?? project.pesoPeca) * order.quantity
-        : 0;
+      const filamento = filamentoId
+        ? filamentos.list.find((item) => item.id === filamentoId)
+        : undefined;
+      const custoFilamento =
+        project && filamento
+          ? (filamento.precoPago / filamento.pesoInicial) *
+            (order.gramsPerUnit ?? project.pesoPeca) *
+            order.quantity
+          : 0;
       if (custoFilamento > 0) {
         const expense: Expense = {
           id: randomUUID(),
@@ -383,15 +423,21 @@ export const resolveOrderAssetUrl = createServerFn({ method: "POST" })
     return { ok: true as const, url };
   });
 
-function phoneMatchesClient(order: Order, clients: Awaited<ReturnType<typeof clientsRepo>>["list"], phone: string) {
+function phoneMatchesClient(
+  order: Order,
+  clients: Awaited<ReturnType<typeof clientsRepo>>["list"],
+  phone: string,
+) {
   const normalizedInput = normalizePhone(phone);
   if (!normalizedInput) return false;
   const client = order.clientId ? clients.find((item) => item.id === order.clientId) : null;
   const normalizedStored = normalizePhone(client?.whatsapp);
   if (!normalizedStored || normalizedInput.length < 8) return false;
-  return normalizedStored === normalizedInput
-    || normalizedStored.endsWith(normalizedInput)
-    || normalizedInput.endsWith(normalizedStored);
+  return (
+    normalizedStored === normalizedInput ||
+    normalizedStored.endsWith(normalizedInput) ||
+    normalizedInput.endsWith(normalizedStored)
+  );
 }
 
 export const updateOrder = createServerFn({ method: "POST" })
@@ -418,7 +464,11 @@ export const updateOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const [orders, clientsData, partsRepo] = await Promise.all([ordersRepo(), clientsRepo(), orderPartsRepo()]);
+    const [orders, clientsData, partsRepo] = await Promise.all([
+      ordersRepo(),
+      clientsRepo(),
+      orderPartsRepo(),
+    ]);
     const order = orders.list.find((item) => item.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };
     if (order.status === "vendido" || order.status === "presente" || order.status === "falha") {
@@ -436,7 +486,7 @@ export const updateOrder = createServerFn({ method: "POST" })
       quantity: data.quantity,
       timeMinutes: aggregated?.timeMinutes ?? data.timeMinutes,
       filamentoId: data.filamentoId ?? undefined,
-      gramsPerUnit: aggregated?.gramsPerUnit ?? (data.gramsPerUnit ?? undefined),
+      gramsPerUnit: aggregated?.gramsPerUnit ?? data.gramsPerUnit ?? undefined,
       precoVenda: data.precoVenda ?? null,
       linkProjeto: data.linkProjeto ?? null,
       multiPart: existingParts.length > 0 ? true : (data.multiPart ?? order.multiPart ?? false),
@@ -464,15 +514,21 @@ export const updateOrderPartStatus = createServerFn({ method: "POST" })
     const [orders, partsRepo] = await Promise.all([ordersRepo(), orderPartsRepo()]);
     const order = orders.list.find((item) => item.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };
-    const part = partsRepo.list.find((item) => item.id === data.partId && item.orderId === data.orderId);
+    const part = partsRepo.list.find(
+      (item) => item.id === data.partId && item.orderId === data.orderId,
+    );
     if (!part) return { ok: false as const, reason: "part_not_found" as const };
 
     const now = nowIso();
     const nextParts = partsRepo.list
       .filter((item) => item.orderId === data.orderId)
-      .map((item) => (item.id === data.partId ? { ...item, status: data.status, updatedAt: now } : item));
+      .map((item) =>
+        item.id === data.partId ? { ...item, status: data.status, updatedAt: now } : item,
+      );
 
     await partsRepo.saveForOrder(data.orderId, nextParts);
-    await orders.save(orders.list.map((item) => (item.id === order.id ? { ...item, updatedAt: now } : item)));
+    await orders.save(
+      orders.list.map((item) => (item.id === order.id ? { ...item, updatedAt: now } : item)),
+    );
     return { ok: true as const };
   });

@@ -46,10 +46,26 @@ function Dashboard() {
     const despesas = filteredExpenses.reduce((sum, e) => sum + e.valor, 0);
     const lucro = receita - custoTotal - despesas;
     return [
-      { label: "Trabalhos ativos", value: String(trabalhosAtivos), delta: `de ${orders.length} pedidos` },
-      { label: `Receita (${periodLabel})`, value: brl(receita), delta: `${filteredVendas.length} vendas` },
-      { label: `Lucro Líquido (${periodLabel})`, value: brl(lucro), delta: lucro >= 0 ? "positivo" : "negativo" },
-      { label: `Despesas (${periodLabel})`, value: brl(despesas), delta: `${filteredExpenses.length} lançamentos` },
+      {
+        label: "Trabalhos ativos",
+        value: String(trabalhosAtivos),
+        delta: `de ${orders.length} pedidos`,
+      },
+      {
+        label: `Receita (${periodLabel})`,
+        value: brl(receita),
+        delta: `${filteredVendas.length} vendas`,
+      },
+      {
+        label: `Lucro Líquido (${periodLabel})`,
+        value: brl(lucro),
+        delta: lucro >= 0 ? "positivo" : "negativo",
+      },
+      {
+        label: `Despesas (${periodLabel})`,
+        value: brl(despesas),
+        delta: `${filteredExpenses.length} lançamentos`,
+      },
     ];
   }, [orders, filteredVendas, filteredExpenses, periodLabel]);
 
@@ -68,8 +84,28 @@ function Dashboard() {
           <p className="text-sm text-muted-foreground">Visão geral da sua fábrica de impressão.</p>
         </div>
         <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
-          <button className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", period === "month" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} onClick={() => setPeriod("month")}>Este Mês</button>
-          <button className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors", period === "all" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")} onClick={() => setPeriod("all")}>Todo Período</button>
+          <button
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              period === "month"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setPeriod("month")}
+          >
+            Este Mês
+          </button>
+          <button
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+              period === "all"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setPeriod("all")}
+          >
+            Todo Período
+          </button>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -94,15 +130,26 @@ function Dashboard() {
                   <p className="text-xs text-muted-foreground">{o.client}</p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-xs font-semibold uppercase tracking-wider" style={{
-                    color: o.status === "vendido" ? "var(--filament-green)" :
-                           o.status === "presente" ? "var(--filament-yellow)" :
-                           o.status === "falha" ? "var(--filament-magenta)" :
-                           "var(--filament-cyan)"
-                  }}>
-                    {o.status === "vendido" ? "Vendido" :
-                     o.status === "presente" ? "Presente" :
-                     o.status === "falha" ? "Falha" : "Concluído"}
+                  <p
+                    className="text-xs font-semibold uppercase tracking-wider"
+                    style={{
+                      color:
+                        o.status === "vendido"
+                          ? "var(--filament-green)"
+                          : o.status === "presente"
+                            ? "var(--filament-yellow)"
+                            : o.status === "falha"
+                              ? "var(--filament-magenta)"
+                              : "var(--filament-cyan)",
+                    }}
+                  >
+                    {o.status === "vendido"
+                      ? "Vendido"
+                      : o.status === "presente"
+                        ? "Presente"
+                        : o.status === "falha"
+                          ? "Falha"
+                          : "Concluído"}
                   </p>
                   {o.valorRecebido !== undefined && (
                     <p className="text-xs text-muted-foreground">R$ {o.valorRecebido.toFixed(2)}</p>

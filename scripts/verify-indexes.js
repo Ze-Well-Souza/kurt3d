@@ -30,7 +30,7 @@ ORDER BY tablename, indexname;
           query: verifyQuery,
           read_only: true,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -40,32 +40,33 @@ ORDER BY tablename, indexname;
     }
 
     const result = await response.json();
-    
+
     let currentTable = null;
     let indexCount = 0;
-    
+
     if (result && Array.isArray(result) && result.length > 0) {
       for (const row of result) {
         if (row.tablename !== currentTable) {
           if (currentTable !== null) console.log("");
           currentTable = row.tablename;
           const tableDesc = {
-            'production_calendar': '📅 Calendário de Produção',
-            'portfolio_videos': '🎬 Vídeos/Reels',
-            'budget_quotes': '💰 Orçamentos',
-            'saved_reports': '📊 Relatórios Salvos'
+            production_calendar: "📅 Calendário de Produção",
+            portfolio_videos: "🎬 Vídeos/Reels",
+            budget_quotes: "💰 Orçamentos",
+            saved_reports: "📊 Relatórios Salvos",
           };
           console.log(`${tableDesc[currentTable] || currentTable}:`);
         }
-        
+
         console.log(`   ✓ ${row.indexname}`);
         indexCount++;
       }
       console.log(`\n✅ Total de ${indexCount} índices verificados!`);
     } else {
-      console.log("⚠️ Nenhum índice encontrado (pode ser esperado se os índices tiverem nomes diferentes)");
+      console.log(
+        "⚠️ Nenhum índice encontrado (pode ser esperado se os índices tiverem nomes diferentes)",
+      );
     }
-
   } catch (error) {
     console.error("❌ Erro:", error.message);
     process.exit(1);

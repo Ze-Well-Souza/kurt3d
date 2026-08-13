@@ -34,7 +34,7 @@ ORDER BY tablename, policyname;
           query: verifyQuery,
           read_only: true,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -44,32 +44,33 @@ ORDER BY tablename, policyname;
     }
 
     const result = await response.json();
-    
+
     let currentTable = null;
     let policyCount = 0;
-    
+
     if (result && Array.isArray(result) && result.length > 0) {
       for (const row of result) {
         if (row.tablename !== currentTable) {
           if (currentTable !== null) console.log("");
           currentTable = row.tablename;
           const tableDesc = {
-            'production_calendar': '📅 Calendário de Produção',
-            'portfolio_videos': '🎬 Vídeos/Reels',
-            'budget_quotes': '💰 Orçamentos',
-            'saved_reports': '📊 Relatórios Salvos'
+            production_calendar: "📅 Calendário de Produção",
+            portfolio_videos: "🎬 Vídeos/Reels",
+            budget_quotes: "💰 Orçamentos",
+            saved_reports: "📊 Relatórios Salvos",
           };
           console.log(`${tableDesc[currentTable] || currentTable}:`);
         }
-        
-        console.log(`   ✓ ${row.policyname} (${row.cmd}) - ${row.permissive ? 'PERMISSIVE' : 'RESTRICTIVE'}`);
+
+        console.log(
+          `   ✓ ${row.policyname} (${row.cmd}) - ${row.permissive ? "PERMISSIVE" : "RESTRICTIVE"}`,
+        );
         policyCount++;
       }
       console.log(`\n✅ Total de ${policyCount} políticas RLS verificadas!`);
     } else {
       console.log("⚠️ Nenhuma política RLS encontrada");
     }
-
   } catch (error) {
     console.error("❌ Erro:", error.message);
     process.exit(1);

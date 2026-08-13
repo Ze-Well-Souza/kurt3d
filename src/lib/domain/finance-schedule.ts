@@ -148,11 +148,12 @@ export function buildScheduleEntries(params: {
       ? filamentosHistory.filter((f) => f.batchId === payment.batchId)
       : [];
     const batchFilamentos = activeFilamentos.length > 0 ? activeFilamentos : historyFilamentos;
-    const label = batchFilamentos.length > 0
-      ? batchFilamentos.map((f) => f.sku).join(", ")
-      : payment?.batchId
-        ? `Lote ${payment.batchId.slice(0, 8)}`
-        : `Pagamento ${i.paymentId.slice(0, 8)}`;
+    const label =
+      batchFilamentos.length > 0
+        ? batchFilamentos.map((f) => f.sku).join(", ")
+        : payment?.batchId
+          ? `Lote ${payment.batchId.slice(0, 8)}`
+          : `Pagamento ${i.paymentId.slice(0, 8)}`;
     const dataCompra = batchFilamentos.length
       ? (batchFilamentos
           .map((f) => f.dataCompra)
@@ -192,9 +193,12 @@ export function buildScheduleEntries(params: {
       inst: i,
       payment,
       dataCompra,
-      label: insumo?.nome
-        || i.observacao
-        || (payment ? `Insumo ${payment.insumoId.slice(0, 8)}` : `Pagamento ${i.paymentId.slice(0, 8)}`),
+      label:
+        insumo?.nome ||
+        i.observacao ||
+        (payment
+          ? `Insumo ${payment.insumoId.slice(0, 8)}`
+          : `Pagamento ${i.paymentId.slice(0, 8)}`),
       overdue: !i.pago && i.vencimento <= today,
       progress,
     };

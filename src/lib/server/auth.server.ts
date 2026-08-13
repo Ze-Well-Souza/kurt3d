@@ -72,7 +72,12 @@ export async function getUserAuthInfo(
   return { role: user.role ?? null, mustChangePassword: user.mustChangePassword ?? false };
 }
 
-export async function setupAdminUser(input: { username: string; password: string; phone?: string; nome?: string }) {
+export async function setupAdminUser(input: {
+  username: string;
+  password: string;
+  phone?: string;
+  nome?: string;
+}) {
   const repo = await usersRepo();
   if (repo.list.length > 0) {
     throw new Error("setup_already_done");
@@ -152,7 +157,12 @@ export async function resetUserPassword(userId: string) {
   await repo.save(repo.list);
 }
 
-export async function createAdminUser(input: { username: string; password: string; phone?: string; nome?: string }) {
+export async function createAdminUser(input: {
+  username: string;
+  password: string;
+  phone?: string;
+  nome?: string;
+}) {
   const repo = await usersRepo();
   assertPasswordPolicy(input.password);
   const now = nowIso();
@@ -218,4 +228,3 @@ export async function updateUser(userId: string, input: { nome?: string; usernam
   user.updatedAt = nowIso();
   await repo.save(repo.list);
 }
-

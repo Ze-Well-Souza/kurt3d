@@ -4,11 +4,14 @@ import { replaceById, unwrapResult } from "./shared";
 
 export async function portfolioRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("portfolio_projects").select("*").order("created_at", { ascending: false }), {
-    table: "portfolio_projects",
-    operation: "list",
-    query: "select(*).order(created_at desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("portfolio_projects").select("*").order("created_at", { ascending: false }),
+    {
+      table: "portfolio_projects",
+      operation: "list",
+      query: "select(*).order(created_at desc)",
+    },
+  );
   const list = (rows as any[]).map(fromPortfolioRow);
   return {
     list,

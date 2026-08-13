@@ -1,13 +1,53 @@
 import { describe, expect, it } from "vitest";
-import { normalizeOrderParts, computeOrderTotalsFromParts, summarizeOrderParts } from "./order-parts";
+import {
+  normalizeOrderParts,
+  computeOrderTotalsFromParts,
+  summarizeOrderParts,
+} from "./order-parts";
 import type { OrderPart } from "./types";
 
 describe("normalizeOrderParts", () => {
   it("reordena posicoes sequencialmente", () => {
     const parts: OrderPart[] = [
-      { id: "p1", orderId: "o1", nome: "Parte A", position: 5, quantity: 1, timeMinutes: 30, gramsPerUnit: 10, status: "todo", notes: null, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
-      { id: "p2", orderId: "o1", nome: "Parte B", position: 1, quantity: 2, timeMinutes: 15, gramsPerUnit: 5, status: "todo", notes: null, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
-      { id: "p3", orderId: "o1", nome: "Parte C", position: 3, quantity: 1, timeMinutes: 60, gramsPerUnit: 20, status: "done", notes: "Teste", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      {
+        id: "p1",
+        orderId: "o1",
+        nome: "Parte A",
+        position: 5,
+        quantity: 1,
+        timeMinutes: 30,
+        gramsPerUnit: 10,
+        status: "todo",
+        notes: null,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      },
+      {
+        id: "p2",
+        orderId: "o1",
+        nome: "Parte B",
+        position: 1,
+        quantity: 2,
+        timeMinutes: 15,
+        gramsPerUnit: 5,
+        status: "todo",
+        notes: null,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      },
+      {
+        id: "p3",
+        orderId: "o1",
+        nome: "Parte C",
+        position: 3,
+        quantity: 1,
+        timeMinutes: 60,
+        gramsPerUnit: 20,
+        status: "done",
+        notes: "Teste",
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      },
     ];
     const result = normalizeOrderParts(parts);
     expect(result[0].nome).toBe("Parte B");
@@ -21,8 +61,32 @@ describe("normalizeOrderParts", () => {
 
   it("nao muta o array original", () => {
     const parts: OrderPart[] = [
-      { id: "p1", orderId: "o1", nome: "A", position: 2, quantity: 1, timeMinutes: 10, gramsPerUnit: 5, status: "todo", notes: null, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
-      { id: "p2", orderId: "o1", nome: "B", position: 1, quantity: 1, timeMinutes: 10, gramsPerUnit: 5, status: "todo", notes: null, createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      {
+        id: "p1",
+        orderId: "o1",
+        nome: "A",
+        position: 2,
+        quantity: 1,
+        timeMinutes: 10,
+        gramsPerUnit: 5,
+        status: "todo",
+        notes: null,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      },
+      {
+        id: "p2",
+        orderId: "o1",
+        nome: "B",
+        position: 1,
+        quantity: 1,
+        timeMinutes: 10,
+        gramsPerUnit: 5,
+        status: "todo",
+        notes: null,
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      },
     ];
     const originalPositions = parts.map((p) => p.position);
     normalizeOrderParts(parts);

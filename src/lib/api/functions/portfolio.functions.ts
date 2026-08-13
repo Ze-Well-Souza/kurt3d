@@ -8,7 +8,10 @@ import { nowIso } from "../../server/db.server";
 import { requireSession } from "../../server/require-session.server";
 import { assertExplicitClientIdExists, resolveClientId } from "./shared";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
-import { uploadPortfolioImage, deletePortfolioImage } from "../../server/portfolio-image-upload.server";
+import {
+  uploadPortfolioImage,
+  deletePortfolioImage,
+} from "../../server/portfolio-image-upload.server";
 
 export const listPortfolio = createServerFn({ method: "GET" }).handler(async () => {
   await requireSession();
@@ -192,7 +195,7 @@ export const updatePortfolioProject = createServerFn({ method: "POST" })
 
     // Handle publishedAt transition logic (pure function, testable)
     const publishedAt = computePublishedAt(
-      project.isPublic ?? true,  // legacy: treat missing as public
+      project.isPublic ?? true, // legacy: treat missing as public
       data.isPublic,
       project.publishedAt,
       now,
@@ -241,7 +244,11 @@ export const createOrderFromPortfolio = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const [orders, portfolio, clientsData] = await Promise.all([ordersRepo(), portfolioRepo(), clientsRepo()]);
+    const [orders, portfolio, clientsData] = await Promise.all([
+      ordersRepo(),
+      portfolioRepo(),
+      clientsRepo(),
+    ]);
     const project = portfolio.list.find((item) => item.id === data.portfolioProjectId);
     if (!project) return { ok: false as const };
     assertExplicitClientIdExists(clientsData.list, data.clientId);

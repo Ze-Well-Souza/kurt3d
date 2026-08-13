@@ -2,11 +2,24 @@ import { useState } from "react";
 import { Banknote, Check, CreditCard, Pencil, Trash2, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatIsoDatePtBr, todayIso } from "@/lib/domain/installments";
 import type { Filamento, FilamentoPayment, FilamentoPaymentInstallment } from "@/lib/domain/types";
 
@@ -15,10 +28,24 @@ type PaymentScheduleProps = {
   installments: FilamentoPaymentInstallment[];
   batchFilamentos: Filamento[];
   brl: (n: number) => string;
-  onPay: (input: { installmentId: string; dataPagamento: string; valorPago?: number; observacao?: string }) => Promise<unknown> | void;
+  onPay: (input: {
+    installmentId: string;
+    dataPagamento: string;
+    valorPago?: number;
+    observacao?: string;
+  }) => Promise<unknown> | void;
   onRevert: (installmentId: string) => Promise<unknown> | void;
-  onSettle: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) => Promise<unknown> | void;
-  onUpdateInst: (input: { installmentId: string; vencimento?: string; valor?: number; observacao?: string }) => Promise<unknown> | void;
+  onSettle: (input: {
+    paymentId: string;
+    totalPago?: number;
+    dataPagamento?: string;
+  }) => Promise<unknown> | void;
+  onUpdateInst: (input: {
+    installmentId: string;
+    vencimento?: string;
+    valor?: number;
+    observacao?: string;
+  }) => Promise<unknown> | void;
   isPending: boolean;
 };
 
@@ -131,7 +158,9 @@ export function PaymentSchedule({
                         className="h-7 text-xs"
                       />
                     ) : (
-                      <span className={`text-xs tabular-nums ${overdue ? "font-semibold text-destructive" : ""}`}>
+                      <span
+                        className={`text-xs tabular-nums ${overdue ? "font-semibold text-destructive" : ""}`}
+                      >
                         {formatIsoDatePtBr(i.vencimento)}
                       </span>
                     )}
@@ -153,13 +182,20 @@ export function PaymentSchedule({
                         <Check className="h-3 w-3" /> Pago
                       </Badge>
                     ) : isPartial(i) ? (
-                      <Badge variant="outline" className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700">
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/30 bg-amber-50 text-[10px] text-amber-700"
+                      >
                         Parcial
                       </Badge>
                     ) : overdue ? (
-                      <Badge variant="destructive" className="text-[10px]">Atrasado</Badge>
+                      <Badge variant="destructive" className="text-[10px]">
+                        Atrasado
+                      </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px]">Pendente</Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        Pendente
+                      </Badge>
                     )}
                   </TableCell>
                   <TableCell className="tabular-nums text-xs text-muted-foreground">
@@ -285,11 +321,28 @@ export function PaymentSchedule({
           {payDialog && (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Valor total da parcela: <strong className="text-foreground">{brl(sorted.find((item) => item.id === payDialog.installmentId)?.valor ?? 0)}</strong>
+                Valor total da parcela:{" "}
+                <strong className="text-foreground">
+                  {brl(sorted.find((item) => item.id === payDialog.installmentId)?.valor ?? 0)}
+                </strong>
                 {" · "}
-                ja pago: <strong className="text-foreground">{brl(getPaidAmount(sorted.find((item) => item.id === payDialog.installmentId) ?? installments[0]))}</strong>
+                ja pago:{" "}
+                <strong className="text-foreground">
+                  {brl(
+                    getPaidAmount(
+                      sorted.find((item) => item.id === payDialog.installmentId) ?? installments[0],
+                    ),
+                  )}
+                </strong>
                 {" · "}
-                restante: <strong className="text-foreground">{brl(getRemainingAmount(sorted.find((item) => item.id === payDialog.installmentId) ?? installments[0]))}</strong>
+                restante:{" "}
+                <strong className="text-foreground">
+                  {brl(
+                    getRemainingAmount(
+                      sorted.find((item) => item.id === payDialog.installmentId) ?? installments[0],
+                    ),
+                  )}
+                </strong>
               </p>
               <div className="space-y-1">
                 <Label className="text-xs">Data do pagamento</Label>
@@ -309,14 +362,20 @@ export function PaymentSchedule({
                 />
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setPayDialog(null)}>Cancelar</Button>
+                <Button variant="outline" onClick={() => setPayDialog(null)}>
+                  Cancelar
+                </Button>
                 <Button
                   onClick={async () => {
                     if (!payDialog) return;
                     const installment = sorted.find((item) => item.id === payDialog.installmentId);
                     if (!installment) return;
                     const amount = Number(payDialog.valorPago);
-                    if (!Number.isFinite(amount) || amount <= 0 || amount > getRemainingAmount(installment)) {
+                    if (
+                      !Number.isFinite(amount) ||
+                      amount <= 0 ||
+                      amount > getRemainingAmount(installment)
+                    ) {
                       return;
                     }
                     await onPay({
@@ -329,9 +388,16 @@ export function PaymentSchedule({
                   disabled={
                     isPending ||
                     !(() => {
-                      const installment = sorted.find((item) => item.id === payDialog.installmentId);
+                      const installment = sorted.find(
+                        (item) => item.id === payDialog.installmentId,
+                      );
                       const amount = Number(payDialog.valorPago);
-                      return installment && Number.isFinite(amount) && amount > 0 && amount <= getRemainingAmount(installment);
+                      return (
+                        installment &&
+                        Number.isFinite(amount) &&
+                        amount > 0 &&
+                        amount <= getRemainingAmount(installment)
+                      );
                     })()
                   }
                 >
@@ -343,7 +409,10 @@ export function PaymentSchedule({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={settleDialog.open} onOpenChange={(o) => setOpenSettle((s) => ({ ...s, open: o }))}>
+      <Dialog
+        open={settleDialog.open}
+        onOpenChange={(o) => setOpenSettle((s) => ({ ...s, open: o }))}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
@@ -372,15 +441,27 @@ export function PaymentSchedule({
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpenSettle((s) => ({ ...s, open: false }))}>Cancelar</Button>
+              <Button
+                variant="outline"
+                onClick={() => setOpenSettle((s) => ({ ...s, open: false }))}
+              >
+                Cancelar
+              </Button>
               <Button
                 onClick={async () => {
                   await onSettle({
                     paymentId: payment.id,
                     dataPagamento: settleDialog.dataPagamento,
-                    totalPago: Number(settleDialog.totalPago) > 0 ? Number(settleDialog.totalPago) : undefined,
+                    totalPago:
+                      Number(settleDialog.totalPago) > 0
+                        ? Number(settleDialog.totalPago)
+                        : undefined,
                   });
-                  setOpenSettle({ open: false, totalPago: "", dataPagamento: new Date().toISOString().slice(0, 10) });
+                  setOpenSettle({
+                    open: false,
+                    totalPago: "",
+                    dataPagamento: new Date().toISOString().slice(0, 10),
+                  });
                 }}
                 disabled={isPending}
               >

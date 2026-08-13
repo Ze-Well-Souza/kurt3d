@@ -45,4 +45,3 @@ export async function writeJson<T extends JsonValue>(path: string, value: T): Pr
   writeLocks.set(path, next);
   await next;
 }
-

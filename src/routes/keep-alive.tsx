@@ -11,8 +11,6 @@ export const Route = createFileRoute("/keep-alive")({
 function KeepAliveStatus() {
   const data = Route.useLoaderData();
   return (
-    <pre style={{ padding: 16, fontFamily: "monospace" }}>
-      {JSON.stringify(data, null, 2)}
-    </pre>
+    <pre style={{ padding: 16, fontFamily: "monospace" }}>{JSON.stringify(data, null, 2)}</pre>
   );
 }

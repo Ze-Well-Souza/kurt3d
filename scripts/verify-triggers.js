@@ -30,7 +30,7 @@ ORDER BY event_object_table, trigger_name;
           query: verifyQuery,
           read_only: true,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -40,24 +40,24 @@ ORDER BY event_object_table, trigger_name;
     }
 
     const result = await response.json();
-    
+
     let currentTable = null;
     let triggerCount = 0;
-    
+
     if (result && Array.isArray(result) && result.length > 0) {
       for (const row of result) {
         if (row.event_object_table !== currentTable) {
           if (currentTable !== null) console.log("");
           currentTable = row.event_object_table;
           const tableDesc = {
-            'production_calendar': '📅 Calendário de Produção',
-            'portfolio_videos': '🎬 Vídeos/Reels',
-            'budget_quotes': '💰 Orçamentos',
-            'saved_reports': '📊 Relatórios Salvos'
+            production_calendar: "📅 Calendário de Produção",
+            portfolio_videos: "🎬 Vídeos/Reels",
+            budget_quotes: "💰 Orçamentos",
+            saved_reports: "📊 Relatórios Salvos",
           };
           console.log(`${tableDesc[currentTable] || currentTable}:`);
         }
-        
+
         console.log(`   ✓ ${row.trigger_name} (${row.event_manipulation})`);
         triggerCount++;
       }
@@ -66,7 +66,6 @@ ORDER BY event_object_table, trigger_name;
     } else {
       console.log("⚠️ Nenhum trigger encontrado");
     }
-
   } catch (error) {
     console.error("❌ Erro:", error.message);
     process.exit(1);

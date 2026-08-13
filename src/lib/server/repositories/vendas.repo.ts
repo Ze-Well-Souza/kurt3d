@@ -4,11 +4,14 @@ import { replaceById, unwrapResult } from "./shared";
 
 export async function vendasRepo() {
   const supabase = getSupabaseAdminClient();
-  const rows = unwrapResult(await supabase.from("vendas").select("*").order("data", { ascending: false }), {
-    table: "vendas",
-    operation: "list",
-    query: "select(*).order(data desc)",
-  });
+  const rows = unwrapResult(
+    await supabase.from("vendas").select("*").order("data", { ascending: false }),
+    {
+      table: "vendas",
+      operation: "list",
+      query: "select(*).order(data desc)",
+    },
+  );
   const list = (rows as any[]).map(fromVendaRow);
   return {
     list,

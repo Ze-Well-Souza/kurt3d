@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { siteContentSchema, siteTestimonialSchema, heroStatSchema, featureSchema } from "./site-content-schema";
+import {
+  siteContentSchema,
+  siteTestimonialSchema,
+  heroStatSchema,
+  featureSchema,
+} from "./site-content-schema";
 
 describe("siteTestimonialSchema", () => {
   it("aceita depoimento valido", () => {

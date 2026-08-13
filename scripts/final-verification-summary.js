@@ -6,7 +6,7 @@ console.log("║     RELATÓRIO FINAL DE MIGRAÇÃO - KURTI 3D                  
 console.log("╚══════════════════════════════════════════════════════════════╝");
 console.log("");
 console.log(`📦 Projeto: ${SUPABASE_PROJECT_REF}`);
-console.log(`🕐 Data: ${new Date().toLocaleString('pt-BR')}`);
+console.log(`🕐 Data: ${new Date().toLocaleString("pt-BR")}`);
 console.log("");
 console.log("─".repeat(64));
 console.log("");
@@ -66,7 +66,7 @@ WHERE schemaname = 'public'
           query: summaryQuery,
           read_only: true,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -74,24 +74,24 @@ WHERE schemaname = 'public'
     }
 
     const result = await response.json();
-    
+
     console.log("📊 RESUMO DA MIGRAÇÃO:");
     console.log("");
-    
+
     const labels = {
-      'tables': '✅ Tabelas criadas',
-      'columns': '📝 Colunas totais',
-      'indexes': '🔖 Índices criados',
-      'rls_policies': '🔒 Políticas RLS'
+      tables: "✅ Tabelas criadas",
+      columns: "📝 Colunas totais",
+      indexes: "🔖 Índices criados",
+      rls_policies: "🔒 Políticas RLS",
     };
-    
+
     if (result && Array.isArray(result)) {
       for (const row of result) {
         const label = labels[row.category] || row.category;
         console.log(`   ${label}: ${row.count}`);
       }
     }
-    
+
     console.log("");
     console.log("─".repeat(64));
     console.log("");
@@ -133,7 +133,6 @@ WHERE schemaname = 'public'
     console.log("╔══════════════════════════════════════════════════════════════╗");
     console.log("║                    🎉 Kurti 3D System 🎉                     ║");
     console.log("╚══════════════════════════════════════════════════════════════╝");
-
   } catch (error) {
     console.error("❌ Erro:", error.message);
     process.exit(1);

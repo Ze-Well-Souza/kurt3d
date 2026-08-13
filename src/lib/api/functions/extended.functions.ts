@@ -10,7 +10,15 @@ import {
   receiptsRepo,
   savedReportsRepo,
 } from "../../server/repositories.server";
-import type { BudgetQuote, BudgetQuoteItem, Order, PortfolioVideo, ProductionCalendarEvent, Receipt, SavedReport } from "../../domain/types";
+import type {
+  BudgetQuote,
+  BudgetQuoteItem,
+  Order,
+  PortfolioVideo,
+  ProductionCalendarEvent,
+  Receipt,
+  SavedReport,
+} from "../../domain/types";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 
@@ -55,12 +63,12 @@ export const createBudgetQuote = createServerFn({ method: "POST" })
     await requireSession();
     const repo = await budgetQuotesRepo();
     const now = nowIso();
-    
+
     const subtotal = data.items.reduce((sum, item) => sum + item.subtotal, 0);
     const discount = data.discountPercent ?? 0;
     const total = subtotal * (1 - discount / 100);
-    const expiresAt = new Date(Date.now() + (data.validityDays * 24 * 60 * 60 * 1000)).toISOString();
-    
+    const expiresAt = new Date(Date.now() + data.validityDays * 24 * 60 * 60 * 1000).toISOString();
+
     const quote: BudgetQuote = {
       id: randomUUID(),
       clientName: data.clientName,
@@ -79,7 +87,7 @@ export const createBudgetQuote = createServerFn({ method: "POST" })
       expiresAt,
       convertedToOrderId: null,
     };
-    
+
     await repo.upsert(quote);
     return { ok: true, quoteId: quote.id };
   });
@@ -104,12 +112,12 @@ export const updateBudgetQuote = createServerFn({ method: "POST" })
     const repo = await budgetQuotesRepo();
     const quote = repo.list.find((q) => q.id === data.quoteId);
     if (!quote) return { ok: false, reason: "not_found" };
-    
+
     const now = nowIso();
     const subtotal = data.items.reduce((sum, item) => sum + item.subtotal, 0);
     const discount = data.discountPercent ?? 0;
     const total = subtotal * (1 - discount / 100);
-    
+
     const updated: BudgetQuote = {
       ...quote,
       clientName: data.clientName,
@@ -124,7 +132,7 @@ export const updateBudgetQuote = createServerFn({ method: "POST" })
       notes: data.notes ?? null,
       updatedAt: now,
     };
-    
+
     await repo.upsert(updated);
     return { ok: true };
   });
@@ -154,8 +162,14 @@ export const convertQuoteToOrder = createServerFn({ method: "POST" })
 
     // Create one order for the entire quote (items are bundled as a multi-part order or single summary)
     const totalTime = quote.items.reduce((sum, item) => sum + item.timeMinutes * item.quantity, 0);
-    const totalGrams = quote.items.reduce((sum, item) => sum + item.materialGrams * item.quantity, 0);
-    const avgGramsPerUnit = quote.items.length > 0 ? totalGrams / quote.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+    const totalGrams = quote.items.reduce(
+      (sum, item) => sum + item.materialGrams * item.quantity,
+      0,
+    );
+    const avgGramsPerUnit =
+      quote.items.length > 0
+        ? totalGrams / quote.items.reduce((sum, item) => sum + item.quantity, 0)
+        : 0;
 
     const order: Order = {
       id: orderId,
@@ -174,7 +188,12 @@ export const convertQuoteToOrder = createServerFn({ method: "POST" })
 
     // Save order and update quote
     await orders.save([order, ...orders.list]);
-    const updated: BudgetQuote = { ...quote, status: "converted", convertedToOrderId: orderId, updatedAt: now };
+    const updated: BudgetQuote = {
+      ...quote,
+      status: "converted",
+      convertedToOrderId: orderId,
+      updatedAt: now,
+    };
     await quotesRepo.upsert(updated);
     return { ok: true as const, quoteId: quote.id, orderId };
   });
@@ -199,7 +218,7 @@ export const addPortfolioVideo = createServerFn({ method: "POST" })
     await requireSession();
     const repo = await portfolioVideosRepo();
     const now = nowIso();
-    
+
     const video: PortfolioVideo = {
       id: randomUUID(),
       projectId: data.projectId ?? null,
@@ -214,7 +233,7 @@ export const addPortfolioVideo = createServerFn({ method: "POST" })
       createdAt: now,
       updatedAt: now,
     };
-    
+
     await repo.upsert(video);
     return { ok: true, videoId: video.id };
   });
@@ -238,7 +257,7 @@ export const updatePortfolioVideo = createServerFn({ method: "POST" })
     const repo = await portfolioVideosRepo();
     const video = repo.list.find((v) => v.id === data.videoId);
     if (!video) return { ok: false, reason: "not_found" };
-    
+
     const updated: PortfolioVideo = {
       ...video,
       title: data.title,
@@ -250,7 +269,7 @@ export const updatePortfolioVideo = createServerFn({ method: "POST" })
       featured: data.featured,
       updatedAt: nowIso(),
     };
-    
+
     await repo.upsert(updated);
     return { ok: true };
   });
@@ -283,7 +302,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
     await requireSession();
     const repo = await productionCalendarRepo();
     const now = nowIso();
-    
+
     const event: ProductionCalendarEvent = {
       id: randomUUID(),
       orderId: data.orderId,
@@ -296,7 +315,7 @@ export const createCalendarEvent = createServerFn({ method: "POST" })
       createdAt: now,
       updatedAt: now,
     };
-    
+
     await repo.upsert(event);
     return { ok: true, eventId: event.id };
   });
@@ -319,7 +338,7 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
     const repo = await productionCalendarRepo();
     const event = repo.list.find((e) => e.id === data.eventId);
     if (!event) return { ok: false, reason: "not_found" };
-    
+
     const updated: ProductionCalendarEvent = {
       ...event,
       title: data.title,
@@ -330,7 +349,7 @@ export const updateCalendarEvent = createServerFn({ method: "POST" })
       notes: data.notes ?? null,
       updatedAt: nowIso(),
     };
-    
+
     await repo.upsert(updated);
     return { ok: true };
   });
@@ -361,7 +380,7 @@ export const saveReport = createServerFn({ method: "POST" })
     await requireSession();
     const repo = await savedReportsRepo();
     const now = nowIso();
-    
+
     const report: SavedReport = {
       id: randomUUID(),
       name: data.name,
@@ -372,7 +391,7 @@ export const saveReport = createServerFn({ method: "POST" })
       createdAt: now,
       updatedAt: now,
     };
-    
+
     await repo.upsert(report);
     return { ok: true, reportId: report.id };
   });

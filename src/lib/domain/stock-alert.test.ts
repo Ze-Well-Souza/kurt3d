@@ -3,19 +3,23 @@ import { extractQuantityNumber, getFilamentoAlertLevel, getInsumoAlertLevel } fr
 
 describe("stock alerts", () => {
   it("classifica filamento com pouca disponibilidade como baixo estoque", () => {
-    expect(getFilamentoAlertLevel({
-      pesoInicial: 1000,
-      pesoAtual: 350,
-      disponivelGrams: 180,
-    })).toBe("low");
+    expect(
+      getFilamentoAlertLevel({
+        pesoInicial: 1000,
+        pesoAtual: 350,
+        disponivelGrams: 180,
+      }),
+    ).toBe("low");
   });
 
   it("classifica filamento intermediario como alerta medio", () => {
-    expect(getFilamentoAlertLevel({
-      pesoInicial: 1000,
-      pesoAtual: 380,
-      disponivelGrams: 380,
-    })).toBe("medium");
+    expect(
+      getFilamentoAlertLevel({
+        pesoInicial: 1000,
+        pesoAtual: 380,
+        disponivelGrams: 380,
+      }),
+    ).toBe("medium");
   });
 
   it("extrai quantidade numerica de insumo textual", () => {

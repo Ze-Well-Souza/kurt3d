@@ -87,7 +87,14 @@ vi.mock("../server/db.server", () => ({
 vi.mock("../server/repositories.server", () => ({
   clientsRepo: vi.fn(async () => clientsRepoMock),
   expensesRepo: vi.fn(async () => expensesRepoMock),
-  filamentoInstallmentsRepo: vi.fn(async () => ({ list: [], save: vi.fn(), insertMany: vi.fn(), update: vi.fn(), deleteByPayment: vi.fn(), removeMany: vi.fn() })),
+  filamentoInstallmentsRepo: vi.fn(async () => ({
+    list: [],
+    save: vi.fn(),
+    insertMany: vi.fn(),
+    update: vi.fn(),
+    deleteByPayment: vi.fn(),
+    removeMany: vi.fn(),
+  })),
   filamentoPaymentEventsRepo: vi.fn(async () => ({ list: [], insert: vi.fn() })),
   filamentoPaymentsRepo: vi.fn(async () => ({ list: [], save: vi.fn() })),
   filamentosHistoryRepo: vi.fn(async () => ({ list: [], save: vi.fn(), archive: vi.fn() })),
@@ -131,7 +138,8 @@ vi.mock("../server/supabase.server", () => ({
           return builder;
         },
         order: () => builder,
-        then: (resolve: any, reject: any) => Promise.resolve({ data: rows, error: null }).then(resolve, reject),
+        then: (resolve: any, reject: any) =>
+          Promise.resolve({ data: rows, error: null }).then(resolve, reject),
       };
       return builder;
     },
@@ -181,7 +189,14 @@ describe("removeOrder", () => {
       },
     ];
     inventoryRepoMock.list = [
-      { id: "tx-1", orderId: "order-1", filamentId: "fil-1", type: "reserve", grams: 30, createdAt: "2026-06-26T10:05:00.000Z" },
+      {
+        id: "tx-1",
+        orderId: "order-1",
+        filamentId: "fil-1",
+        type: "reserve",
+        grams: 30,
+        createdAt: "2026-06-26T10:05:00.000Z",
+      },
     ];
 
     const { removeOrder } = await import("./data.functions");
@@ -214,7 +229,14 @@ describe("removeOrder", () => {
       },
     ];
     inventoryRepoMock.list = [
-      { id: "tx-1", orderId: "order-2", filamentId: "fil-1", type: "reserve", grams: 30, createdAt: "2026-06-26T10:05:00.000Z" },
+      {
+        id: "tx-1",
+        orderId: "order-2",
+        filamentId: "fil-1",
+        type: "reserve",
+        grams: 30,
+        createdAt: "2026-06-26T10:05:00.000Z",
+      },
     ];
 
     const { removeOrder } = await import("./data.functions");
@@ -310,15 +332,17 @@ describe("client linking", () => {
 
     const { addOrder } = await import("./data.functions");
 
-    await expect(addOrder({
-      data: {
-        client: "Cliente Invalido",
-        clientId: "client-missing",
-        projectName: "Projeto",
-        quantity: 1,
-        timeMinutes: 30,
-      },
-    })).rejects.toThrow("client_not_found");
+    await expect(
+      addOrder({
+        data: {
+          client: "Cliente Invalido",
+          clientId: "client-missing",
+          projectName: "Projeto",
+          quantity: 1,
+          timeMinutes: 30,
+        },
+      }),
+    ).rejects.toThrow("client_not_found");
   });
 
   it("agrega tempo e material ao criar pedido multi-partes e persiste as partes", async () => {
