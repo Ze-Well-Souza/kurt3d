@@ -7,6 +7,7 @@ import {
   filamentosHistoryRepo,
   filamentosRepo,
   inventoryRepo,
+  ordersRepo,
 } from "../../server/repositories.server";
 import { requireSession } from "../../server/require-session.server";
 import { checkMutationRateLimit } from "../../server/mutation-guard.server";
@@ -117,7 +118,38 @@ export const removeFilamento = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const repo = await filamentosRepo();
+    const [repo, inv, orders] = await Promise.all([
+      filamentosRepo(),
+      inventoryRepo(),
+      ordersRepo(),
+    ]);
+
+    // P1-9: nao ha FK de orders.filamento_id para filamentos, entao apagar um
+    // rolo em uso deixava o pedido apontando para uma linha inexistente — e a
+    // reserva de estoque orfa. Recusa com uma mensagem que diz o que fazer.
+    const reservado = computeReservedByFilament(inv.list)[data.id] ?? 0;
+    if (reservado > 0) {
+      throw new Error(
+        `Este rolo tem ${reservado.toFixed(0)}g reservados por pedidos em producao. ` +
+          `Finalize ou cancele esses pedidos antes de remover.`,
+      );
+    }
+
+    const pedidosVinculados = orders.list.filter(
+      (order) =>
+        order.filamentoId === data.id &&
+        order.status !== "vendido" &&
+        order.status !== "presente" &&
+        order.status !== "falha",
+    );
+    if (pedidosVinculados.length > 0) {
+      throw new Error(
+        `Este rolo esta vinculado a ${pedidosVinculados.length} pedido(s) em aberto. ` +
+          `Troque o filamento desses pedidos ou finalize-os antes de remover. ` +
+          `Para tirar o rolo do estoque sem perder o historico, use Arquivar.`,
+      );
+    }
+
     await repo.remove(data.id);
     return { ok: true };
   });

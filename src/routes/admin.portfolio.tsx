@@ -128,6 +128,7 @@ import { normalizeText } from "@/lib/utils/normalization";
 import { openPrintQuote, type QuoteInput } from "@/lib/domain/quote-print";
 import { openPrintReceipt, type ReceiptInput } from "@/lib/domain/payment-receipt-print";
 import { openPrintSaleReceipt, openSaleReceiptWhatsApp } from "@/lib/domain/sale-receipt-print";
+import { formatIsoDatePtBr } from "@/lib/domain/installments";
 
 export const Route = createFileRoute("/admin/portfolio")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -1912,7 +1913,7 @@ function CalcPedidos() {
                       label="Data Pagamento"
                       value={
                         detailOrder.dataPagamento
-                          ? new Date(detailOrder.dataPagamento).toLocaleDateString("pt-BR")
+                          ? formatIsoDatePtBr(detailOrder.dataPagamento)
                           : "—"
                       }
                     />
@@ -1931,13 +1932,13 @@ function CalcPedidos() {
                       label="Previsao operacional"
                       value={
                         tracking.estimatedDeliveryAt
-                          ? new Date(tracking.estimatedDeliveryAt).toLocaleDateString("pt-BR")
+                          ? formatIsoDatePtBr(tracking.estimatedDeliveryAt)
                           : "—"
                       }
                     />
                     <DetailItem
                       label="Criado em"
-                      value={new Date(detailOrder.createdAt).toLocaleDateString("pt-BR")}
+                      value={formatIsoDatePtBr(detailOrder.createdAt)}
                     />
                   </div>
                   {parts.length > 0 && (
@@ -3650,7 +3651,7 @@ function CalcPedidos() {
                         <span>{o.formaPagamento}</span>
                         {o.dataPagamento && (
                           <span className="text-muted-foreground/70">
-                            · {new Date(o.dataPagamento).toLocaleDateString("pt-BR")}
+                            · {formatIsoDatePtBr(o.dataPagamento)}
                           </span>
                         )}
                       </div>
@@ -4106,7 +4107,7 @@ function OrderCardView({
             <span className="font-medium">{order.formaPagamento}</span>
             {order.dataPagamento && (
               <span className="text-muted-foreground/70">
-                · {new Date(order.dataPagamento).toLocaleDateString("pt-BR")}
+                · {formatIsoDatePtBr(order.dataPagamento)}
               </span>
             )}
           </div>

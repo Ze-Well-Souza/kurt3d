@@ -69,3 +69,20 @@ export function getOrderTrackingSummary(
     estimatedDeliveryAt: getOrderEstimatedDeliveryDate(order),
   };
 }
+
+/**
+ * Converte um código de acompanhamento no prefixo do id do pedido, para
+ * filtrar no SQL em vez de varrer a tabela inteira em memória (P1-7).
+ *
+ * O código são os 12 primeiros caracteres hexadecimais do UUID, sem hífens e
+ * em maiúsculas. Num UUID esses 12 caracteres cobrem os dois primeiros grupos
+ * (8-4), então o prefixo do id é `xxxxxxxx-xxxx`.
+ *
+ * Devolve null quando o código não tem a forma esperada — aí não há prefixo
+ * seguro para consultar e o chamador deve tratar como não encontrado.
+ */
+export function buildTrackingCodeIdPrefix(code: string): string | null {
+  const normalizado = code.trim().toLowerCase().replace(/-/g, "");
+  if (!/^[0-9a-f]{12}$/.test(normalizado)) return null;
+  return `${normalizado.slice(0, 8)}-${normalizado.slice(8, 12)}`;
+}

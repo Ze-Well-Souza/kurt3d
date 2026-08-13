@@ -5,6 +5,9 @@ import { brl } from "@/lib/utils";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useVendas } from "@/lib/hooks/use-vendas";
 import { useExpenses } from "@/lib/hooks/use-expenses";
+import { useInsumos } from "@/lib/hooks/use-insumos";
+import { useInsumoPayments } from "@/lib/hooks/use-insumo-payments";
+import { calcularTotaisFinanceiros, classificarDespesas } from "@/lib/domain/finance-totals";
 
 export const Route = createFileRoute("/admin/")({
   component: Dashboard,
@@ -14,37 +17,56 @@ function Dashboard() {
   const { data: ordersData } = useOrders();
   const { data: vendasData } = useVendas();
   const { data: expensesData } = useExpenses();
+  const { data: insumosData } = useInsumos();
+  const { data: ipData } = useInsumoPayments();
   const orders = ordersData ?? [];
   const vendas = vendasData ?? [];
   const expenses = expensesData ?? [];
+  const insumos = insumosData ?? [];
+  const insumoPayments = ipData?.insumoPayments ?? [];
   const [period, setPeriod] = useState<"month" | "all">("month");
 
   const periodLabel = period === "month" ? "este mês" : "total";
 
+  // P2-10: era useMemo(..., []), entao uma aba deixada aberta nao virava o mes.
   const monthStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  }, []);
+  }, [period]);
 
   const filteredVendas = useMemo(() => {
     if (period === "all") return vendas;
     return vendas.filter((v) => v.data >= monthStart);
   }, [vendas, period, monthStart]);
 
+  const classifiedExpenses = useMemo(
+    () => classificarDespesas(expenses, insumos),
+    [expenses, insumos],
+  );
+
   const filteredExpenses = useMemo(() => {
-    if (period === "all") return expenses;
+    if (period === "all") return classifiedExpenses;
     const monthStartDate = monthStart.slice(0, 10);
-    return expenses.filter((e) => e.data >= monthStartDate);
-  }, [expenses, period, monthStart]);
+    return classifiedExpenses.filter((e) => e.data >= monthStartDate);
+  }, [classifiedExpenses, period, monthStart]);
+
+  // P1-6: mesma funcao de dominio que a tela de Financas usa. Antes o Painel
+  // somava TODAS as despesas — incluindo investimento/imobilizado e insumos ja
+  // contados pelas parcelas — e as duas telas discordavam sobre o lucro do mes.
+  const totais = useMemo(
+    () =>
+      calcularTotaisFinanceiros({
+        vendas: filteredVendas,
+        despesasClassificadas: filteredExpenses,
+        insumoPayments,
+      }),
+    [filteredVendas, filteredExpenses, insumoPayments],
+  );
 
   const stats = useMemo(() => {
     const trabalhosAtivos = orders.filter(
       (o) => o.status === "todo" || o.status === "printing",
     ).length;
-    const receita = filteredVendas.reduce((sum, v) => sum + v.valor, 0);
-    const custoTotal = filteredVendas.reduce((sum, v) => sum + v.custo, 0);
-    const despesas = filteredExpenses.reduce((sum, e) => sum + e.valor, 0);
-    const lucro = receita - custoTotal - despesas;
     return [
       {
         label: "Trabalhos ativos",
@@ -53,21 +75,21 @@ function Dashboard() {
       },
       {
         label: `Receita (${periodLabel})`,
-        value: brl(receita),
+        value: brl(totais.receita),
         delta: `${filteredVendas.length} vendas`,
       },
       {
         label: `Lucro Líquido (${periodLabel})`,
-        value: brl(lucro),
-        delta: lucro >= 0 ? "positivo" : "negativo",
+        value: brl(totais.lucro),
+        delta: totais.lucro >= 0 ? "positivo" : "negativo",
       },
       {
         label: `Despesas (${periodLabel})`,
-        value: brl(despesas),
+        value: brl(totais.despesasOperacionais),
         delta: `${filteredExpenses.length} lançamentos`,
       },
     ];
-  }, [orders, filteredVendas, filteredExpenses, periodLabel]);
+  }, [orders, totais, filteredVendas, filteredExpenses, periodLabel]);
 
   // Recent terminal orders for activity section
   const recentActivity = useMemo(() => {

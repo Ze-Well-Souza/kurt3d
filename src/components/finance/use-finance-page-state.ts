@@ -10,7 +10,7 @@ import {
   settleInsumoPayment,
   settlePayment,
 } from "@/lib/api/data.functions";
-import { todayIso } from "@/lib/domain/installments";
+import { formatIsoDatePtBr, todayIso } from "@/lib/domain/installments";
 import {
   buildCurrentMonthInstallmentBreakdown,
   buildInstallmentAuditByMonth,
@@ -44,6 +44,11 @@ import {
   useFilamentoPaymentEvents,
 } from "@/lib/hooks/use-filamento-payments";
 import { useInsumoPayments, useInsumoPaymentEvents } from "@/lib/hooks/use-insumo-payments";
+import {
+  calcularTotaisFinanceiros,
+  classificarDespesas,
+  ehDespesaOperacional,
+} from "@/lib/domain/finance-totals";
 import { invalidarPor } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
 import { brl } from "@/lib/utils";
@@ -286,20 +291,12 @@ export function useFinancePageState() {
     [expenses, isDateInSelectedPeriod],
   );
 
-  const insumoById = useMemo(() => new Map(insumos.map((item) => [item.id, item])), [insumos]);
-
+  // P1-6: a classificacao e os totais moram em domain/finance-totals.ts, para
+  // que o Painel use exatamente a mesma regra e as duas telas parem de mostrar
+  // lucros diferentes para o mesmo mes.
   const allClassifiedExpenses = useMemo(
-    () =>
-      expenses.map((expense) => {
-        const linkedInsumo = expense.source === "insumo" ? insumoById.get(expense.refId) : null;
-        const financialClass =
-          linkedInsumo?.classificacaoFinanceira === "investimento" ||
-          expense.categoria === "Investimento / Imobilizado"
-            ? "investimento"
-            : "operacional";
-        return { ...expense, financialClass };
-      }),
-    [expenses, insumoById],
+    () => classificarDespesas(expenses, insumos),
+    [expenses, insumos],
   );
 
   const classifiedExpenses = useMemo(
@@ -447,27 +444,15 @@ export function useFinancePageState() {
     [allPaymentEvents, isDateInSelectedPeriod],
   );
 
-  const totals = useMemo(() => {
-    const receita = periodFilteredVendas.reduce((s, v) => s + v.valor, 0);
-    const custo = periodFilteredVendas.reduce((s, v) => s + v.custo, 0);
-
-    // Exclui despesas de insumos que já têm parcelamento (evita dupla contagem com fluxo de caixa)
-    const insumoIdsComParcelamento = new Set(insumoPayments.map((p) => p.insumoId));
-    const despesasOperacionais = classifiedExpenses
-      .filter((expense) => {
-        if (expense.financialClass !== "operacional") return false;
-        // Exclui insumos que possuem parcelamento próprio
-        if (expense.source === "insumo" && insumoIdsComParcelamento.has(expense.refId))
-          return false;
-        return true;
-      })
-      .reduce((s, e) => s + e.valor, 0);
-    const investimentos = classifiedExpenses
-      .filter((expense) => expense.financialClass === "investimento")
-      .reduce((s, e) => s + e.valor, 0);
-    const lucro = receita - custo - despesasOperacionais;
-    return { receita, custo, lucro, despesasOperacionais, investimentos };
-  }, [classifiedExpenses, periodFilteredVendas, insumoPayments]);
+  const totals = useMemo(
+    () =>
+      calcularTotaisFinanceiros({
+        vendas: periodFilteredVendas,
+        despesasClassificadas: classifiedExpenses,
+        insumoPayments,
+      }),
+    [classifiedExpenses, periodFilteredVendas, insumoPayments],
+  );
 
   // Série dos últimos 6 meses (terminando no mês âncora) para comparativo mês a mês
   // na aba Vendas, usando a mesma regra de despesas operacionais do totals.
@@ -490,12 +475,9 @@ export function useFinancePageState() {
       const receita = monthVendas.reduce((s, v) => s + v.valor, 0);
       const custo = monthVendas.reduce((s, v) => s + v.custo, 0);
       const despesas = allClassifiedExpenses
-        .filter((e) => {
-          if (e.data.slice(0, 7) !== key) return false;
-          if (e.financialClass !== "operacional") return false;
-          if (e.source === "insumo" && insumoIdsComParcelamento.has(e.refId)) return false;
-          return true;
-        })
+        .filter(
+          (e) => e.data.slice(0, 7) === key && ehDespesaOperacional(e, insumoIdsComParcelamento),
+        )
         .reduce((s, e) => s + e.valor, 0);
       series.push({
         key,
@@ -965,7 +947,7 @@ export function useFinancePageState() {
         (row) => `
           <tr>
             <td>${row.tipo}</td>
-            <td>${new Date(row.data).toLocaleDateString("pt-BR")}</td>
+            <td>${formatIsoDatePtBr(row.data)}</td>
             <td>${escapeHtml(row.descricao)}</td>
             <td>${escapeHtml(row.categoria)}</td>
             <td>${escapeHtml(row.cliente)}</td>

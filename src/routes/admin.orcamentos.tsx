@@ -49,6 +49,7 @@ import { openPrintSaleReceipt, openSaleReceiptWhatsApp } from "@/lib/domain/sale
 import { normalizeText } from "@/lib/utils/normalization";
 import type { BudgetQuote, BudgetQuoteItem, BudgetQuoteStatus } from "@/lib/domain/types";
 import { invalidarPor } from "@/lib/query-keys";
+import { formatIsoDatePtBr } from "@/lib/domain/installments";
 
 export const Route = createFileRoute("/admin/orcamentos")({
   head: () => ({ meta: [{ title: "Orçamentos — Kurti 3D" }] }),
@@ -410,7 +411,7 @@ function OrcamentosPage() {
                           <span>{formatPhoneDisplay(quote.clientContact)}</span>
                         )}
                         {quote.clientEmail && <span>{quote.clientEmail}</span>}
-                        <span>{new Date(quote.createdAt).toLocaleDateString("pt-BR")}</span>
+                        <span>{formatIsoDatePtBr(quote.createdAt)}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

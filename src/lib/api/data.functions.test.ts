@@ -137,6 +137,11 @@ vi.mock("../server/supabase.server", () => ({
           rows = rows.filter((row) => row[column] === value);
           return builder;
         },
+        like: (column: string, pattern: string) => {
+          const prefixo = pattern.replace(/%$/, "");
+          rows = rows.filter((row) => String(row[column] ?? "").startsWith(prefixo));
+          return builder;
+        },
         limit: (count: number) => {
           rows = rows.slice(0, count);
           return builder;
@@ -152,6 +157,7 @@ vi.mock("../server/supabase.server", () => ({
 
 vi.mock("../server/mutation-guard.server", () => ({
   checkMutationRateLimit: vi.fn(async () => undefined),
+  checkPublicRateLimit: vi.fn(async () => undefined),
 }));
 
 describe("removeOrder", () => {
@@ -472,28 +478,33 @@ describe("client linking", () => {
   });
 
   it("permite acompanhamento publico do pedido com codigo e telefone do cliente", async () => {
-    ordersRepoMock.list = [
-      {
-        id: "12345678-90ab-cdef-1234-567890abcdef",
-        client: "Cliente Oficial",
-        projectName: "Miniatura",
-        quantity: 2,
-        timeMinutes: 120,
-        status: "printing",
-        createdAt: "2026-06-26T10:00:00.000Z",
-        updatedAt: "2026-06-26T12:00:00.000Z",
-        clientId: "client-1",
-      },
-    ];
-    clientsRepoMock.list = [
-      {
-        id: "client-1",
-        nome: "Cliente Oficial",
-        whatsapp: "5511999998888",
-        createdAt: "2026-06-26T10:00:00.000Z",
-        updatedAt: "2026-06-26T10:00:00.000Z",
-      },
-    ];
+    // O rastreio publico agora filtra no SQL pelo prefixo do id (P1-7), em vez
+    // de baixar `orders` e `clients` inteiras — por isso os dados vao no mock
+    // do Supabase, em formato de linha, e nao nos repositorios.
+    supabaseMockRows = {
+      orders: [
+        {
+          id: "12345678-90ab-cdef-1234-567890abcdef",
+          client: "Cliente Oficial",
+          project_name: "Miniatura",
+          quantity: 2,
+          time_minutes: 120,
+          status: "printing",
+          created_at: "2026-06-26T10:00:00.000Z",
+          updated_at: "2026-06-26T12:00:00.000Z",
+          client_id: "client-1",
+        },
+      ],
+      clients: [
+        {
+          id: "client-1",
+          nome: "Cliente Oficial",
+          whatsapp: "5511999998888",
+          created_at: "2026-06-26T10:00:00.000Z",
+          updated_at: "2026-06-26T10:00:00.000Z",
+        },
+      ],
+    };
 
     const { getPublicOrderTracking } = await import("./data.functions");
 
@@ -516,28 +527,30 @@ describe("client linking", () => {
   });
 
   it("nao revela pedido quando telefone nao confere", async () => {
-    ordersRepoMock.list = [
-      {
-        id: "12345678-90ab-cdef-1234-567890abcdef",
-        client: "Cliente Oficial",
-        projectName: "Miniatura",
-        quantity: 2,
-        timeMinutes: 120,
-        status: "printing",
-        createdAt: "2026-06-26T10:00:00.000Z",
-        updatedAt: "2026-06-26T12:00:00.000Z",
-        clientId: "client-1",
-      },
-    ];
-    clientsRepoMock.list = [
-      {
-        id: "client-1",
-        nome: "Cliente Oficial",
-        whatsapp: "5511999998888",
-        createdAt: "2026-06-26T10:00:00.000Z",
-        updatedAt: "2026-06-26T10:00:00.000Z",
-      },
-    ];
+    supabaseMockRows = {
+      orders: [
+        {
+          id: "12345678-90ab-cdef-1234-567890abcdef",
+          client: "Cliente Oficial",
+          project_name: "Miniatura",
+          quantity: 2,
+          time_minutes: 120,
+          status: "printing",
+          created_at: "2026-06-26T10:00:00.000Z",
+          updated_at: "2026-06-26T12:00:00.000Z",
+          client_id: "client-1",
+        },
+      ],
+      clients: [
+        {
+          id: "client-1",
+          nome: "Cliente Oficial",
+          whatsapp: "5511999998888",
+          created_at: "2026-06-26T10:00:00.000Z",
+          updated_at: "2026-06-26T10:00:00.000Z",
+        },
+      ],
+    };
 
     const { getPublicOrderTracking } = await import("./data.functions");
 
@@ -552,6 +565,18 @@ describe("client linking", () => {
       ok: false,
       reason: "not_found",
     });
+  });
+
+  it("nao consulta o banco quando o codigo tem formato invalido", async () => {
+    supabaseMockRows = { orders: [], clients: [] };
+
+    const { getPublicOrderTracking } = await import("./data.functions");
+
+    const result = await getPublicOrderTracking({
+      data: { code: "ZZZZZZZZZZZZ", phone: "(11) 99999-8888" },
+    });
+
+    expect(result).toEqual({ ok: false, reason: "not_found" });
   });
 });
 

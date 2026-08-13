@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ArrowLeft, Clock3, PackageSearch, Truck } from "lucide-react";
 import { getPublicOrderTracking } from "@/lib/api/data.functions";
+import { formatIsoDatePtBr } from "@/lib/domain/installments";
 
 export const Route = createFileRoute("/acompanhar")({
   head: () => ({
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/acompanhar")({
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("pt-BR");
+  return formatIsoDatePtBr(value);
 }
 
 function OrderTrackingPage() {

@@ -5,7 +5,7 @@ import type { Client, Lead } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { syncLeadToCrm } from "../../server/lead-crm.server";
 import { clientsRepo, leadsRepo, ordersRepo } from "../../server/repositories.server";
-import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { checkMutationRateLimit, checkPublicRateLimit } from "../../server/mutation-guard.server";
 import { requireSession } from "../../server/require-session.server";
 import { uploadImagesToStorage } from "../../server/lead-image-upload.server";
 import {
@@ -42,7 +42,8 @@ export const submitLead = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    await checkMutationRateLimit();
+    // Rota publica sem sessao, com upload de ate 6 imagens: limite apertado.
+    await checkPublicRateLimit("submit-lead");
     const repo = await leadsRepo();
 
     // Upload images to Supabase Storage — original base64 is NOT stored in DB

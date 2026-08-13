@@ -80,6 +80,7 @@ function Reports() {
   const orders = ordersData ?? [];
   const vendas = vendasData ?? [];
   const filamentos = filamentosData?.filamentos ?? [];
+  const filamentosHistory = filamentosData?.filamentosHistory ?? [];
   const expenses = expensesData ?? [];
   const calendarEvents = calendarEventsData ?? [];
   const budgetQuotes = budgetQuotesData ?? [];
@@ -188,15 +189,18 @@ function Reports() {
       filamentConsumedGrams,
       activeClients,
     };
-  }, [orders, vendas, expenses, filamentos, periodPreset, filteredDates]);
+  }, [orders, vendas, expenses, filamentos, filamentosHistory, periodPreset, filteredDates]);
 
   // Revenue by month for chart data
   const revenueByMonth = useMemo(() => {
     const months: Record<string, number> = {};
+    // Ancora no dia 1: `new Date(); d.setMonth(d.getMonth() - i)` transborda
+    // quando hoje e dia 29, 30 ou 31 (31/03 -> "31/02" -> 03/03), pulando meses
+    // da serie.
+    const hoje = new Date();
     const last12Months = Array.from({ length: 12 }, (_, i) => {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      return d.toISOString().slice(0, 7);
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     }).reverse();
 
     for (const month of last12Months) {
@@ -251,6 +255,11 @@ function Reports() {
       expired: budgetQuotes.filter((q) => q.status === "expired").length,
       conversionRate: 0,
     };
+    // Estava fixo em 0 e exibido como "% conversao": o card mostrava sempre
+    // 0,0%. Conversao = orcamentos que viraram pedido / orcamentos que sairam
+    // do rascunho (um rascunho nunca enviado nao entra no denominador).
+    const enviados = stats.total - stats.draft;
+    stats.conversionRate = enviados > 0 ? (stats.converted / enviados) * 100 : 0;
     return stats;
   }, [budgetQuotes]);
 

@@ -33,14 +33,18 @@ export async function cleanupOldLeadImages(olderThanDays: number = 90): Promise<
 
     // Extract storage paths from old leads' images
     const pathsToDelete: string[] = [];
+    const leadIdsComImagem: string[] = [];
     for (const lead of oldLeads) {
       const imagens = lead.imagens;
       if (!Array.isArray(imagens)) continue;
+      let temImagem = false;
       for (const img of imagens) {
         if (img?.storagePath && typeof img.storagePath === "string") {
           pathsToDelete.push(img.storagePath);
+          temImagem = true;
         }
       }
+      if (temImagem) leadIdsComImagem.push(lead.id);
     }
 
     if (pathsToDelete.length === 0) {
@@ -63,9 +67,27 @@ export async function cleanupOldLeadImages(olderThanDays: number = 90): Promise<
       }
     }
 
+    // P1-8: limpar a referencia no banco. Antes os arquivos sumiam do Storage
+    // mas `leads.imagens` continuava apontando para eles, entao a tela de Leads
+    // exibia imagens quebradas para sempre — e nao havia como distinguir "lead
+    // sem foto" de "foto apagada pela retencao".
+    if (deletedCount > 0 && leadIdsComImagem.length > 0) {
+      const { error: updateError } = await supabase
+        .from("leads")
+        .update({ imagens: null })
+        .in("id", leadIdsComImagem);
+      if (updateError) {
+        logger.warn("cleanup.clear_lead_refs_failed", {
+          error: updateError.message,
+          leads: leadIdsComImagem.length,
+        });
+      }
+    }
+
     logger.info("cleanup.completed", {
       leadsChecked: oldLeads.length,
       filesDeleted: deletedCount,
+      leadsLimpos: leadIdsComImagem.length,
       olderThanDays,
     });
 

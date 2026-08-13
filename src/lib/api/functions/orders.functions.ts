@@ -5,9 +5,16 @@ import { calcOrderCostHybrid, estimateOrderMaterialGrams } from "../../domain/co
 import { isValidOrderProjectReference } from "../../domain/order-asset";
 import { computeOrderTotalsFromParts, normalizeOrderParts } from "../../domain/order-parts";
 import { clampGrams } from "../../domain/inventory";
-import { getOrderTrackingSummary, matchesOrderTrackingCode } from "../../domain/order-tracking";
+import {
+  buildTrackingCodeIdPrefix,
+  getOrderTrackingSummary,
+  matchesOrderTrackingCode,
+} from "../../domain/order-tracking";
 import type { Expense, Order, OrderDestino, OrderPart, Status, Venda } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
+import { getSupabaseAdminClient } from "../../server/supabase.server";
+import { fromClientRow, fromOrderRow } from "../../server/repositories/mappers";
+import { unwrapResult } from "../../server/repositories/shared";
 import {
   createOrderAssetSignedUrl,
   uploadOrderAssetToStorage,
@@ -25,7 +32,7 @@ import {
   vendasRepo,
 } from "../../server/repositories.server";
 import { requireSession } from "../../server/require-session.server";
-import { checkMutationRateLimit } from "../../server/mutation-guard.server";
+import { checkMutationRateLimit, checkPublicRateLimit } from "../../server/mutation-guard.server";
 import { normalizePhone } from "../../utils/normalization";
 import {
   allowedStatusTransition,
@@ -385,13 +392,43 @@ export const getPublicOrderTracking = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    await checkMutationRateLimit();
-    const [orders, clientsData] = await Promise.all([ordersRepo(), clientsRepo()]);
-    const order = orders.list.find((item) => matchesOrderTrackingCode(item.id, data.code));
-    if (!order) {
-      return { ok: false as const, reason: "not_found" as const };
-    }
-    if (!phoneMatchesClient(order, clientsData.list, data.phone)) {
+    await checkPublicRateLimit("order-tracking");
+
+    // P1-7: rota publica de maior risco de abuso. Antes baixava `orders` e
+    // `clients` INTEIRAS do Supabase a cada consulta anonima so para achar um
+    // pedido — egress pago por requisicao de qualquer visitante. Agora o filtro
+    // acontece no SQL, pelo prefixo do id que o codigo representa.
+    const prefixo = buildTrackingCodeIdPrefix(data.code);
+    if (!prefixo) return { ok: false as const, reason: "not_found" as const };
+
+    const supabase = getSupabaseAdminClient();
+    const candidatos = unwrapResult(
+      await supabase
+        .from("orders")
+        .select("id, project_name, quantity, status, created_at, updated_at, multi_part, client_id")
+        .like("id", `${prefixo}%`)
+        .limit(5),
+      {
+        table: "orders",
+        operation: "publicTracking",
+        query: "select(cols).like(id, prefixo).limit(5)",
+      },
+    ) as any[];
+
+    const row = candidatos.find((item) => matchesOrderTrackingCode(item.id, data.code));
+    if (!row) return { ok: false as const, reason: "not_found" as const };
+
+    const order = fromOrderRow(row);
+
+    // Só o cliente daquele pedido é carregado — não a agenda inteira.
+    const clientRows = order.clientId
+      ? (unwrapResult(
+          await supabase.from("clients").select("*").eq("id", order.clientId).limit(1),
+          { table: "clients", operation: "publicTrackingClient", query: "select(*).eq(id)" },
+        ) as any[])
+      : [];
+
+    if (!phoneMatchesClient(order, clientRows.map(fromClientRow), data.phone)) {
       return { ok: false as const, reason: "not_found" as const };
     }
 
@@ -480,10 +517,11 @@ export const updateOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const [orders, clientsData, partsRepo] = await Promise.all([
+    const [orders, clientsData, partsRepo, inv] = await Promise.all([
       ordersRepo(),
       clientsRepo(),
       orderPartsRepo(),
+      inventoryRepo(),
     ]);
     const order = orders.list.find((item) => item.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };
@@ -491,6 +529,23 @@ export const updateOrder = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "terminal_state" as const };
     }
     assertExplicitClientIdExists(clientsData.list, data.clientId);
+
+    // P1-9: trocar o filamento de um pedido em producao precisa devolver os
+    // gramas reservados no rolo antigo. Sem isso a reserva ficava presa para
+    // sempre e o "disponivel" daquele rolo nunca mais voltava ao valor real.
+    const filamentoAnterior = order.filamentoId ?? null;
+    const filamentoNovo = data.filamentoId ?? null;
+    if (filamentoAnterior && filamentoAnterior !== filamentoNovo) {
+      const reservado = computeOrderReservedGrams(inv.list, order.id, filamentoAnterior);
+      if (reservado > 0) {
+        await inv.append({
+          orderId: order.id,
+          filamentId: filamentoAnterior,
+          type: "release",
+          grams: reservado,
+        });
+      }
+    }
 
     const existingParts = partsRepo.list.filter((part) => part.orderId === order.id);
     const aggregated = existingParts.length > 0 ? computeOrderTotalsFromParts(existingParts) : null;

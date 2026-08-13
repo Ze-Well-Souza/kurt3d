@@ -23,6 +23,7 @@ import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizePhone, normalizeText } from "@/lib/utils/normalization";
 import { formatPhoneDisplay } from "@/lib/utils";
 import { invalidarPor } from "@/lib/query-keys";
+import { formatIsoDatePtBr } from "@/lib/domain/installments";
 
 export const Route = createFileRoute("/admin/leads")({
   head: () => ({ meta: [{ title: "Leads — Kurti 3D" }] }),
@@ -151,7 +152,7 @@ function LeadsPage() {
                         )}
                         <Badge variant="secondary" className="text-xs">
                           <Calendar className="mr-1 h-3 w-3" />
-                          {new Date(lead.createdAt).toLocaleDateString("pt-BR")}
+                          {formatIsoDatePtBr(lead.createdAt)}
                         </Badge>
                       </div>
                     </div>
