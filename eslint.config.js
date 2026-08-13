@@ -6,7 +6,21 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // Saídas de build e diretórios gerados. Sem isto, `eslint .` entra nos
+  // bundles minificados de .vercel/output e reporta ~31k erros de formatação
+  // em código de terceiros, tornando o lint inutilizável.
+  {
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      ".vercel",
+      ".tanstack",
+      "data",
+      "Python",
+      "src/routeTree.gen.ts",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
