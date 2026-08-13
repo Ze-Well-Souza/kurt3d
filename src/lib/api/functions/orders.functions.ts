@@ -21,6 +21,7 @@ import {
   orderPartsRepo,
   ordersRepo,
   portfolioRepo,
+  settingsRepo,
   vendasRepo,
 } from "../../server/repositories.server";
 import { requireSession } from "../../server/require-session.server";
@@ -269,13 +270,15 @@ export const finalizarDestino = createServerFn({ method: "POST" })
     await checkMutationRateLimit();
     await requireSession();
     const destino = data.destino as OrderDestino;
-    const [orders, vendas, portfolio, filamentos, expenses] = await Promise.all([
+    const [orders, vendas, portfolio, filamentos, expenses, settingsData] = await Promise.all([
       ordersRepo(),
       vendasRepo(),
       portfolioRepo(),
       filamentosRepo(),
       expensesRepo(),
+      settingsRepo(),
     ]);
+    const settings = settingsData.settings;
     const order = orders.list.find((item) => item.id === data.orderId);
     if (!order) return { ok: false as const, reason: "not_found" as const };
     if (order.status !== "done") return { ok: false as const, reason: "invalid_state" as const };
@@ -316,7 +319,17 @@ export const finalizarDestino = createServerFn({ method: "POST" })
         ? filamentos.list.find((item) => item.id === filamentoId)
         : undefined;
       const precoVendaUnit = data.valorRecebido / Math.max(1, order.quantity);
-      const cost = calcOrderCostHybrid({ order, portfolio: project, filamento, precoVendaUnit });
+      // `settings` é obrigatório aqui: sem ele o domínio cai em
+      // DEFAULT_APP_SETTINGS e o custo da venda passa a ignorar a tarifa de
+      // energia, a depreciação e o custo fixo configurados em Configurações —
+      // errando o lucro de toda a operação.
+      const cost = calcOrderCostHybrid({
+        order,
+        portfolio: project,
+        filamento,
+        precoVendaUnit,
+        settings,
+      });
       const venda: Venda = {
         id: randomUUID(),
         orderId: order.id,
@@ -338,11 +351,15 @@ export const finalizarDestino = createServerFn({ method: "POST" })
       const filamento = filamentoId
         ? filamentos.list.find((item) => item.id === filamentoId)
         : undefined;
+      // Antes exigia `project && filamento`, entao pedido avulso (sem projeto
+      // de portfolio) que falhava nao gerava perda de material nenhuma no
+      // financeiro. O peso agora vem de estimateOrderMaterialGrams — a mesma
+      // funcao que a reserva/baixa de estoque usa, para o que foi consumido do
+      // rolo e o que entra como despesa nao divergirem.
+      const gramsPerdidos = estimateOrderMaterialGrams(order, project);
       const custoFilamento =
-        project && filamento
-          ? (filamento.precoPago / filamento.pesoInicial) *
-            (order.gramsPerUnit ?? project.pesoPeca) *
-            order.quantity
+        filamento && gramsPerdidos && filamento.pesoInicial > 0
+          ? (filamento.precoPago / filamento.pesoInicial) * gramsPerdidos
           : 0;
       if (custoFilamento > 0) {
         const expense: Expense = {
