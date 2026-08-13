@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { addCalendarMonthsIso, todayIso } from "../../domain/installments";
+import { addCalendarMonthsIso, allocateSettlement, todayIso } from "../../domain/installments";
 import type {
   FilamentoPayment,
   FilamentoPaymentEvent,
@@ -365,46 +365,30 @@ export const settlePayment = createServerFn({ method: "POST" })
       (sum, installment) => sum + getInstallmentRemainingAmount(installment),
       0,
     );
-    let remaining = data.totalPago ?? totalRemaining;
-    if (remaining <= 0) throw new Error("Informe um valor maior que zero para quitar.");
-    if (remaining - totalRemaining > 0.001) {
+    const budget = data.totalPago ?? totalRemaining;
+    if (budget <= 0) throw new Error("Informe um valor maior que zero para quitar.");
+    if (budget - totalRemaining > 0.001) {
       throw new Error("O valor informado é maior que o saldo restante do lote.");
     }
-    let distributed = 0;
-    const updates: FilamentoPaymentInstallment[] = [];
-    for (let index = 0; index < pending.length; index++) {
-      const installment = pending[index];
-      const isLast = index === pending.length - 1;
-      const currentPaid = getInstallmentPaidAmount(installment);
-      const installmentRemaining = getInstallmentRemainingAmount(installment);
-      const amountToAdd = isLast ? roundMoney(remaining - distributed) : installmentRemaining;
-      const valorPago = roundMoney(currentPaid + amountToAdd);
-      updates.push({
-        ...installment,
-        pago: valorPago >= installment.valor,
+
+    for (const allocation of allocateSettlement(pending, budget)) {
+      const update: FilamentoPaymentInstallment = {
+        ...allocation.installment,
+        pago: allocation.pago,
         dataPagamento: today,
-        valorPago,
-      });
-      distributed += amountToAdd;
-    }
-    for (const update of updates) {
+        valorPago: allocation.valorPago,
+      };
       await installmentsRepo.update(update);
-      const amountAdded = roundMoney(
-        (update.valorPago ?? 0) -
-          getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!),
-      );
-      if (amountAdded > 0) {
-        await recordFilamentoEvent({
-          id: randomUUID(),
-          installmentId: update.id,
-          paymentId: update.paymentId,
-          tipo: "pagamento",
-          valor: amountAdded,
-          dataPagamento: today,
-          observacao: update.observacao,
-          createdAt: nowIso(),
-        });
-      }
+      await recordFilamentoEvent({
+        id: randomUUID(),
+        installmentId: update.id,
+        paymentId: update.paymentId,
+        tipo: "pagamento",
+        valor: allocation.amountToAdd,
+        dataPagamento: today,
+        observacao: update.observacao,
+        createdAt: nowIso(),
+      });
     }
     return { ok: true };
   });
@@ -532,46 +516,30 @@ export const settleInsumoPayment = createServerFn({ method: "POST" })
       (sum, installment) => sum + getInstallmentRemainingAmount(installment),
       0,
     );
-    let remaining = data.totalPago ?? totalRemaining;
-    if (remaining <= 0) throw new Error("Informe um valor maior que zero para quitar.");
-    if (remaining - totalRemaining > 0.001) {
+    const budget = data.totalPago ?? totalRemaining;
+    if (budget <= 0) throw new Error("Informe um valor maior que zero para quitar.");
+    if (budget - totalRemaining > 0.001) {
       throw new Error("O valor informado é maior que o saldo restante da compra.");
     }
-    let distributed = 0;
-    const updates: InsumoPaymentInstallment[] = [];
-    for (let index = 0; index < pending.length; index++) {
-      const installment = pending[index];
-      const isLast = index === pending.length - 1;
-      const currentPaid = getInstallmentPaidAmount(installment);
-      const installmentRemaining = getInstallmentRemainingAmount(installment);
-      const amountToAdd = isLast ? roundMoney(remaining - distributed) : installmentRemaining;
-      const valorPago = roundMoney(currentPaid + amountToAdd);
-      updates.push({
-        ...installment,
-        pago: valorPago >= installment.valor,
+
+    for (const allocation of allocateSettlement(pending, budget)) {
+      const update: InsumoPaymentInstallment = {
+        ...allocation.installment,
+        pago: allocation.pago,
         dataPagamento: paymentDate,
-        valorPago,
-      });
-      distributed += amountToAdd;
-    }
-    for (const update of updates) {
+        valorPago: allocation.valorPago,
+      };
       await installmentsRepo.update(update);
-      const amountAdded = roundMoney(
-        (update.valorPago ?? 0) -
-          getInstallmentPaidAmount(pending.find((item) => item.id === update.id)!),
-      );
-      if (amountAdded > 0) {
-        await recordInsumoEvent({
-          id: randomUUID(),
-          installmentId: update.id,
-          paymentId: update.paymentId,
-          tipo: "pagamento",
-          valor: amountAdded,
-          dataPagamento: paymentDate,
-          observacao: update.observacao,
-          createdAt: nowIso(),
-        });
-      }
+      await recordInsumoEvent({
+        id: randomUUID(),
+        installmentId: update.id,
+        paymentId: update.paymentId,
+        tipo: "pagamento",
+        valor: allocation.amountToAdd,
+        dataPagamento: paymentDate,
+        observacao: update.observacao,
+        createdAt: nowIso(),
+      });
     }
     return { ok: true };
   });
