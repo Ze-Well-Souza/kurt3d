@@ -321,7 +321,6 @@ export function fromPortfolioRow(row: any): PortfolioProject {
         ? (custosExtrasRaw as PortfolioProject["custosExtras"])
         : undefined,
     custoKwh: row.custo_kwh ?? null,
-    custoKwOverride: row.consumo_kw ?? null,
     custoTrabalhoHoras: row.custo_mao_obra_horas ?? null,
     custoTrabalhoValorHora: row.custo_mao_obra_valor_hora ?? null,
     taxaGateway: row.taxa_gateway ?? null,
@@ -351,7 +350,6 @@ export function toPortfolioRow(row: PortfolioProject) {
     filamentos: row.filamentos ? JSON.parse(JSON.stringify(row.filamentos)) : [],
     custos_extras: row.custosExtras ? JSON.parse(JSON.stringify(row.custosExtras)) : [],
     custo_kwh: row.custoKwh ?? null,
-    consumo_kw: row.custoKwOverride ?? null,
     custo_mao_obra_horas: row.custoTrabalhoHoras ?? null,
     custo_mao_obra_valor_hora: row.custoTrabalhoValorHora ?? null,
     taxa_gateway: row.taxaGateway ?? null,
