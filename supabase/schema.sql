@@ -447,3 +447,53 @@ create table if not exists public.receipts (
 create index if not exists idx_receipts_number on public.receipts(receipt_number);
 create index if not exists idx_receipts_client on public.receipts(client_name);
 create index if not exists idx_receipts_created on public.receipts(created_at);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SEGURANÇA — Row Level Security (P0-3)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ESTE BLOCO É OBRIGATÓRIO. Até 08/2026 ele não existia aqui: o RLS vivia
+-- apenas numa migration com lista fixa de tabelas, então (a) toda tabela nova
+-- nascia aberta e (b) um ambiente recriado a partir deste arquivo ficava com
+-- TODAS as tabelas expostas — inclusive `users`, com os hashes de senha.
+--
+-- A chave anônima do Supabase é publicada no bundle do site. Sem RLS, qualquer
+-- visitante lê e escreve as tabelas direto pelo PostgREST.
+--
+-- Mantenha isto no FINAL do arquivo: a varredura pega qualquer tabela criada
+-- acima, então tabelas novas ficam protegidas sem ninguém precisar lembrar.
+
+do $$
+declare
+  t record;
+begin
+  for t in
+    select c.relname
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r'
+  loop
+    execute format('grant all on public.%I to service_role', t.relname);
+    execute format('alter table public.%I enable row level security', t.relname);
+    execute format('revoke all on public.%I from anon, authenticated', t.relname);
+  end loop;
+end
+$$;
+
+-- Única exceção: vídeos em destaque do portfólio são conteúdo público do site.
+-- Só SELECT, e só nas linhas com featured = true (ver policy abaixo).
+grant select on public.portfolio_videos to anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'portfolio_videos'
+      and policyname = 'Public can view featured videos'
+  ) then
+    create policy "Public can view featured videos"
+      on public.portfolio_videos for select
+      using (featured = true);
+  end if;
+end
+$$;
