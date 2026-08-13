@@ -1,13 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { listSnapshot } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useSnapshot() {
-  return useQuery({
-    queryKey: ["snapshot"],
-    queryFn: () => listSnapshot(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useSnapshot = createAdminQuery(queryKeys.snapshot, () => listSnapshot());

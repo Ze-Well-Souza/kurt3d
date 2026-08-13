@@ -1,9 +1,11 @@
-import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { createQueryClient } from "./lib/query-client";
 
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  // Traz o onError global das mutações — sem ele, gravação recusada pelo
+  // servidor falhava em silêncio na maior parte do painel (P1-1).
+  const queryClient = createQueryClient();
 
   const router = createRouter({
     routeTree,

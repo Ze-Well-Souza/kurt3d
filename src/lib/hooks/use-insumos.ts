@@ -1,13 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { listInsumos } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useInsumos() {
-  return useQuery({
-    queryKey: ["insumos"],
-    queryFn: () => listInsumos(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useInsumos = createAdminQuery(queryKeys.insumos, () => listInsumos());

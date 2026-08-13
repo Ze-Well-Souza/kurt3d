@@ -15,7 +15,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { convertLeadToClient } from "@/lib/api/data.functions";
 import { useLeads } from "@/lib/hooks/use-leads";
@@ -23,6 +22,7 @@ import { useClients } from "@/lib/hooks/use-clients";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { normalizePhone, normalizeText } from "@/lib/utils/normalization";
 import { formatPhoneDisplay } from "@/lib/utils";
+import { invalidarPor } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/admin/leads")({
   head: () => ({ meta: [{ title: "Leads — Kurti 3D" }] }),
@@ -43,8 +43,7 @@ function LeadsPage() {
   const mutateConvertLead = useMutation({
     mutationFn: (leadId: string) => convertLeadToClient({ data: { leadId } }),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["leads"] });
-      qc.invalidateQueries({ queryKey: ["clients"] });
+      invalidarPor(qc, "converterLead");
       toast.success(
         result.created ? "Lead convertido em cliente." : "Lead vinculado a cliente existente.",
       );
@@ -73,7 +72,6 @@ function LeadsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Toaster />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Leads</h1>

@@ -31,7 +31,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -67,6 +66,7 @@ import type { AppSettings, SiteContent } from "@/lib/domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "@/lib/domain/types";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
+import { invalidarPor } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({ meta: [{ title: "Configurações — Kurti 3D" }] }),
@@ -131,7 +131,7 @@ function SettingsPage() {
   const mutate = useMutation({
     mutationFn: (input: AppSettings) => saveSettings({ data: input }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["settings"] });
+      invalidarPor(qc, "salvarSettings");
       setHasChanges(false);
       toast.success("Configurações salvas com sucesso.");
     },
@@ -194,7 +194,6 @@ function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <Toaster />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold tracking-tight">Configurações</h1>
@@ -721,7 +720,7 @@ function UserManagementCard() {
         },
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      invalidarPor(qc, "gerenciarUsuarios");
       toast.success("Usuário criado.");
       setCreatedCreds({ ...form });
       setForm({ nome: "", phone: "", username: "", password: "Kurti-3D" });
@@ -733,7 +732,7 @@ function UserManagementCard() {
   const mutateDelete = useMutation({
     mutationFn: (userId: string) => deleteUser({ data: { userId } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      invalidarPor(qc, "gerenciarUsuarios");
       toast.success("Usuário removido.");
       setDeleteId(null);
     },
@@ -743,7 +742,7 @@ function UserManagementCard() {
   const mutateReset = useMutation({
     mutationFn: (userId: string) => resetPassword({ data: { userId } }),
     onSuccess: (_, userId) => {
-      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      invalidarPor(qc, "gerenciarUsuarios");
       const user = (usersQ.data ?? []).find((u) => u.id === userId);
       if (user) {
         setShareCreds({
@@ -763,7 +762,7 @@ function UserManagementCard() {
   const mutateResetForShare = useMutation({
     mutationFn: (userId: string) => resetPassword({ data: { userId } }),
     onSuccess: (_, userId) => {
-      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      invalidarPor(qc, "gerenciarUsuarios");
       const user = (usersQ.data ?? []).find((u) => u.id === userId);
       if (user) {
         setShareCreds({
@@ -784,7 +783,7 @@ function UserManagementCard() {
   const mutateDeactivate = useMutation({
     mutationFn: (userId: string) => deactivateUser({ data: { userId } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      invalidarPor(qc, "gerenciarUsuarios");
       toast.success("Usuario inativado.");
     },
     onError: () => toast.error("Erro ao inativar."),
@@ -793,7 +792,7 @@ function UserManagementCard() {
   const mutateActivate = useMutation({
     mutationFn: (userId: string) => activateUser({ data: { userId } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      invalidarPor(qc, "gerenciarUsuarios");
       toast.success("Usuario ativado.");
     },
     onError: () => toast.error("Erro ao ativar."),
@@ -805,7 +804,7 @@ function UserManagementCard() {
         data: { userId: editTarget!.id, nome: editForm.nome, username: editForm.username },
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["adminUsers"] });
+      invalidarPor(qc, "gerenciarUsuarios");
       toast.success("Usuario atualizado.");
       setEditTarget(null);
     },
@@ -1243,7 +1242,7 @@ function SiteContentCard() {
   const mutate = useMutation({
     mutationFn: () => saveSiteContent({ data: form }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["siteContent"] });
+      invalidarPor(qc, "salvarConteudoSite");
       setDirty(false);
       toast.success("Conteúdo do site salvo.");
     },
@@ -1391,7 +1390,7 @@ function StorageCleanupCard() {
   const mutateCleanup = useMutation({
     mutationFn: (olderThanDays: number) => runStorageCleanup({ data: { olderThanDays } }),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["leads"] });
+      invalidarPor(qc, "limpezaStorage");
       toast.success(`${result.deletedCount} arquivos removidos do storage.`);
     },
     onError: () => toast.error("Erro ao executar limpeza."),

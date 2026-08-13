@@ -1,13 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { listSettings } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useSettings() {
-  return useQuery({
-    queryKey: ["settings"],
-    queryFn: () => listSettings(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useSettings = createAdminQuery(queryKeys.settings, () => listSettings());

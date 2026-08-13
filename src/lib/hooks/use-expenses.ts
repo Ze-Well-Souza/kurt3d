@@ -1,13 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { listExpenses } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useExpenses() {
-  return useQuery({
-    queryKey: ["expenses"],
-    queryFn: () => listExpenses(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useExpenses = createAdminQuery(queryKeys.expenses, () => listExpenses());

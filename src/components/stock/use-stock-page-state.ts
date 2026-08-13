@@ -36,6 +36,7 @@ import { useFilamentos } from "@/lib/hooks/use-filamentos";
 import { useInsumos } from "@/lib/hooks/use-insumos";
 import { useFilamentoPayments } from "@/lib/hooks/use-filamento-payments";
 import { useInsumoPayments } from "@/lib/hooks/use-insumo-payments";
+import { invalidarPor, type OperacaoDeNegocio } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
 import { getFilamentoAlertLevel, getInsumoAlertLevel } from "@/lib/domain/stock-alert";
 import {
@@ -72,9 +73,11 @@ export function useStockPageState() {
   const insumoPayments = (ipData?.insumoPayments ?? []) as InsumoPayment[];
   const insumoInstallments = (ipData?.insumoInstallments ?? []) as InsumoPaymentInstallment[];
 
-  const invalidateFilamentos = () => qc.invalidateQueries({ queryKey: ["filamentos"] });
-  const invalidateInsumos = () => qc.invalidateQueries({ queryKey: ["insumos"] });
-  const invalidateFPayments = () => qc.invalidateQueries({ queryKey: ["filamento-payments"] });
+  // P1-2: cada operacao declara TODAS as chaves que afeta em query-keys.ts.
+  // Antes, salvar/remover insumo mexia em `expenses` no servidor mas so
+  // invalidava ["insumos"] — a aba Despesas seguia mostrando a despesa de um
+  // insumo ja excluido.
+  const invalidar = (operacao: OperacaoDeNegocio) => invalidarPor(qc, operacao);
 
   const mutateFilamento = useMutation({
     mutationFn: (
@@ -84,12 +87,12 @@ export function useStockPageState() {
         paymentId?: string;
       },
     ) => upsertFilamento({ data: input as z.input<typeof filamentoSchema> }),
-    onSuccess: invalidateFilamentos,
+    onSuccess: () => invalidar("salvarFilamento"),
   });
 
   const mutateRemoveFilamento = useMutation({
     mutationFn: (id: string) => removeFilamento({ data: { id } }),
-    onSuccess: invalidateFilamentos,
+    onSuccess: () => invalidar("removerFilamento"),
   });
 
   const mutateArchive = useMutation({
@@ -100,7 +103,7 @@ export function useStockPageState() {
       dataFim?: string;
     }) => archiveFilamento({ data: input }),
     onSuccess: () => {
-      invalidateFilamentos();
+      invalidar("arquivarFilamento");
       toast.success("Filamento arquivado no histórico.");
     },
   });
@@ -108,29 +111,29 @@ export function useStockPageState() {
   const mutateUpdateArchived = useMutation({
     mutationFn: (input: z.infer<typeof filamentoSchema> & { id: string; pesoAtual: number }) =>
       updateArchivedFilamento({ data: input }),
-    onSuccess: invalidateFilamentos,
+    onSuccess: () => invalidar("salvarFilamento"),
   });
 
   const mutateRestore = useMutation({
     mutationFn: (id: string) => restoreFilamento({ data: { id } }),
-    onSuccess: invalidateFilamentos,
+    onSuccess: () => invalidar("restaurarFilamento"),
   });
 
   const mutateInsumo = useMutation({
     mutationFn: (input: z.infer<typeof insumoSchema>) =>
       addInsumo({ data: input as z.input<typeof insumoSchema> }),
-    onSuccess: invalidateInsumos,
+    onSuccess: () => invalidar("salvarInsumo"),
   });
 
   const mutateUpdateInsumo = useMutation({
     mutationFn: (input: z.infer<typeof insumoSchema> & { id: string }) =>
       updateInsumo({ data: input as z.input<typeof insumoSchema> & { id: string } }),
-    onSuccess: invalidateInsumos,
+    onSuccess: () => invalidar("salvarInsumo"),
   });
 
   const mutateRemoveInsumo = useMutation({
     mutationFn: (id: string) => removeInsumo({ data: { id } }),
-    onSuccess: invalidateInsumos,
+    onSuccess: () => invalidar("removerInsumo"),
   });
 
   const mutateCreatePayment = useMutation({
@@ -141,7 +144,7 @@ export function useStockPageState() {
       parcelas: number;
       dataParaPagamento: string;
     }) => createFilamentoPayment({ data: input }),
-    onSuccess: invalidateFPayments,
+    onSuccess: () => invalidar("pagamentoFilamento"),
   });
 
   const mutateUpdatePayment = useMutation({
@@ -152,12 +155,12 @@ export function useStockPageState() {
       parcelas: number;
       dataParaPagamento: string;
     }) => updateFilamentoPayment({ data: input }),
-    onSuccess: invalidateFPayments,
+    onSuccess: () => invalidar("pagamentoFilamento"),
   });
 
   const mutateDeletePayment = useMutation({
     mutationFn: (paymentId: string) => deleteFilamentoPayment({ data: { paymentId } }),
-    onSuccess: invalidateFPayments,
+    onSuccess: () => invalidar("pagamentoFilamento"),
   });
 
   const mutatePayInstallment = useMutation({
@@ -167,12 +170,12 @@ export function useStockPageState() {
       valorPago?: number;
       observacao?: string;
     }) => payInstallment({ data: input }),
-    onSuccess: invalidateFPayments,
+    onSuccess: () => invalidar("pagamentoFilamento"),
   });
 
   const mutateRevertInstallment = useMutation({
     mutationFn: (installmentId: string) => revertInstallment({ data: { installmentId } }),
-    onSuccess: invalidateFPayments,
+    onSuccess: () => invalidar("pagamentoFilamento"),
   });
 
   const mutateUpdateInstallment = useMutation({
@@ -182,13 +185,13 @@ export function useStockPageState() {
       valor?: number;
       observacao?: string;
     }) => updateInstallment({ data: input }),
-    onSuccess: invalidateFPayments,
+    onSuccess: () => invalidar("pagamentoFilamento"),
   });
 
   const mutateSettlePayment = useMutation({
     mutationFn: (input: { paymentId: string; totalPago?: number; dataPagamento?: string }) =>
       settlePayment({ data: input }),
-    onSuccess: invalidateFPayments,
+    onSuccess: () => invalidar("pagamentoFilamento"),
   });
 
   const allUsedSkus = useMemo(

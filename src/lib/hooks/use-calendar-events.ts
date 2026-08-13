@@ -1,13 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
 import { listCalendarEvents } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useCalendarEvents() {
-  return useQuery({
-    queryKey: ["calendar-events"],
-    queryFn: () => listCalendarEvents(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useCalendarEvents = createAdminQuery(queryKeys.calendarEvents, () =>
+  listCalendarEvents(),
+);

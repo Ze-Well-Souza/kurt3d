@@ -44,6 +44,7 @@ import {
   useFilamentoPaymentEvents,
 } from "@/lib/hooks/use-filamento-payments";
 import { useInsumoPayments, useInsumoPaymentEvents } from "@/lib/hooks/use-insumo-payments";
+import { invalidarPor } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
 import { brl } from "@/lib/utils";
 import {
@@ -138,15 +139,10 @@ export function useFinancePageState() {
   });
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
 
-  const invalidateExpenses = () => qc.invalidateQueries({ queryKey: ["expenses"] });
-  const invalidateFilamentoPayments = () => {
-    qc.invalidateQueries({ queryKey: ["filamento-payments"] });
-    qc.invalidateQueries({ queryKey: ["filamento-payment-events"] });
-  };
-  const invalidateInsumoPayments = () => {
-    qc.invalidateQueries({ queryKey: ["insumo-payments"] });
-    qc.invalidateQueries({ queryKey: ["insumo-payment-events"] });
-  };
+  // P1-2: os efeitos colaterais de cada operacao ficam em query-keys.ts.
+  const invalidateExpenses = () => invalidarPor(qc, "despesaManual");
+  const invalidateFilamentoPayments = () => invalidarPor(qc, "pagamentoFilamento");
+  const invalidateInsumoPayments = () => invalidarPor(qc, "pagamentoInsumo");
   const mutateAddExp = useMutation({
     mutationFn: (data: {
       descricao: string;
@@ -242,8 +238,7 @@ export function useFinancePageState() {
       items: { installmentId: string; kind: "filamento" | "insumo"; newVencimento: string }[],
     ) => rescheduleInstallments({ data: { items } }),
     onSuccess: (_data) => {
-      invalidateFilamentoPayments();
-      invalidateInsumoPayments();
+      invalidarPor(qc, "reagendarParcelas");
       setRescheduleDialog({ open: false, targetDate: "" });
       toast.success(`${_data?.count ?? 0} parcela(s) reagendada(s).`);
     },

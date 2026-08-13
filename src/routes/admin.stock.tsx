@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Toaster } from "@/components/ui/sonner";
 import { brl, cn } from "@/lib/utils";
 import { FilamentArchiveDialog } from "@/components/stock/FilamentArchiveDialog";
 import { FilamentCreateDialog } from "@/components/stock/FilamentCreateDialog";
@@ -46,8 +45,6 @@ function Stock() {
 
   return (
     <div className="space-y-6">
-      <Toaster />
-
       {/* Header global: título + KPIs + ação principal */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">

@@ -38,7 +38,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useVendas } from "@/lib/hooks/use-vendas";
@@ -649,8 +648,6 @@ function Reports() {
           </div>
         </Card>
       )}
-
-      <Toaster />
     </div>
   );
 }

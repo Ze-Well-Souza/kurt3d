@@ -70,7 +70,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { brl } from "@/lib/utils";
@@ -124,6 +123,7 @@ import { usePortfolio } from "@/lib/hooks/use-portfolio";
 import { useClients } from "@/lib/hooks/use-clients";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
+import { invalidarPor, type OperacaoDeNegocio } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
 import { openPrintQuote, type QuoteInput } from "@/lib/domain/quote-print";
 import { openPrintReceipt, type ReceiptInput } from "@/lib/domain/payment-receipt-print";
@@ -533,17 +533,19 @@ function CalcPedidos() {
     ),
   });
 
-  const invalidateOrders = () => qc.invalidateQueries({ queryKey: ["orders"] });
-  const invalidatePortfolio = () => qc.invalidateQueries({ queryKey: ["portfolio"] });
+  // P1-2: os efeitos colaterais de cada operacao ficam em query-keys.ts.
+  // Finalizar destino, por exemplo, grava venda e (em falha) despesa — antes
+  // so ["orders"] era invalidada e Financas seguia defasada por ate 60s.
+  const invalidar = (operacao: OperacaoDeNegocio) => invalidarPor(qc, operacao);
 
   /* ── mutations ── */
   const mutateAddProject = useMutation({
     mutationFn: (input: any) => addPortfolioProject({ data: input }),
-    onSuccess: () => invalidatePortfolio(),
+    onSuccess: () => invalidar("salvarProjeto"),
   });
   const mutateRemoveProject = useMutation({
     mutationFn: (id: string) => removePortfolioProject({ data: { id } }),
-    onSuccess: () => invalidatePortfolio(),
+    onSuccess: () => invalidar("removerProjeto"),
   });
   const mutateCreateOrder = useMutation({
     mutationFn: (input: {
@@ -553,7 +555,7 @@ function CalcPedidos() {
       quantity: number;
     }) => createOrderFromPortfolio({ data: input }),
     onSuccess: () => {
-      invalidateOrders();
+      invalidar("criarPedido");
       toast.success("Pedido criado na fila.");
     },
     onError: (error) =>
@@ -562,27 +564,27 @@ function CalcPedidos() {
   const mutateStatus = useMutation({
     mutationFn: (input: { orderId: string; status: "todo" | "printing" | "acabamento" | "done" }) =>
       updateOrderStatus({ data: input }),
-    onSuccess: () => invalidateOrders(),
+    onSuccess: () => invalidar("mudarStatusPedido"),
   });
   const mutateAddOrder = useMutation({
     mutationFn: (input: any) => addOrder({ data: input }),
-    onSuccess: () => invalidateOrders(),
+    onSuccess: () => invalidar("criarPedido"),
   });
   const mutateFinalizar = useMutation({
     mutationFn: (input: any) => finalizarDestino({ data: input }),
-    onSuccess: () => invalidateOrders(),
+    onSuccess: () => invalidar("finalizarPedido"),
   });
   const mutateRemoveOrder = useMutation({
     mutationFn: (input: { orderId: string; reason: string }) => removeOrder({ data: input }),
     onSuccess: () => {
-      invalidateOrders();
+      invalidar("removerPedido");
       toast.success("Pedido excluído.");
     },
   });
   const mutateUpdateOrder = useMutation({
     mutationFn: (input: any) => updateOrder({ data: input }),
     onSuccess: () => {
-      invalidateOrders();
+      invalidar("editarPedido");
       toast.success("Pedido atualizado.");
     },
     onError: handleUpdateError,
@@ -590,7 +592,7 @@ function CalcPedidos() {
   const mutateUpdateProject = useMutation({
     mutationFn: (input: any) => updatePortfolioProject({ data: input }),
     onSuccess: () => {
-      invalidatePortfolio();
+      invalidar("salvarProjeto");
       toast.success("Projeto atualizado.");
     },
     onError: handleUpdateError,
@@ -606,7 +608,7 @@ function CalcPedidos() {
     mutationFn: (input: { orderId: string; partId: string; status: OrderPartStatus }) =>
       updateOrderPartStatus({ data: input }),
     onError: handleUpdateError,
-    onSuccess: () => invalidateOrders(),
+    onSuccess: () => invalidar("editarPedido"),
   });
 
   /* ── calculator state ── */
@@ -1123,7 +1125,6 @@ function CalcPedidos() {
   /* ═══════════ JSX ═══════════ */
   return (
     <div className="space-y-6">
-      <Toaster />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold tracking-tight">Calculadora e Pedidos</h1>

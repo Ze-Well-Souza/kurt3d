@@ -1,5 +1,4 @@
 ﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 import { CashTab } from "@/components/finance/CashTab";
 import { DashboardTab } from "@/components/finance/DashboardTab";
@@ -144,8 +143,6 @@ function Finances() {
         <PeriodChip label={ctx.periodLabel} />
         <SalesTab ctx={ctx} />
       </div>
-
-      <Toaster />
     </div>
   );
 }

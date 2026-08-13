@@ -1,13 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { listClients } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useClients() {
-  return useQuery({
-    queryKey: ["clients"],
-    queryFn: () => listClients(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useClients = createAdminQuery(queryKeys.clients, () => listClients());

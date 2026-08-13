@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { authStatus, login, setupAdmin } from "@/lib/api/auth.functions";
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
@@ -83,7 +82,6 @@ function LoginPage() {
 
   return (
     <div className="grid min-h-screen place-items-center bg-background px-4">
-      <Toaster />
       <Card className="w-full max-w-md border-border bg-card p-6">
         <h1 className="font-display text-2xl font-bold tracking-tight">
           {isSetup ? "Configurar Admin" : "Entrar"}

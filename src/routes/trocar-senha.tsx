@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { changePassword, logout, requireAuth } from "@/lib/api/auth.functions";
 import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
@@ -58,7 +57,6 @@ function TrocarSenhaPage() {
 
   return (
     <div className="grid min-h-screen place-items-center bg-background px-4">
-      <Toaster />
       <Card className="filament-top w-full max-w-md border-border bg-card p-6">
         <div className="flex items-center gap-2">
           <Lock className="h-5 w-5 text-muted-foreground" />

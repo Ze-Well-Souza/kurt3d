@@ -32,7 +32,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { brl, formatPhoneDisplay } from "@/lib/utils";
 import {
@@ -49,6 +48,7 @@ import { openPrintQuote, openQuoteWhatsApp, type QuoteInput } from "@/lib/domain
 import { openPrintSaleReceipt, openSaleReceiptWhatsApp } from "@/lib/domain/sale-receipt-print";
 import { normalizeText } from "@/lib/utils/normalization";
 import type { BudgetQuote, BudgetQuoteItem, BudgetQuoteStatus } from "@/lib/domain/types";
+import { invalidarPor } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/admin/orcamentos")({
   head: () => ({ meta: [{ title: "Orçamentos — Kurti 3D" }] }),
@@ -218,7 +218,7 @@ function OrcamentosPage() {
   const mutateCreate = useMutation({
     mutationFn: (data: any) => createBudgetQuote({ data }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget-quotes"] });
+      invalidarPor(qc, "orcamento");
       toast.success("Orçamento criado.");
       setShowForm(false);
       resetForm();
@@ -229,7 +229,7 @@ function OrcamentosPage() {
   const mutateUpdate = useMutation({
     mutationFn: (data: any) => updateBudgetQuote({ data }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget-quotes"] });
+      invalidarPor(qc, "orcamento");
       toast.success("Orçamento atualizado.");
       setShowForm(false);
       setEditQuote(null);
@@ -249,7 +249,7 @@ function OrcamentosPage() {
   const mutateDelete = useMutation({
     mutationFn: (quoteId: string) => deleteBudgetQuote({ data: { quoteId } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget-quotes"] });
+      invalidarPor(qc, "orcamento");
       toast.success("Orçamento removido.");
       setDeleteId(null);
     },
@@ -259,8 +259,7 @@ function OrcamentosPage() {
   const mutateConvert = useMutation({
     mutationFn: (quoteId: string) => convertQuoteToOrder({ data: { quoteId } }),
     onSuccess: (result) => {
-      qc.invalidateQueries({ queryKey: ["budget-quotes"] });
-      qc.invalidateQueries({ queryKey: ["orders"] });
+      invalidarPor(qc, "orcamento");
       if (result.ok) {
         toast.success("Orçamento convertido em pedido!");
       } else {
@@ -293,7 +292,7 @@ function OrcamentosPage() {
       });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["budget-quotes"] });
+      invalidarPor(qc, "orcamento");
       toast.success("Status atualizado.");
     },
     onError: () => toast.error("Erro ao atualizar status."),
@@ -341,7 +340,6 @@ function OrcamentosPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Toaster />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Orçamentos</h1>

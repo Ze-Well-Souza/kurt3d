@@ -1,24 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { listInsumoPayments, listInsumoPaymentEvents } from "@/lib/api/data.functions";
+import { listInsumoPaymentEvents, listInsumoPayments } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useInsumoPayments() {
-  return useQuery({
-    queryKey: ["insumo-payments"],
-    queryFn: () => listInsumoPayments(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useInsumoPayments = createAdminQuery(queryKeys.insumoPayments, () =>
+  listInsumoPayments(),
+);
 
-export function useInsumoPaymentEvents() {
-  return useQuery({
-    queryKey: ["insumo-payment-events"],
-    queryFn: () => listInsumoPaymentEvents(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useInsumoPaymentEvents = createAdminQuery(queryKeys.insumoPaymentEvents, () =>
+  listInsumoPaymentEvents(),
+);

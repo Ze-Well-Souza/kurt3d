@@ -31,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import {
   createCalendarEvent,
@@ -41,6 +40,7 @@ import {
 import type { ProductionCalendarEvent } from "@/lib/domain/types";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useCalendarEvents } from "@/lib/hooks/use-calendar-events";
+import { invalidarPor } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/admin/calendar")({
   component: Calendar,
@@ -82,7 +82,7 @@ function Calendar() {
     status: "scheduled" as ProductionCalendarEvent["status"],
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["calendar-events"] });
+  const invalidate = () => invalidarPor(qc, "calendario");
 
   const mutateCreate = useMutation({
     mutationFn: (data: any) => createCalendarEvent({ data }),
@@ -478,8 +478,6 @@ function Calendar() {
           </form>
         </DialogContent>
       </Dialog>
-
-      <Toaster />
     </div>
   );
 }

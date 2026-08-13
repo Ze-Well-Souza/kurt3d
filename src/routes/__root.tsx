@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
+import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -165,6 +166,13 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      {/*
+        Toaster único da aplicação. Antes cada rota montava o seu, e o Painel
+        (/admin) não montava nenhum — então o onError global das mutações não
+        teria onde aparecer. Manter SÓ aqui: duas instâncias montadas ao mesmo
+        tempo duplicam cada toast.
+      */}
+      <Toaster />
     </QueryClientProvider>
   );
 }

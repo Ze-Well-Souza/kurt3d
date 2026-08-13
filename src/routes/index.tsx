@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import {
@@ -71,7 +70,6 @@ const fallbackGallery = [
 function Landing() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Toaster />
       <Nav />
       <Hero />
       <Features />

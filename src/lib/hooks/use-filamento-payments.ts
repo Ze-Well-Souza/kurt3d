@@ -1,24 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { listFilamentoPayments, listFilamentoPaymentEvents } from "@/lib/api/data.functions";
+import { listFilamentoPaymentEvents, listFilamentoPayments } from "@/lib/api/data.functions";
+import { queryKeys } from "@/lib/query-keys";
+import { createAdminQuery } from "./create-admin-query";
 
-export function useFilamentoPayments() {
-  return useQuery({
-    queryKey: ["filamento-payments"],
-    queryFn: () => listFilamentoPayments(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useFilamentoPayments = createAdminQuery(queryKeys.filamentoPayments, () =>
+  listFilamentoPayments(),
+);
 
-export function useFilamentoPaymentEvents() {
-  return useQuery({
-    queryKey: ["filamento-payment-events"],
-    queryFn: () => listFilamentoPaymentEvents(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
-  });
-}
+export const useFilamentoPaymentEvents = createAdminQuery(queryKeys.filamentoPaymentEvents, () =>
+  listFilamentoPaymentEvents(),
+);

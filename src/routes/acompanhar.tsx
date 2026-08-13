@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { ArrowLeft, Clock3, PackageSearch, Truck } from "lucide-react";
 import { getPublicOrderTracking } from "@/lib/api/data.functions";
@@ -36,7 +35,6 @@ function OrderTrackingPage() {
 
   return (
     <div className="min-h-screen bg-background px-6 py-12 text-foreground">
-      <Toaster />
       <div className="mx-auto max-w-3xl space-y-8">
         <div className="flex items-center justify-between gap-4">
           <div>

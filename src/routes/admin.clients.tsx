@@ -24,7 +24,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { brl, formatPhoneDisplay } from "@/lib/utils";
@@ -34,6 +33,7 @@ import type { Client, Order } from "@/lib/domain/types";
 import { useClients } from "@/lib/hooks/use-clients";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { normalizeText } from "@/lib/utils/normalization";
+import { invalidarPor } from "@/lib/query-keys";
 
 export const Route = createFileRoute("/admin/clients")({
   head: () => ({ meta: [{ title: "Clientes — Kurti 3D" }] }),
@@ -56,7 +56,7 @@ function ClientsPage() {
   const mutateAdd = useMutation({
     mutationFn: (data: any) => addClient({ data }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clients"] });
+      invalidarPor(qc, "salvarCliente");
       toast.success("Cliente cadastrado.");
       setForm({ nome: "", whatsapp: "", email: "", notas: "" });
       setShowForm(false);
@@ -65,7 +65,7 @@ function ClientsPage() {
   const mutateUpdate = useMutation({
     mutationFn: (data: any) => updateClient({ data }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clients"] });
+      invalidarPor(qc, "salvarCliente");
       toast.success("Cliente atualizado.");
       setEditClient(null);
     },
@@ -73,7 +73,7 @@ function ClientsPage() {
   const mutateRemove = useMutation({
     mutationFn: (id: string) => removeClient({ data: { id } }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clients"] });
+      invalidarPor(qc, "removerCliente");
       toast.success("Cliente removido.");
       setDeleteId(null);
     },
@@ -96,7 +96,6 @@ function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      <Toaster />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-bold tracking-tight">Clientes</h1>
