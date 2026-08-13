@@ -61,15 +61,30 @@ export async function getUserRole(userId: string): Promise<string | null> {
   return user?.role ?? null;
 }
 
-// Estado de acesso usado pelos guards de rota: papel + se a senha ainda é
-// provisória (exige troca obrigatória antes de liberar o painel).
+// Estado de acesso usado pelos guards de rota: papel, se a senha ainda é
+// provisória (exige troca obrigatória antes de liberar o painel) e se a conta
+// segue ativa.
+//
+// `active` é consultado a cada requisição de propósito: o cookie de sessão vale
+// 30 dias, então sem esta checagem desativar um usuário não revogava nada — ele
+// continuava com acesso total ao painel até o cookie expirar.
 export async function getUserAuthInfo(
   userId: string,
-): Promise<{ role: string | null; mustChangePassword: boolean } | null> {
+): Promise<{ role: string | null; mustChangePassword: boolean; active: boolean } | null> {
   const repo = await usersRepo();
   const user = repo.list.find((u) => u.id === userId);
   if (!user) return null;
-  return { role: user.role ?? null, mustChangePassword: user.mustChangePassword ?? false };
+  return {
+    role: user.role ?? null,
+    mustChangePassword: user.mustChangePassword ?? false,
+    active: user.active ?? true,
+  };
+}
+
+/** Conta existe e está ativa? Usado pelo guard de sessão a cada requisição. */
+export async function isUserActive(userId: string): Promise<boolean> {
+  const info = await getUserAuthInfo(userId);
+  return info?.active ?? false;
 }
 
 export async function setupAdminUser(input: {

@@ -1,12 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest, useSession } from "@tanstack/react-start/server";
+import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getPasswordPolicyMessage } from "../domain/password-policy";
 import {
   changeUserPassword,
   createAdminUser,
   deleteAdminUser,
-  ensureSessionPassword,
   getAuthSetupState,
   getUserAuthInfo,
   getUserRole,
@@ -17,6 +16,7 @@ import {
   updateUser,
   validateLogin,
 } from "../server/auth.server";
+import { getSession, requireSession } from "../server/require-session.server";
 import { logger } from "../server/logger.server";
 import { getClientIp } from "../server/rate-limit.server";
 import {
@@ -24,27 +24,10 @@ import {
   inspectLoginRateLimit,
   recordLoginFailure,
 } from "../server/login-rate-limit.server";
-import { isSecureRequest } from "../server/request-security.server";
 import { siteContentRepo } from "../server/repositories.server";
 import { siteContentSchema } from "../domain/site-content-schema";
 import type { SiteContent } from "../domain/types";
 import { normalizePhone, normalizeText } from "../utils/normalization";
-
-type SessionData = { userId?: string; username?: string };
-
-async function getSession() {
-  const request = getRequest();
-  return useSession<SessionData>({
-    password: await ensureSessionPassword(),
-    maxAge: 60 * 60 * 24 * 30,
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict",
-      path: "/",
-      secure: request ? isSecureRequest(request) : false,
-    },
-  });
-}
 
 function buildLoginRateLimitKey(phone: string) {
   const request = getRequest();
@@ -58,12 +41,6 @@ function assertPasswordPolicy(password: string) {
   if (message) throw new Error(message);
 }
 
-async function requireSession() {
-  const session = await getSession();
-  if (!session.data.userId) throw new Error("unauthorized");
-  return session.data.userId;
-}
-
 // Apenas o super admin pode gerenciar perfis de acesso (criar/remover usuários).
 async function requireSuperAdmin() {
   const userId = await requireSession();
@@ -72,14 +49,35 @@ async function requireSuperAdmin() {
   return userId;
 }
 
+/**
+ * Resolve a sessão atual para os guards de rota.
+ *
+ * Conta desativada ou removida encerra a sessão na hora e passa a ser tratada
+ * como deslogada — caso contrário o cookie de 30 dias mantinha o acesso ao
+ * painel depois de o super admin clicar em "desativar".
+ */
+async function resolveSessionUser() {
+  const session = await getSession();
+  const userId = session.data.userId;
+  if (!userId) return { userId: null, username: null, info: null };
+
+  const info = await getUserAuthInfo(userId);
+  if (!info || !info.active) {
+    await session.clear();
+    logger.warn("auth.session.revoked", { reason: info ? "inactive" : "user_not_found" });
+    return { userId: null, username: null, info: null };
+  }
+
+  return { userId, username: session.data.username ?? null, info };
+}
+
 export const authStatus = createServerFn({ method: "GET" }).handler(async () => {
   const setup = await getAuthSetupState();
-  const session = await getSession();
-  const info = session.data.userId ? await getUserAuthInfo(session.data.userId) : null;
+  const { userId, username, info } = await resolveSessionUser();
   return {
     setupRequired: !setup.hasAdmin,
-    loggedIn: !!session.data.userId,
-    username: session.data.username ?? null,
+    loggedIn: !!userId,
+    username,
     role: info?.role ?? null,
     mustChangePassword: info?.mustChangePassword ?? false,
   };
@@ -145,12 +143,11 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 
 export const requireAuth = createServerFn({ method: "GET" }).handler(async () => {
   const setup = await getAuthSetupState();
-  const session = await getSession();
-  const info = session.data.userId ? await getUserAuthInfo(session.data.userId) : null;
+  const { userId, username, info } = await resolveSessionUser();
   return {
     setupRequired: !setup.hasAdmin,
-    userId: session.data.userId ?? null,
-    username: session.data.username ?? null,
+    userId,
+    username,
     role: info?.role ?? null,
     mustChangePassword: info?.mustChangePassword ?? false,
   };
