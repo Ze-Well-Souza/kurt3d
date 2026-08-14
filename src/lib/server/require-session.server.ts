@@ -14,6 +14,10 @@ export type SessionData = { userId?: string; username?: string };
  */
 export async function getSession() {
   const request = getRequest();
+  // `useSession` aqui é o helper de sessão do TanStack Start (server-only),
+  // não um React Hook — o nome com prefixo "use" engana o eslint-plugin-
+  // react-hooks, que trata qualquer `useX` como sujeito às regras de hooks.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   return useSession<SessionData>({
     password: await ensureSessionPassword(),
     maxAge: 60 * 60 * 24 * 30,

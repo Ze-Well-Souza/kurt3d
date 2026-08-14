@@ -6,9 +6,15 @@ create table if not exists public.users (
   nome text null,
   role text not null default 'admin',
   must_change_password boolean not null default false,
+  active boolean not null default true,
   created_at timestamptz not null,
   updated_at timestamptz not null
 );
+
+-- Compatibilidade com bancos criados antes da coluna de soft-delete de usuario.
+-- Sem isto, um banco novo criado so com o CREATE TABLE acima ja tem a coluna
+-- (default true cobre o caso), mas um banco existente sem ela precisa do ALTER.
+alter table public.users add column if not exists active boolean not null default true;
 
 do $$
 begin
@@ -123,6 +129,8 @@ create table if not exists public.portfolio_projects (
   published_at timestamptz null,
   -- Portfolio image
   image_url text null,
+  -- Galeria "Nossos trabalhos": até 10 imagens por projeto.
+  image_urls jsonb null,
   -- Multi-filament calculator fields (JSONB)
   filamentos jsonb not null default '[]',
   custos_extras jsonb not null default '[]',
@@ -134,6 +142,11 @@ create table if not exists public.portfolio_projects (
   created_at timestamptz not null,
   updated_at timestamptz not null
 );
+
+-- Compatibilidade: coluna adicionada por migration solta
+-- (20260728030000_portfolio_image_urls.sql), nunca antes consolidada na
+-- definição de CREATE TABLE acima — mesma classe de bug do `users.active`.
+alter table public.portfolio_projects add column if not exists image_urls jsonb null;
 
 create table if not exists public.insumos (
   id text primary key,
@@ -222,8 +235,19 @@ create table if not exists public.app_settings (
   default_peso_rolo double precision not null default 1000,
   default_quantidade integer not null default 10,
   whatsapp_numero text not null default '5511999999999',
+  -- Presets de impressora usados pela Calculadora / Configurações.
+  selected_printer_preset text null,
+  printer_prices jsonb null,
+  printer_vida_util jsonb null,
   check (id = 'main')
 );
+
+-- Compatibilidade: colunas adicionadas por migration solta
+-- (20260728020000_app_settings_printer_columns.sql), nunca antes
+-- consolidadas na definição de CREATE TABLE acima.
+alter table public.app_settings add column if not exists selected_printer_preset text null;
+alter table public.app_settings add column if not exists printer_prices jsonb null;
+alter table public.app_settings add column if not exists printer_vida_util jsonb null;
 
 insert into public.app_settings (id) values ('main') on conflict (id) do nothing;
 

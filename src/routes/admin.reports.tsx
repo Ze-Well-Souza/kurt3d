@@ -209,7 +209,7 @@ function Reports() {
 
     vendas.forEach((v) => {
       const month = v.data.slice(0, 7);
-      if (months.hasOwnProperty(month)) {
+      if (Object.hasOwn(months, month)) {
         months[month] += v.valor;
       }
     });
