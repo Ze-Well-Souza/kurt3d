@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "../supabase.server";
 import { fromSiteContentRow } from "./mappers";
+import type { SiteContentRow } from "./row-types";
 import { unwrapResult } from "./shared";
 
 export async function siteContentRepo() {
@@ -12,7 +13,7 @@ export async function siteContentRepo() {
       query: "select(*).eq(id, main).limit(1)",
     },
   );
-  const list = rows as any[];
+  const list = rows as SiteContentRow[];
   const content = list.length > 0 ? fromSiteContentRow(list[0]) : fromSiteContentRow({});
   return {
     content,

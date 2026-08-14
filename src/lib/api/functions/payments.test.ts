@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FilamentoPaymentInstallment, InsumoPaymentInstallment } from "../../domain/types";
+import type {
+  FilamentoPaymentEvent,
+  FilamentoPaymentInstallment,
+  InsumoPaymentEvent,
+  InsumoPaymentInstallment,
+} from "../../domain/types";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // P0-2 — quitação de lote não pode gravar valor negativo nem pagar a mais
@@ -27,15 +32,21 @@ const insumoInstallments: { list: Installment[]; update: ReturnType<typeof vi.fn
   list: [],
   update: vi.fn(),
 };
-const filamentoEvents = { list: [] as any[], insert: vi.fn() };
-const insumoEvents = { list: [] as any[], insert: vi.fn() };
+const filamentoEvents = { list: [] as FilamentoPaymentEvent[], insert: vi.fn() };
+const insumoEvents = { list: [] as InsumoPaymentEvent[], insert: vi.fn() };
+
+type ServerFnChain = {
+  inputValidator: () => ServerFnChain;
+  validator: () => ServerFnChain;
+  handler: <F>(fn: F) => F;
+};
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
-    const chain: any = {
+    const chain: ServerFnChain = {
       inputValidator: () => chain,
       validator: () => chain,
-      handler: (fn: any) => fn,
+      handler: (fn) => fn,
     };
     return chain;
   },

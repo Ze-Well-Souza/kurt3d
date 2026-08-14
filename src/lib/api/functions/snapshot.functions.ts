@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { computeReservedByFilament } from "../../domain/inventory";
 import { DEFAULT_APP_SETTINGS } from "../../domain/types";
+import type {
+  AppSettingsRow,
+  FilamentoRow,
+  PortfolioProjectRow,
+} from "../../server/repositories/row-types";
 import {
   clientsRepo,
   expensesRepo,
@@ -41,23 +46,32 @@ export const listPublicSnapshot = createServerFn({ method: "GET" }).handler(asyn
       .eq("is_public", true),
     supabase.from("filamentos").select("id, material, cor"),
     supabase.from("app_settings").select("whatsapp_numero").eq("id", "main").limit(1),
-  ]).then(([portfolio, filamentos, settings]) => [
-    unwrapResult(portfolio, {
-      table: "portfolio_projects",
-      operation: "listPublic",
-      query: "select(public cols).eq(is_public, true)",
-    }) as any[],
-    unwrapResult(filamentos, {
-      table: "filamentos",
-      operation: "listPublicLookup",
-      query: "select(id, material, cor)",
-    }) as any[],
-    unwrapResult(settings, {
-      table: "app_settings",
-      operation: "getPublicSettings",
-      query: "select(whatsapp_numero).eq(id, main).limit(1)",
-    }) as any[],
-  ]);
+  ]).then(
+    ([portfolio, filamentos, settings]): [
+      Pick<
+        PortfolioProjectRow,
+        "id" | "nome" | "categoria" | "image_url" | "image_urls" | "published_at" | "filamento_id"
+      >[],
+      Pick<FilamentoRow, "id" | "material" | "cor">[],
+      Pick<AppSettingsRow, "whatsapp_numero">[],
+    ] => [
+      unwrapResult(portfolio, {
+        table: "portfolio_projects",
+        operation: "listPublic",
+        query: "select(public cols).eq(is_public, true)",
+      }),
+      unwrapResult(filamentos, {
+        table: "filamentos",
+        operation: "listPublicLookup",
+        query: "select(id, material, cor)",
+      }),
+      unwrapResult(settings, {
+        table: "app_settings",
+        operation: "getPublicSettings",
+        query: "select(whatsapp_numero).eq(id, main).limit(1)",
+      }),
+    ],
+  );
 
   const publicPortfolio = portfolioRows
     .map((row) => {

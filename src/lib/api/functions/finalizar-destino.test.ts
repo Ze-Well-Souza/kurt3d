@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppSettings, Expense, Filamento, Order, Venda } from "../../domain/types";
+import type {
+  AppSettings,
+  Expense,
+  Filamento,
+  Order,
+  PortfolioProject,
+  Venda,
+} from "../../domain/types";
 import { DEFAULT_APP_SETTINGS } from "../../domain/types";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -26,15 +33,23 @@ const filamentosRepoMock = {
   list: [] as Filamento[],
   update: vi.fn(async (row: Filamento) => row),
 };
-const portfolioRepoMock = { list: [] as any[] };
+const portfolioRepoMock = {
+  list: [] as Pick<PortfolioProject, "id" | "pesoPeca" | "filamentoId">[],
+};
 let settingsMock: AppSettings = DEFAULT_APP_SETTINGS;
+
+type ServerFnChain = {
+  inputValidator: () => ServerFnChain;
+  validator: () => ServerFnChain;
+  handler: <F>(fn: F) => F;
+};
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
-    const chain: any = {
+    const chain: ServerFnChain = {
       inputValidator: () => chain,
       validator: () => chain,
-      handler: (fn: any) => fn,
+      handler: (fn) => fn,
     };
     return chain;
   },

@@ -54,7 +54,7 @@ function ClientsPage() {
   const [form, setForm] = useState({ nome: "", whatsapp: "", email: "", notas: "" });
 
   const mutateAdd = useMutation({
-    mutationFn: (data: any) => addClient({ data }),
+    mutationFn: (data: Parameters<typeof addClient>[0]["data"]) => addClient({ data }),
     onSuccess: () => {
       invalidarPor(qc, "salvarCliente");
       toast.success("Cliente cadastrado.");
@@ -63,7 +63,7 @@ function ClientsPage() {
     },
   });
   const mutateUpdate = useMutation({
-    mutationFn: (data: any) => updateClient({ data }),
+    mutationFn: (data: Parameters<typeof updateClient>[0]["data"]) => updateClient({ data }),
     onSuccess: () => {
       invalidarPor(qc, "salvarCliente");
       toast.success("Cliente atualizado.");

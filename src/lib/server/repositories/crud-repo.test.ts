@@ -11,27 +11,39 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 //  2. lista truncada pelo teto de linhas do PostgREST vira erro visível em vez
 //     de silenciosamente virar base para cálculo e gravação.
 
-type Call = { op: string; table: string; payload?: any; filter?: [string, any] };
+type Call = { op: string; table: string; payload?: unknown; filter?: [string, unknown] };
 let calls: Call[] = [];
-let rowsByTable: Record<string, any[]> = {};
+let rowsByTable: Record<string, unknown[]> = {};
 let countByTable: Record<string, number | null> = {};
 
+type QueryResult = { data: unknown[]; error: null; count: number };
+interface MockBuilder extends PromiseLike<QueryResult> {
+  select: () => MockBuilder;
+  insert: (payload: unknown) => MockBuilder;
+  update: (payload: unknown) => MockBuilder;
+  upsert: (payload: unknown) => MockBuilder;
+  delete: () => MockBuilder;
+  eq: (column: string, value: unknown) => MockBuilder;
+  in: (column: string, values: unknown[]) => MockBuilder;
+  order: () => MockBuilder;
+}
+
 function builderFor(table: string) {
-  const state: { op: string; payload?: any; filter?: [string, any] } = { op: "select" };
-  const builder: any = {
+  const state: { op: string; payload?: unknown } = { op: "select" };
+  const builder: MockBuilder = {
     select: () => builder,
-    insert: (payload: any) => {
+    insert: (payload: unknown) => {
       state.op = "insert";
       state.payload = payload;
       calls.push({ op: "insert", table, payload });
       return builder;
     },
-    update: (payload: any) => {
+    update: (payload: unknown) => {
       state.op = "update";
       state.payload = payload;
       return builder;
     },
-    upsert: (payload: any) => {
+    upsert: (payload: unknown) => {
       calls.push({ op: "upsert", table, payload });
       return builder;
     },
@@ -44,11 +56,11 @@ function builderFor(table: string) {
       return builder;
     },
     in: (column: string, values: unknown[]) => {
-      calls.push({ op: state.op, table, payload: state.payload, filter: [column, values as any] });
+      calls.push({ op: state.op, table, payload: state.payload, filter: [column, values] });
       return builder;
     },
     order: () => builder,
-    then: (resolve: any, reject: any) =>
+    then: (resolve, reject) =>
       Promise.resolve({
         data: rowsByTable[table] ?? [],
         error: null,
@@ -65,7 +77,7 @@ vi.mock("../supabase.server", () => ({
 type Linha = { id: string; nome: string };
 const config = {
   table: "teste",
-  fromRow: (row: any): Linha => ({ id: row.id, nome: row.nome }),
+  fromRow: (row: Linha): Linha => ({ id: row.id, nome: row.nome }),
   toRow: (row: Linha) => ({ id: row.id, nome: row.nome }),
   order: [{ column: "id", ascending: true }],
 };

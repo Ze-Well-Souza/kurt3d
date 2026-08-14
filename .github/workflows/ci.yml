@@ -30,12 +30,11 @@ jobs:
       - name: Testes
         run: bun test
 
-  # Separado do job acima para que a dívida de formatação herdada não
-  # bloqueie tipos e testes. Vira `continue-on-error: false` ao fim da Fase 4.
+  # Separado do job acima para que tipos e testes não fiquem reféns do lint.
+  # Bloqueante desde o fim da Fase 4 (zero @typescript-eslint/no-explicit-any).
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

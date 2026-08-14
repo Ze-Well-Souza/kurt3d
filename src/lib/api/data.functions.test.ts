@@ -1,7 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  Client,
+  Expense,
+  InventoryTxn,
+  Insumo,
+  InsumoPayment,
+  InsumoPaymentInstallment,
+  Lead,
+  Order,
+  OrderPart,
+  PortfolioProject,
+} from "../domain/types";
 
-type CrudMock = {
-  list: any[];
+type CrudMock<T> = {
+  list: T[];
   insert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   updateMany: ReturnType<typeof vi.fn>;
@@ -9,30 +21,30 @@ type CrudMock = {
   removeMany: ReturnType<typeof vi.fn>;
 };
 
-type OrderRepoMock = CrudMock;
+type OrderRepoMock = CrudMock<Order>;
 
 type InventoryRepoMock = {
-  list: any[];
+  list: InventoryTxn[];
   append: ReturnType<typeof vi.fn>;
 };
 
 type PortfolioRepoMock = {
-  list: any[];
+  list: PortfolioProject[];
 };
 
-type ClientRepoMock = CrudMock;
+type ClientRepoMock = CrudMock<Client>;
 
 type OrderPartRepoMock = {
-  list: any[];
+  list: OrderPart[];
   saveForOrder: ReturnType<typeof vi.fn>;
 };
 
-type ExpenseRepoMock = CrudMock;
+type ExpenseRepoMock = CrudMock<Expense>;
 
-type InsumoRepoMock = CrudMock;
+type InsumoRepoMock = CrudMock<Insumo>;
 
 type InsumoPaymentRepoMock = {
-  list: any[];
+  list: InsumoPayment[];
   insert: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
@@ -41,20 +53,20 @@ type InsumoPaymentRepoMock = {
 };
 
 type InsumoInstallmentRepoMock = {
-  list: any[];
+  list: InsumoPaymentInstallment[];
   insertMany: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
   deleteByPayment: ReturnType<typeof vi.fn>;
   removeMany: ReturnType<typeof vi.fn>;
 };
 
-type LeadRepoMock = CrudMock;
+type LeadRepoMock = CrudMock<Lead>;
 
-function crudMock(list: any[] = []): CrudMock {
+function crudMock<T>(list: T[] = []): CrudMock<T> {
   return {
     list,
-    insert: vi.fn(async (row: any) => row),
-    update: vi.fn(async (row: any) => row),
+    insert: vi.fn(async (row: T) => row),
+    update: vi.fn(async (row: T) => row),
     updateMany: vi.fn(async () => undefined),
     remove: vi.fn(async () => undefined),
     removeMany: vi.fn(async () => undefined),
@@ -71,14 +83,20 @@ let insumosRepoMock: InsumoRepoMock;
 let insumoPaymentsRepoMock: InsumoPaymentRepoMock;
 let insumoInstallmentsRepoMock: InsumoInstallmentRepoMock;
 let leadsRepoMock: LeadRepoMock;
-let supabaseMockRows: Record<string, any[]> = {};
+let supabaseMockRows: Record<string, Record<string, unknown>[]> = {};
+
+type ServerFnChain = {
+  inputValidator: () => ServerFnChain;
+  validator: () => ServerFnChain;
+  handler: <F>(fn: F) => F;
+};
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => {
-    const chain = {
+    const chain: ServerFnChain = {
       inputValidator: () => chain,
       validator: () => chain,
-      handler: (fn: any) => fn,
+      handler: (fn) => fn,
     };
     return chain;
   },
@@ -127,11 +145,20 @@ vi.mock("../server/require-session.server", () => ({
 // Mock do client Supabase para funções que consultam o banco direto (sem repo),
 // como a listPublicSnapshot — aplica o filtro .eq() em memória para o teste
 // validar que a projeção pública acontece no SQL.
+type SupabaseMockResult = { data: Record<string, unknown>[]; error: null };
+interface SupabaseMockBuilder extends PromiseLike<SupabaseMockResult> {
+  select: () => SupabaseMockBuilder;
+  eq: (column: string, value: unknown) => SupabaseMockBuilder;
+  like: (column: string, pattern: string) => SupabaseMockBuilder;
+  limit: (count: number) => SupabaseMockBuilder;
+  order: () => SupabaseMockBuilder;
+}
+
 vi.mock("../server/supabase.server", () => ({
   getSupabaseAdminClient: () => ({
     from: (table: string) => {
       let rows = [...(supabaseMockRows[table] ?? [])];
-      const builder: any = {
+      const builder: SupabaseMockBuilder = {
         select: () => builder,
         eq: (column: string, value: unknown) => {
           rows = rows.filter((row) => row[column] === value);
@@ -147,7 +174,7 @@ vi.mock("../server/supabase.server", () => ({
           return builder;
         },
         order: () => builder,
-        then: (resolve: any, reject: any) =>
+        then: (resolve, reject) =>
           Promise.resolve({ data: rows, error: null }).then(resolve, reject),
       };
       return builder;
@@ -524,6 +551,13 @@ describe("client linking", () => {
         step: 2,
       },
     });
+    // Trava o bug: o select do rastreio publico esqueceu `time_minutes` na
+    // primeira versao do P1-7. Sem esse campo, getOrderEstimatedDeliveryDate
+    // multiplica por undefined e devolve uma data invalida.
+    if (result.ok) {
+      expect(result.order.estimatedDeliveryAt).not.toBeNull();
+      expect(new Date(result.order.estimatedDeliveryAt!).toString()).not.toBe("Invalid Date");
+    }
   });
 
   it("nao revela pedido quando telefone nao confere", async () => {

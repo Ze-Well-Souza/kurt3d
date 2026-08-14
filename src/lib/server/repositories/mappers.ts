@@ -24,6 +24,29 @@ import type {
   Venda,
 } from "../../domain/types";
 import { DEFAULT_APP_SETTINGS, DEFAULT_SITE_CONTENT } from "../../domain/types";
+import type {
+  AppSettingsRow,
+  ClientRow,
+  ExpenseRow,
+  FilamentoHistoryRow,
+  FilamentoPaymentEventRow,
+  FilamentoPaymentInstallmentRow,
+  FilamentoPaymentRow,
+  FilamentoRow,
+  InsumoPaymentEventRow,
+  InsumoPaymentInstallmentRow,
+  InsumoPaymentRow,
+  InsumoRow,
+  InventoryTxnRow,
+  LeadRow,
+  OrderPartRow,
+  OrderPaymentRow,
+  OrderRow,
+  PortfolioProjectRow,
+  SiteContentRow,
+  UserRow,
+  VendaRow,
+} from "./row-types";
 
 export type User = {
   id: string;
@@ -38,7 +61,7 @@ export type User = {
   updatedAt: string;
 };
 
-export function fromUserRow(row: any): User {
+export function fromUserRow(row: UserRow): User {
   return {
     id: row.id,
     username: row.username,
@@ -86,7 +109,7 @@ export function toUserRow(user: User) {
   };
 }
 
-export function fromFilamentoRow(row: any): Filamento {
+export function fromFilamentoRow(row: FilamentoRow): Filamento {
   return {
     id: row.id,
     sku: row.sku,
@@ -139,7 +162,7 @@ export function toFilamentoRow(row: Filamento) {
   };
 }
 
-export function fromFilamentoHistoryRow(row: any): FilamentoHistory {
+export function fromFilamentoHistoryRow(row: FilamentoHistoryRow): FilamentoHistory {
   return {
     id: row.id,
     sku: row.sku,
@@ -194,14 +217,14 @@ export function toFilamentoHistoryRow(row: FilamentoHistory) {
   };
 }
 
-export function fromOrderRow(row: any): Order {
+export function fromOrderRow(row: OrderRow): Order {
   return {
     id: row.id,
     client: row.client,
     projectName: row.project_name,
     quantity: row.quantity,
     timeMinutes: row.time_minutes,
-    status: row.status,
+    status: row.status as Order["status"],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     portfolioProjectId: row.portfolio_project_id ?? undefined,
@@ -209,7 +232,7 @@ export function fromOrderRow(row: any): Order {
     filamentoIds: Array.isArray(row.filamento_ids) ? row.filamento_ids : undefined,
     gramsPerUnit: row.grams_per_unit ?? undefined,
     valorRecebido: row.valor_recebido ?? undefined,
-    destino: row.destino ?? undefined,
+    destino: (row.destino as Order["destino"]) ?? undefined,
     linkProjeto: row.link_projeto ?? null,
     multiPart: row.multi_part ?? false,
     precoVenda: row.preco_venda ?? null,
@@ -246,7 +269,7 @@ export function toOrderRow(row: Order) {
   };
 }
 
-export function fromOrderPartRow(row: any): OrderPart {
+export function fromOrderPartRow(row: OrderPartRow): OrderPart {
   return {
     id: row.id,
     orderId: row.order_id,
@@ -255,7 +278,7 @@ export function fromOrderPartRow(row: any): OrderPart {
     quantity: row.quantity ?? 1,
     timeMinutes: row.time_minutes,
     gramsPerUnit: row.grams_per_unit,
-    status: row.status ?? "todo",
+    status: (row.status as OrderPart["status"]) ?? "todo",
     linkProjeto: row.link_projeto ?? null,
     notes: row.notes ?? null,
     createdAt: row.created_at,
@@ -280,7 +303,7 @@ export function toOrderPartRow(row: OrderPart) {
   };
 }
 
-export function safeParseJsonArray(value: unknown): any[] {
+export function safeParseJsonArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (typeof value === "string" && value) {
     try {
@@ -292,7 +315,7 @@ export function safeParseJsonArray(value: unknown): any[] {
   return [];
 }
 
-export function fromPortfolioRow(row: any): PortfolioProject {
+export function fromPortfolioRow(row: PortfolioProjectRow): PortfolioProject {
   const filamentosRaw = safeParseJsonArray(row.filamentos);
   const custosExtrasRaw = safeParseJsonArray(row.custos_extras);
   return {
@@ -356,7 +379,7 @@ export function toPortfolioRow(row: PortfolioProject) {
   };
 }
 
-export function fromInsumoRow(row: any): Insumo {
+export function fromInsumoRow(row: InsumoRow): Insumo {
   return {
     id: row.id,
     nome: row.nome,
@@ -365,7 +388,8 @@ export function fromInsumoRow(row: any): Insumo {
     precoTotal: row.preco_total,
     linkProduto: row.link_produto ?? null,
     paymentId: row.payment_id ?? null,
-    classificacaoFinanceira: row.classificacao_financeira ?? "operacional",
+    classificacaoFinanceira:
+      (row.classificacao_financeira as Insumo["classificacaoFinanceira"]) ?? "operacional",
   };
 }
 
@@ -382,7 +406,7 @@ export function toInsumoRow(row: Insumo) {
   };
 }
 
-export function fromVendaRow(row: any): Venda {
+export function fromVendaRow(row: VendaRow): Venda {
   return {
     id: row.id,
     orderId: row.order_id,
@@ -408,12 +432,12 @@ export function toVendaRow(row: Venda) {
   };
 }
 
-export function fromInventoryRow(row: any): InventoryTxn {
+export function fromInventoryRow(row: InventoryTxnRow): InventoryTxn {
   return {
     id: row.id,
     filamentId: row.filament_id,
     orderId: row.order_id,
-    type: row.type,
+    type: row.type as InventoryTxn["type"],
     grams: row.grams,
     createdAt: row.created_at,
   };
@@ -430,7 +454,7 @@ export function toInventoryRow(row: InventoryTxn) {
   };
 }
 
-export function fromPaymentRow(row: any): FilamentoPayment {
+export function fromPaymentRow(row: FilamentoPaymentRow): FilamentoPayment {
   return {
     id: row.id,
     batchId: row.batch_id,
@@ -454,7 +478,7 @@ export function toPaymentRow(row: FilamentoPayment) {
   };
 }
 
-export function fromInsumoPaymentRow(row: any): InsumoPayment {
+export function fromInsumoPaymentRow(row: InsumoPaymentRow): InsumoPayment {
   return {
     id: row.id,
     insumoId: row.insumo_id,
@@ -478,7 +502,9 @@ export function toInsumoPaymentRow(row: InsumoPayment) {
   };
 }
 
-export function fromInstallmentRow(row: any): FilamentoPaymentInstallment {
+export function fromInstallmentRow(
+  row: FilamentoPaymentInstallmentRow,
+): FilamentoPaymentInstallment {
   return {
     id: row.id,
     paymentId: row.payment_id,
@@ -506,12 +532,12 @@ export function toInstallmentRow(row: FilamentoPaymentInstallment) {
   };
 }
 
-export function fromFilamentoPaymentEventRow(row: any): FilamentoPaymentEvent {
+export function fromFilamentoPaymentEventRow(row: FilamentoPaymentEventRow): FilamentoPaymentEvent {
   return {
     id: row.id,
     installmentId: row.installment_id,
     paymentId: row.payment_id,
-    tipo: row.tipo,
+    tipo: row.tipo as FilamentoPaymentEvent["tipo"],
     valor: row.valor,
     dataPagamento: row.data_pagamento,
     observacao: row.observacao ?? null,
@@ -532,7 +558,9 @@ export function toFilamentoPaymentEventRow(row: FilamentoPaymentEvent) {
   };
 }
 
-export function fromInsumoInstallmentRow(row: any): InsumoPaymentInstallment {
+export function fromInsumoInstallmentRow(
+  row: InsumoPaymentInstallmentRow,
+): InsumoPaymentInstallment {
   return {
     id: row.id,
     paymentId: row.payment_id,
@@ -560,12 +588,12 @@ export function toInsumoInstallmentRow(row: InsumoPaymentInstallment) {
   };
 }
 
-export function fromInsumoPaymentEventRow(row: any): InsumoPaymentEvent {
+export function fromInsumoPaymentEventRow(row: InsumoPaymentEventRow): InsumoPaymentEvent {
   return {
     id: row.id,
     installmentId: row.installment_id,
     paymentId: row.payment_id,
-    tipo: row.tipo,
+    tipo: row.tipo as InsumoPaymentEvent["tipo"],
     valor: row.valor,
     dataPagamento: row.data_pagamento,
     observacao: row.observacao ?? null,
@@ -586,7 +614,7 @@ export function toInsumoPaymentEventRow(row: InsumoPaymentEvent) {
   };
 }
 
-export function fromExpenseRow(row: any): Expense {
+export function fromExpenseRow(row: ExpenseRow): Expense {
   return {
     id: row.id,
     source: row.source as ExpenseSource,
@@ -610,7 +638,7 @@ export function toExpenseRow(row: Expense) {
   };
 }
 
-export function fromOrderPaymentRow(row: any): OrderPayment {
+export function fromOrderPaymentRow(row: OrderPaymentRow): OrderPayment {
   return {
     id: row.id,
     orderId: row.order_id,
@@ -636,7 +664,7 @@ export function toOrderPaymentRow(row: OrderPayment) {
   };
 }
 
-export function fromLeadRow(row: any): Lead {
+export function fromLeadRow(row: LeadRow): Lead {
   let imagens: Lead["imagens"] = null;
   try {
     if (Array.isArray(row.imagens)) imagens = row.imagens;
@@ -667,7 +695,7 @@ export function toLeadRow(row: Lead) {
   };
 }
 
-export function fromClientRow(row: any): Client {
+export function fromClientRow(row: ClientRow): Client {
   return {
     id: row.id,
     nome: row.nome,
@@ -691,7 +719,7 @@ export function toClientRow(row: Client) {
   };
 }
 
-export function fromSettingsRow(row: any): AppSettings {
+export function fromSettingsRow(row: Partial<AppSettingsRow>): AppSettings {
   return {
     studioNome: row.studio_nome ?? DEFAULT_APP_SETTINGS.studioNome,
     impressoraModelo: row.impressora_modelo ?? DEFAULT_APP_SETTINGS.impressoraModelo,
@@ -704,8 +732,12 @@ export function fromSettingsRow(row: any): AppSettings {
     whatsappNumero: row.whatsapp_numero ?? DEFAULT_APP_SETTINGS.whatsappNumero,
     selectedPrinterPreset:
       row.selected_printer_preset ?? DEFAULT_APP_SETTINGS.selectedPrinterPreset,
-    printerPrices: row.printer_prices ?? DEFAULT_APP_SETTINGS.printerPrices,
-    printerVidaUtil: row.printer_vida_util ?? DEFAULT_APP_SETTINGS.printerVidaUtil,
+    printerPrices:
+      (row.printer_prices as Record<string, number> | undefined) ??
+      DEFAULT_APP_SETTINGS.printerPrices,
+    printerVidaUtil:
+      (row.printer_vida_util as Record<string, number> | undefined) ??
+      DEFAULT_APP_SETTINGS.printerVidaUtil,
   };
 }
 
@@ -727,7 +759,7 @@ export function toSettingsRow(row: AppSettings) {
   };
 }
 
-export function fromSiteContentRow(row: any): SiteContent {
+export function fromSiteContentRow(row: Partial<SiteContentRow>): SiteContent {
   if (row?.content) {
     return { ...DEFAULT_SITE_CONTENT, ...(row.content as Partial<SiteContent>) };
   }

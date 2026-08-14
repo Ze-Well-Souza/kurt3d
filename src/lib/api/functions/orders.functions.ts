@@ -13,7 +13,8 @@ import {
 import type { Expense, Order, OrderDestino, OrderPart, Status, Venda } from "../../domain/types";
 import { nowIso } from "../../server/db.server";
 import { getSupabaseAdminClient } from "../../server/supabase.server";
-import { fromClientRow, fromOrderRow } from "../../server/repositories/mappers";
+import { fromClientRow } from "../../server/repositories/mappers";
+import type { ClientRow, OrderRow } from "../../server/repositories/row-types";
 import { unwrapResult } from "../../server/repositories/shared";
 import {
   createOrderAssetSignedUrl,
@@ -402,10 +403,16 @@ export const getPublicOrderTracking = createServerFn({ method: "POST" })
     if (!prefixo) return { ok: false as const, reason: "not_found" as const };
 
     const supabase = getSupabaseAdminClient();
+    // Seleciona exatamente os campos que este handler + getOrderTrackingSummary
+    // usam a partir daqui. `time_minutes` é essencial: sem ele,
+    // getOrderEstimatedDeliveryDate multiplica por undefined e devolve uma
+    // data invalida no rastreio publico — faltava no select original.
     const candidatos = unwrapResult(
       await supabase
         .from("orders")
-        .select("id, project_name, quantity, status, created_at, updated_at, multi_part, client_id")
+        .select(
+          "id, project_name, quantity, time_minutes, status, created_at, updated_at, multi_part, client_id",
+        )
         .like("id", `${prefixo}%`)
         .limit(5),
       {
@@ -413,19 +420,40 @@ export const getPublicOrderTracking = createServerFn({ method: "POST" })
         operation: "publicTracking",
         query: "select(cols).like(id, prefixo).limit(5)",
       },
-    ) as any[];
+    ) as Pick<
+      OrderRow,
+      | "id"
+      | "project_name"
+      | "quantity"
+      | "time_minutes"
+      | "status"
+      | "created_at"
+      | "updated_at"
+      | "multi_part"
+      | "client_id"
+    >[];
 
     const row = candidatos.find((item) => matchesOrderTrackingCode(item.id, data.code));
     if (!row) return { ok: false as const, reason: "not_found" as const };
 
-    const order = fromOrderRow(row);
+    const order = {
+      id: row.id,
+      projectName: row.project_name,
+      quantity: row.quantity,
+      timeMinutes: row.time_minutes,
+      status: row.status as Order["status"],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      multiPart: row.multi_part ?? false,
+      clientId: row.client_id,
+    };
 
     // Só o cliente daquele pedido é carregado — não a agenda inteira.
     const clientRows = order.clientId
       ? (unwrapResult(
           await supabase.from("clients").select("*").eq("id", order.clientId).limit(1),
           { table: "clients", operation: "publicTrackingClient", query: "select(*).eq(id)" },
-        ) as any[])
+        ) as ClientRow[])
       : [];
 
     if (!phoneMatchesClient(order, clientRows.map(fromClientRow), data.phone)) {
@@ -477,7 +505,7 @@ export const resolveOrderAssetUrl = createServerFn({ method: "POST" })
   });
 
 function phoneMatchesClient(
-  order: Order,
+  order: Pick<Order, "clientId">,
   clients: Awaited<ReturnType<typeof clientsRepo>>["list"],
   phone: string,
 ) {

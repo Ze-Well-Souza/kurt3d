@@ -94,6 +94,7 @@ import {
 } from "@/lib/api/data.functions";
 import type {
   Order,
+  OrderDestino,
   OrderPart,
   OrderPartStatus,
   Status,
@@ -103,6 +104,15 @@ import type {
   CalculatorFilamentoInput,
   CalculatorExtraCost,
 } from "@/lib/domain/types";
+
+/** Assinatura comum do callback de finalizacao usado em Order Card / Kanban Column. */
+type FinalizarPedidoArgs = {
+  orderId: string;
+  destino: OrderDestino;
+  valorRecebido?: number;
+  formaPagamento?: string;
+  dataPagamento?: string;
+};
 import { DEFAULT_APP_SETTINGS } from "@/lib/domain/types";
 import { SearchInput } from "@/components/SearchInput";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
@@ -540,7 +550,8 @@ function CalcPedidos() {
 
   /* ── mutations ── */
   const mutateAddProject = useMutation({
-    mutationFn: (input: any) => addPortfolioProject({ data: input }),
+    mutationFn: (input: Parameters<typeof addPortfolioProject>[0]["data"]) =>
+      addPortfolioProject({ data: input }),
     onSuccess: () => invalidar("salvarProjeto"),
   });
   const mutateRemoveProject = useMutation({
@@ -567,11 +578,12 @@ function CalcPedidos() {
     onSuccess: () => invalidar("mudarStatusPedido"),
   });
   const mutateAddOrder = useMutation({
-    mutationFn: (input: any) => addOrder({ data: input }),
+    mutationFn: (input: Parameters<typeof addOrder>[0]["data"]) => addOrder({ data: input }),
     onSuccess: () => invalidar("criarPedido"),
   });
   const mutateFinalizar = useMutation({
-    mutationFn: (input: any) => finalizarDestino({ data: input }),
+    mutationFn: (input: Parameters<typeof finalizarDestino>[0]["data"]) =>
+      finalizarDestino({ data: input }),
     onSuccess: () => invalidar("finalizarPedido"),
   });
   const mutateRemoveOrder = useMutation({
@@ -582,7 +594,7 @@ function CalcPedidos() {
     },
   });
   const mutateUpdateOrder = useMutation({
-    mutationFn: (input: any) => updateOrder({ data: input }),
+    mutationFn: (input: Parameters<typeof updateOrder>[0]["data"]) => updateOrder({ data: input }),
     onSuccess: () => {
       invalidar("editarPedido");
       toast.success("Pedido atualizado.");
@@ -590,7 +602,8 @@ function CalcPedidos() {
     onError: handleUpdateError,
   });
   const mutateUpdateProject = useMutation({
-    mutationFn: (input: any) => updatePortfolioProject({ data: input }),
+    mutationFn: (input: Parameters<typeof updatePortfolioProject>[0]["data"]) =>
+      updatePortfolioProject({ data: input }),
     onSuccess: () => {
       invalidar("salvarProjeto");
       toast.success("Projeto atualizado.");
@@ -1853,9 +1866,11 @@ function CalcPedidos() {
               });
               const statusLabel =
                 STATUS_BADGE[detailOrder.status]?.label ??
-                ({ todo: "A Fazer", printing: "Imprimindo", done: "Concluído" } as any)[
-                  detailOrder.status
-                ] ??
+                (
+                  { todo: "A Fazer", printing: "Imprimindo", done: "Concluído" } as Partial<
+                    Record<Status, string>
+                  >
+                )[detailOrder.status] ??
                 detailOrder.status;
               const tracking = getOrderTrackingSummary(detailOrder);
               const trackingPath = `/acompanhar`;
@@ -2206,7 +2221,9 @@ function CalcPedidos() {
                   precoVenda: Number(fd.get("precoVenda")) || null,
                   linkProjeto:
                     (fd.get("linkProjeto") as string)?.trim() ||
-                    (isOrderAssetReference(editOrder.linkProjeto) ? editOrder.linkProjeto : null),
+                    (isOrderAssetReference(editOrder.linkProjeto)
+                      ? (editOrder.linkProjeto ?? null)
+                      : null),
                   multiPart: editOrder.parts?.length ? true : (editOrder.multiPart ?? false),
                   formaPagamento: (fd.get("formaPagamento") as string) || null,
                   dataPagamento: (fd.get("dataPagamento") as string) || null,
@@ -3799,7 +3816,7 @@ function CalculatorDonutChart({
   numeric,
 }: {
   results: PortfolioCalculatorResult;
-  numeric: any;
+  numeric: { quantidade: number };
 }) {
   const total = results.custoLote || 1;
   const segments = [
@@ -3925,13 +3942,7 @@ function OrderCardView({
 }: {
   order: Order;
   dragging?: boolean;
-  onFinalizar: (args: {
-    orderId: string;
-    destino: string;
-    valorRecebido?: number;
-    formaPagamento?: string;
-    dataPagamento?: string;
-  }) => Promise<unknown>;
+  onFinalizar: (args: FinalizarPedidoArgs) => Promise<unknown>;
   filamentos?: Filamento[];
   onDelete?: (orderId: string) => void;
   onDetail?: (order: Order) => void;
@@ -4522,13 +4533,7 @@ function DraggableCard({
   onOpenProjectReference,
 }: {
   order: Order;
-  onFinalizar: (args: {
-    orderId: string;
-    destino: string;
-    valorRecebido?: number;
-    formaPagamento?: string;
-    dataPagamento?: string;
-  }) => Promise<unknown>;
+  onFinalizar: (args: FinalizarPedidoArgs) => Promise<unknown>;
   filamentos?: Filamento[];
   onDelete?: (orderId: string) => void;
   onDetail?: (order: Order) => void;
@@ -4579,13 +4584,7 @@ function KanbanColumn({
   title: string;
   hint: string;
   orders: Order[];
-  onFinalizar: (args: {
-    orderId: string;
-    destino: string;
-    valorRecebido?: number;
-    formaPagamento?: string;
-    dataPagamento?: string;
-  }) => Promise<unknown>;
+  onFinalizar: (args: FinalizarPedidoArgs) => Promise<unknown>;
   filamentos?: Filamento[];
   onDelete?: (orderId: string) => void;
   onDetail?: (order: Order) => void;

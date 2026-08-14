@@ -115,8 +115,9 @@ describe("addPortfolioProject schema", () => {
   });
 
   it("defaults isPublic to false when not provided", () => {
-    const data = validAddProject();
-    delete (data as any).isPublic;
+    const data: Partial<ReturnType<typeof validAddProject>> & { isPublic?: boolean } =
+      validAddProject();
+    delete data.isPublic;
     const result = addPortfolioProjectSchema.safeParse(data);
     if (result.success) expect(result.data.isPublic).toBe(false);
   });
@@ -181,8 +182,9 @@ describe("updatePortfolioProject schema", () => {
   });
 
   it("requires isPublic field", () => {
-    const data = validUpdateProject();
-    delete (data as any).isPublic;
+    const data: Partial<ReturnType<typeof validUpdateProject>> & { isPublic?: boolean } =
+      validUpdateProject();
+    delete data.isPublic;
     const result = updatePortfolioProjectSchema.safeParse(data);
     expect(result.success).toBe(false);
   });

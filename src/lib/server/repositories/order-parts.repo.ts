@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "../supabase.server";
 import { fromOrderPartRow, toOrderPartRow } from "./mappers";
+import type { OrderPartRow } from "./row-types";
 import { unwrapResult } from "./shared";
 
 export async function orderPartsRepo() {
@@ -12,7 +13,7 @@ export async function orderPartsRepo() {
       query: "select(*).order(order_id).order(position)",
     },
   );
-  const list = (rows as any[]).map(fromOrderPartRow);
+  const list = (rows as OrderPartRow[]).map(fromOrderPartRow);
 
   return {
     list,

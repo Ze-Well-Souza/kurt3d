@@ -217,7 +217,8 @@ function OrcamentosPage() {
 
   // Mutations
   const mutateCreate = useMutation({
-    mutationFn: (data: any) => createBudgetQuote({ data }),
+    mutationFn: (data: Parameters<typeof createBudgetQuote>[0]["data"]) =>
+      createBudgetQuote({ data }),
     onSuccess: () => {
       invalidarPor(qc, "orcamento");
       toast.success("Orçamento criado.");
@@ -228,15 +229,16 @@ function OrcamentosPage() {
   });
 
   const mutateUpdate = useMutation({
-    mutationFn: (data: any) => updateBudgetQuote({ data }),
+    mutationFn: (data: Parameters<typeof updateBudgetQuote>[0]["data"]) =>
+      updateBudgetQuote({ data }),
     onSuccess: () => {
       invalidarPor(qc, "orcamento");
       toast.success("Orçamento atualizado.");
       setShowForm(false);
       setEditQuote(null);
     },
-    onError: (err: any) => {
-      const msg = err?.message || String(err);
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("email") || msg.includes("e-mail")) {
         toast.error("E-mail do cliente inválido. Corrija ou remova antes de salvar.");
       } else if (msg.includes("rate_limited")) {

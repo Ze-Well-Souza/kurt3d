@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getPasswordPolicyIssues } from "../domain/password-policy";
+import type { User } from "./repositories/mappers";
 
 // P2-8 — três correções de segurança em torno de senha, travadas aqui:
 //
@@ -14,16 +15,16 @@ import { getPasswordPolicyIssues } from "../domain/password-policy";
 //     de ser provisória — sem isso, um cookie de sessão roubado bastava para
 //     trocar a senha e trancar o dono de fora, sem nunca ter visto a senha.
 
-let usersState: any[] = [];
+let usersState: User[] = [];
 const usersRepoMock = {
   get list() {
     return usersState;
   },
-  insert: vi.fn(async (row: any) => {
+  insert: vi.fn(async (row: User) => {
     usersState.push(row);
     return row;
   }),
-  update: vi.fn(async (row: any) => {
+  update: vi.fn(async (row: User) => {
     usersState = usersState.map((u) => (u.id === row.id ? row : u));
     return row;
   }),
@@ -84,7 +85,7 @@ describe("generateProvisionalPassword", () => {
   });
 });
 
-function usuario(over: Partial<Record<string, unknown>> = {}) {
+function usuario(over: Partial<User> = {}): User {
   return {
     id: "u1",
     username: "user1",

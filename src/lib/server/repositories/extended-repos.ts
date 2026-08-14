@@ -7,9 +7,16 @@ import type {
 } from "../../domain/types";
 import { getSupabaseAdminClient } from "../supabase.server";
 import { createCrudRepo } from "./crud-repo";
+import type {
+  BudgetQuoteRow,
+  PortfolioVideoRow,
+  ProductionCalendarRow,
+  ReceiptRow,
+  SavedReportRow,
+} from "./row-types";
 import { unwrapResult } from "./shared";
 
-function fromProductionCalendarRow(row: any): ProductionCalendarEvent {
+function fromProductionCalendarRow(row: ProductionCalendarRow): ProductionCalendarEvent {
   return {
     id: row.id,
     orderId: row.order_id,
@@ -17,7 +24,7 @@ function fromProductionCalendarRow(row: any): ProductionCalendarEvent {
     startDate: row.start_date,
     endDate: row.end_date,
     printerName: row.printer_name,
-    status: row.status,
+    status: row.status as ProductionCalendarEvent["status"],
     notes: row.notes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -39,7 +46,7 @@ function toProductionCalendarRow(row: ProductionCalendarEvent) {
   };
 }
 
-function fromBudgetQuoteRow(row: any): BudgetQuote {
+function fromBudgetQuoteRow(row: BudgetQuoteRow): BudgetQuote {
   return {
     id: row.id,
     clientName: row.client_name,
@@ -50,7 +57,7 @@ function fromBudgetQuoteRow(row: any): BudgetQuote {
     discountPercent: row.discount_percent ?? null,
     total: row.total,
     validityDays: row.validity_days,
-    status: row.status,
+    status: row.status as BudgetQuote["status"],
     notes: row.notes ?? null,
     pdfUrl: row.pdf_url ?? null,
     createdAt: row.created_at,
@@ -81,7 +88,7 @@ function toBudgetQuoteRow(row: BudgetQuote) {
   };
 }
 
-function fromPortfolioVideoRow(row: any): PortfolioVideo {
+function fromPortfolioVideoRow(row: PortfolioVideoRow): PortfolioVideo {
   return {
     id: row.id,
     projectId: row.project_id ?? null,
@@ -89,7 +96,7 @@ function fromPortfolioVideoRow(row: any): PortfolioVideo {
     description: row.description ?? null,
     videoUrl: row.video_url,
     thumbnailUrl: row.thumbnail_url ?? null,
-    platform: row.platform,
+    platform: row.platform as PortfolioVideo["platform"],
     durationSeconds: row.duration_seconds ?? null,
     viewsCount: row.views_count ?? null,
     featured: row.featured,
@@ -115,13 +122,13 @@ function toPortfolioVideoRow(row: PortfolioVideo) {
   };
 }
 
-function fromSavedReportRow(row: any): SavedReport {
+function fromSavedReportRow(row: SavedReportRow): SavedReport {
   return {
     id: row.id,
     name: row.name,
-    type: row.type,
-    config: row.config ?? {},
-    filters: row.filters ?? null,
+    type: row.type as SavedReport["type"],
+    config: (row.config as Record<string, unknown> | null) ?? {},
+    filters: (row.filters as Record<string, unknown> | null) ?? null,
     createdBy: row.created_by ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -171,11 +178,11 @@ export const savedReportsRepo = createCrudRepo({
 
 // ═══════════ Receipts ═══════════
 
-function fromReceiptRow(row: any): Receipt {
+function fromReceiptRow(row: ReceiptRow): Receipt {
   return {
     id: row.id,
     receiptNumber: row.receipt_number,
-    type: row.type,
+    type: row.type as Receipt["type"],
     clientName: row.client_name,
     items: Array.isArray(row.items) ? row.items : [],
     total: row.total,

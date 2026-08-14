@@ -264,7 +264,11 @@ function Reports() {
   }, [budgetQuotes]);
 
   // Export functions
-  const exportToCSV = (data: any[], filename: string, columns: string[]) => {
+  const exportToCSV = (
+    data: Record<string, string | number | null | undefined>[],
+    filename: string,
+    columns: string[],
+  ) => {
     const csvLines = [
       columns.join(";"),
       ...data.map((row) =>

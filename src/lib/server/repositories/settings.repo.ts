@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "../supabase.server";
 import { fromSettingsRow, toSettingsRow } from "./mappers";
+import type { AppSettingsRow } from "./row-types";
 import { unwrapResult } from "./shared";
 
 export async function settingsRepo() {
@@ -12,7 +13,7 @@ export async function settingsRepo() {
       query: "select(*).eq(id, main).limit(1)",
     },
   );
-  const list = rows as any[];
+  const list = rows as AppSettingsRow[];
   const settings = list.length > 0 ? fromSettingsRow(list[0]) : fromSettingsRow({});
   return {
     settings,

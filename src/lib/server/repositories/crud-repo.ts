@@ -42,8 +42,15 @@ type OrderSpec = { column: string; ascending?: boolean };
 
 export type CrudRepoConfig<T extends RowWithId, R> = {
   table: string;
-  fromRow: (row: any) => T;
-  toRow: (row: T) => R;
+  /** Uma linha lida do banco tem todas as colunas — sempre o tipo completo. */
+  fromRow: (row: R) => T;
+  /**
+   * Um payload de escrita pode legitimamente omitir colunas: as que têm
+   * default no banco (ex.: `created_at`) ou as que a aplicação decidiu não
+   * gerenciar mais (ex.: `portfolio_projects.consumo_kw`, mantida na tabela
+   * mas sem campo de domínio correspondente desde a limpeza do P2-7).
+   */
+  toRow: (row: T) => Partial<R>;
   /** Ordenação aplicada no SQL. Vários níveis são aplicados na ordem dada. */
   order?: OrderSpec[];
 };
@@ -68,7 +75,7 @@ export function createCrudRepo<T extends RowWithId, R>(config: CrudRepoConfig<T,
       table,
       operation: "list",
       query: `select(*).order(${order.map((o) => `${o.column} ${o.ascending === false ? "desc" : "asc"}`).join(", ")})`,
-    }) as any[];
+    }) as R[];
 
     const total = result.count ?? rows.length;
     if (rows.length < total) {

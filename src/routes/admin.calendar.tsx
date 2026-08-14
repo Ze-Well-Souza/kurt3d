@@ -85,7 +85,8 @@ function Calendar() {
   const invalidate = () => invalidarPor(qc, "calendario");
 
   const mutateCreate = useMutation({
-    mutationFn: (data: any) => createCalendarEvent({ data }),
+    mutationFn: (data: Parameters<typeof createCalendarEvent>[0]["data"]) =>
+      createCalendarEvent({ data }),
     onSuccess: () => {
       invalidate();
       toast.success("Evento criado com sucesso!");
@@ -96,7 +97,8 @@ function Calendar() {
   });
 
   const mutateUpdate = useMutation({
-    mutationFn: (data: any) => updateCalendarEvent({ data }),
+    mutationFn: (data: Parameters<typeof updateCalendarEvent>[0]["data"]) =>
+      updateCalendarEvent({ data }),
     onSuccess: () => {
       invalidate();
       toast.success("Evento atualizado!");
@@ -168,7 +170,7 @@ function Calendar() {
       startDate: startDateTime,
       endDate: endDateTime,
       printerName: eventForm.printerName,
-      notes: eventForm.notes || null,
+      notes: eventForm.notes || undefined,
       status: eventForm.status,
     };
 
@@ -433,7 +435,9 @@ function Calendar() {
               <Label>Status</Label>
               <Select
                 value={eventForm.status}
-                onValueChange={(v: any) => setEventForm((s) => ({ ...s, status: v }))}
+                onValueChange={(v: ProductionCalendarEvent["status"]) =>
+                  setEventForm((s) => ({ ...s, status: v }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
