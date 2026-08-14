@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { calcCostFromInputs, calcOrderCostHybrid } from "./cost";
+import {
+  calcCostFromInputs,
+  calcOrderCostHybrid,
+  estimateOrderMaterialGrams,
+  resolveOrderPricingInputs,
+} from "./cost";
 import { DEFAULT_APP_SETTINGS } from "./types";
 import type { Order, Filamento, PortfolioProject } from "./types";
 
@@ -130,7 +135,12 @@ describe("calcOrderCostHybrid", () => {
     expect(result.total).toBeCloseTo(result.breakdown.custoUnidade * 3, 2);
   });
 
-  it("usa tempo do portfolio quando disponível", () => {
+  it("usa o timeMinutes do PEDIDO, nao o tempoMin do portfolio (P2-2)", () => {
+    // O pedido e o registro do que realmente aconteceu naquela producao. Se o
+    // operador editar o tempo depois de criar o pedido a partir de um projeto,
+    // ou o projeto-molde mudar mais tarde, e o valor do pedido que deve custear
+    // a venda — a mesma precedencia que ja valia para o peso e para a baixa de
+    // estoque (estimateOrderMaterialGrams).
     const portfolio: PortfolioProject = {
       id: "proj-1",
       nome: "Test",
@@ -145,9 +155,29 @@ describe("calcOrderCostHybrid", () => {
       createdAt: "2024-01-01",
       updatedAt: "2024-01-01",
     };
-    const order = { ...mockOrder, timeMinutes: 999 }; // should be overridden by portfolio's tempoMin
+    const order = { ...mockOrder, timeMinutes: 999 };
     const result = calcOrderCostHybrid({ order, portfolio, settings: mockSettings });
-    // custoEnergia should use portfolio tempoMin (60), not order.timeMinutes (999)
+    const expectedEnergy = (999 / 60) * mockSettings.consumoKw * mockSettings.tarifaEnergiaKwh;
+    expect(result.breakdown.custoEnergia).toBeCloseTo(expectedEnergy, 3);
+  });
+
+  it("cai para o tempoMin do portfolio quando o pedido nao tem timeMinutes", () => {
+    const portfolio: PortfolioProject = {
+      id: "proj-1",
+      nome: "Test",
+      categoria: "Miniatura",
+      custoRolo: 100,
+      pesoRolo: 1000,
+      pesoPeca: 30,
+      tempoMin: 60,
+      quantidade: 1,
+      precoVenda: 40,
+      isPublic: false,
+      createdAt: "2024-01-01",
+      updatedAt: "2024-01-01",
+    };
+    const order = { ...mockOrder, timeMinutes: undefined as unknown as number };
+    const result = calcOrderCostHybrid({ order, portfolio, settings: mockSettings });
     const expectedEnergy = (60 / 60) * mockSettings.consumoKw * mockSettings.tarifaEnergiaKwh;
     expect(result.breakdown.custoEnergia).toBeCloseTo(expectedEnergy, 3);
   });
@@ -216,5 +246,54 @@ describe("calcOrderCostHybrid", () => {
     // custo filamento por grama: 80/1000 = 0.08
     // peso peca vem do gramsPerUnit do order (undefined) → 0
     expect(result.breakdown.custoFilamento).toBe(0);
+  });
+});
+
+describe("resolveOrderPricingInputs (P2-2)", () => {
+  const mockOrder: Order = {
+    id: "order-1",
+    client: "Test",
+    projectName: "Test Project",
+    quantity: 3,
+    timeMinutes: 120,
+    status: "todo",
+    createdAt: "2024-01-01",
+    updatedAt: "2024-01-01",
+  };
+  const portfolio: PortfolioProject = {
+    id: "proj-1",
+    nome: "Test",
+    categoria: "Miniatura",
+    custoRolo: 100,
+    pesoRolo: 1000,
+    pesoPeca: 30,
+    tempoMin: 60,
+    quantidade: 1,
+    precoVenda: 40,
+    isPublic: false,
+    createdAt: "2024-01-01",
+    updatedAt: "2024-01-01",
+  };
+
+  it("o que e baixado do estoque e o que e custeado usam o mesmo peso", () => {
+    // Esta e a garantia central do P2-2: as duas funcoes tem que concordar
+    // sempre, para qualquer combinacao de valores no pedido e no portfolio.
+    const order = { ...mockOrder, gramsPerUnit: 45, quantity: 3 };
+
+    const gramsBaixados = estimateOrderMaterialGrams(order, portfolio);
+    const { pesoPeca: pesoCusteado } = resolveOrderPricingInputs(order, portfolio);
+
+    expect(gramsBaixados).toBe(pesoCusteado * order.quantity);
+    expect(pesoCusteado).toBe(45); // pedido vence o portfolio (30)
+  });
+
+  it("sem peso no pedido, os dois caem para o mesmo valor do portfolio", () => {
+    const order = { ...mockOrder, gramsPerUnit: undefined, quantity: 2 };
+
+    const gramsBaixados = estimateOrderMaterialGrams(order, portfolio);
+    const { pesoPeca: pesoCusteado } = resolveOrderPricingInputs(order, portfolio);
+
+    expect(gramsBaixados).toBe(pesoCusteado * order.quantity);
+    expect(pesoCusteado).toBe(30);
   });
 });

@@ -112,7 +112,6 @@ import { getOrderTrackingSummary } from "@/lib/domain/order-tracking";
 import {
   BAMBU_PRESETS,
   type BambuPresetId,
-  calcPortfolioPricing,
   calcAdvancedPortfolioPricing,
   type PortfolioCalculatorEntryMode,
   type PortfolioCalculatorResult,
@@ -3339,7 +3338,13 @@ function CalcPedidos() {
                 </TableHeader>
                 <TableBody>
                   {filteredProjects.map((p) => {
-                    const r = calcPortfolioPricing({
+                    // P2-2: esta tabela usava calcPortfolioPricing (versão sem
+                    // multi-filamento/custos extras/taxa de gateway/mão de
+                    // obra), enquanto o resumo de totais logo abaixo já usava
+                    // calcAdvancedPortfolioPricing com os mesmos dados — as
+                    // duas podiam mostrar lucro diferente para o mesmo
+                    // projeto sempre que ele usasse algum desses campos.
+                    const r = calcAdvancedPortfolioPricing({
                       custoRolo: p.custoRolo,
                       pesoRolo: p.pesoRolo,
                       pesoEntrada: p.pesoPeca,
@@ -3350,6 +3355,12 @@ function CalcPedidos() {
                       entryMode: "unit",
                       unidadesPorImpressao: 1,
                       settings,
+                      filamentos: p.filamentos,
+                      custosExtras: p.custosExtras,
+                      taxaGateway: p.taxaGateway ?? 0,
+                      custoTrabalhoHoras: p.custoTrabalhoHoras ?? 0,
+                      custoTrabalhoValorHora: p.custoTrabalhoValorHora ?? 0,
+                      custoKwhOverride: p.custoKwh ?? 0,
                     });
                     return (
                       <TableRow key={p.id}>
