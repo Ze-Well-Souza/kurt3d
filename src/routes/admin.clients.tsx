@@ -32,8 +32,10 @@ import { addClient, updateClient, removeClient } from "@/lib/api/data.functions"
 import type { Client, Order } from "@/lib/domain/types";
 import { useClients } from "@/lib/hooks/use-clients";
 import { useOrders } from "@/lib/hooks/use-orders";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { normalizeText } from "@/lib/utils/normalization";
 import { invalidarPor } from "@/lib/query-keys";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 
 export const Route = createFileRoute("/admin/clients")({
   head: () => ({ meta: [{ title: "Clientes — Kurti 3D" }] }),
@@ -89,6 +91,7 @@ function ClientsPage() {
         normalizeText(c.email).includes(s),
     );
   }, [clients, search]);
+  const pagination = usePagination(filtered, search);
 
   function clientOrders(client: Client): Order[] {
     return orders.filter((o) => o.clientId === client.id);
@@ -147,7 +150,7 @@ function ClientsPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map((c) => {
+          {pagination.pageRows.map((c) => {
             const cOrders = clientOrders(c);
             const totalGasto = cOrders.reduce(
               (sum, o) => sum + (o.precoVenda ?? 0) * o.quantity,
@@ -269,6 +272,19 @@ function ClientsPage() {
             );
           })}
         </div>
+      )}
+
+      {filtered.length > 0 && (
+        <Card>
+          <PaginationBar
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </Card>
       )}
 
       {/* ── New Client Dialog ── */}

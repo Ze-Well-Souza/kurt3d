@@ -20,10 +20,12 @@ import { convertLeadToClient } from "@/lib/api/data.functions";
 import { useLeads } from "@/lib/hooks/use-leads";
 import { useClients } from "@/lib/hooks/use-clients";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { normalizePhone, normalizeText } from "@/lib/utils/normalization";
 import { formatPhoneDisplay } from "@/lib/utils";
 import { invalidarPor } from "@/lib/query-keys";
 import { formatIsoDatePtBr } from "@/lib/domain/installments";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 
 export const Route = createFileRoute("/admin/leads")({
   head: () => ({ meta: [{ title: "Leads — Kurti 3D" }] }),
@@ -70,6 +72,7 @@ function LeadsPage() {
       normalizeText(l.mensagem).includes(q)
     );
   });
+  const pagination = usePagination(filtered, search);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -107,7 +110,7 @@ function LeadsPage() {
       )}
 
       <div className="grid gap-3">
-        {filtered.map((lead) => (
+        {pagination.pageRows.map((lead) => (
           <Card key={lead.id}>
             {(() => {
               const linkedClient = findLinkedClient(lead);
@@ -212,6 +215,19 @@ function LeadsPage() {
           </Card>
         ))}
       </div>
+
+      {filtered.length > 0 && (
+        <Card>
+          <PaginationBar
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </Card>
+      )}
     </div>
   );
 }

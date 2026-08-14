@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/SearchInput";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import { calcOrderCostHybrid } from "@/lib/domain/cost";
 import { isOrderAssetReference } from "@/lib/domain/order-asset";
 import { formatIsoDatePtBr } from "@/lib/domain/installments";
@@ -32,6 +33,7 @@ export function OrdersTab({ ctx }: { ctx: CalcPedidosCtx }) {
     openProjectReference,
     activeOrder,
     terminalOrders,
+    terminalOrdersPagination,
   } = ctx;
 
   return (
@@ -142,7 +144,7 @@ export function OrdersTab({ ctx }: { ctx: CalcPedidosCtx }) {
             Histórico de Destinos
           </h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {terminalOrders.map((o) => {
+            {terminalOrdersPagination.pageRows.map((o) => {
               const fil = o.filamentoId
                 ? filamentos.find((f) => f.id === o.filamentoId)
                 : undefined;
@@ -203,6 +205,16 @@ export function OrdersTab({ ctx }: { ctx: CalcPedidosCtx }) {
               );
             })}
           </div>
+          <Card className="mt-2">
+            <PaginationBar
+              page={terminalOrdersPagination.page}
+              totalPages={terminalOrdersPagination.totalPages}
+              total={terminalOrdersPagination.total}
+              pageSize={terminalOrdersPagination.pageSize}
+              onPageChange={terminalOrdersPagination.setPage}
+              onPageSizeChange={terminalOrdersPagination.setPageSize}
+            />
+          </Card>
         </div>
       )}
     </div>

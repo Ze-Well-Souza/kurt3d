@@ -10,6 +10,7 @@ import {
 import { useBudgetQuotes } from "@/lib/hooks/use-budget-quotes";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useSettings } from "@/lib/hooks/use-settings";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { normalizeText } from "@/lib/utils/normalization";
 import type { BudgetQuote, BudgetQuoteItem, BudgetQuoteStatus } from "@/lib/domain/types";
 import { invalidarPor } from "@/lib/query-keys";
@@ -261,6 +262,7 @@ export function useOrcamentosPageState() {
       (q.clientEmail && normalizeText(q.clientEmail).includes(s))
     );
   });
+  const pagination = usePagination(filtered, search);
 
   return {
     quotes,
@@ -303,6 +305,7 @@ export function useOrcamentosPageState() {
     mutateConvert,
     mutateStatus,
     filtered,
+    pagination,
   };
 }
 

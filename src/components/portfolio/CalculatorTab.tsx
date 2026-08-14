@@ -34,6 +34,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, brl } from "@/lib/utils";
 import { SearchInput } from "@/components/SearchInput";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 import {
   BAMBU_PRESETS,
   type BambuPresetId,
@@ -80,6 +81,7 @@ export function CalculatorTab({ ctx }: { ctx: CalcPedidosCtx }) {
     setProjectSearch,
     openEditProject,
     filteredProjects,
+    projectsPagination,
     handlePrintQuote,
     handleProjectAction,
     submitProject,
@@ -867,7 +869,7 @@ export function CalculatorTab({ ctx }: { ctx: CalcPedidosCtx }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProjects.map((p) => {
+                {projectsPagination.pageRows.map((p) => {
                   // P2-2: esta tabela usava calcPortfolioPricing (versão sem
                   // multi-filamento/custos extras/taxa de gateway/mão de
                   // obra), enquanto o resumo de totais logo abaixo já usava
@@ -1018,6 +1020,14 @@ export function CalculatorTab({ ctx }: { ctx: CalcPedidosCtx }) {
               </TableBody>
             </Table>
           )}
+          <PaginationBar
+            page={projectsPagination.page}
+            totalPages={projectsPagination.totalPages}
+            total={projectsPagination.total}
+            pageSize={projectsPagination.pageSize}
+            onPageChange={projectsPagination.setPage}
+            onPageSizeChange={projectsPagination.setPageSize}
+          />
         </div>
       </div>
     </TooltipProvider>

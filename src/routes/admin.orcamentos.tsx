@@ -9,6 +9,7 @@ import { QuoteFormDialog } from "@/components/orcamentos/QuoteFormDialog";
 import { ReceiptDialog } from "@/components/orcamentos/ReceiptDialog";
 import { STATUS_ICONS, STATUS_LABELS } from "@/components/orcamentos/orcamentos-shared";
 import { useOrcamentosPageState } from "@/components/orcamentos/use-orcamentos-page-state";
+import { PaginationBar } from "@/components/shared/pagination-bar";
 
 export const Route = createFileRoute("/admin/orcamentos")({
   head: () => ({ meta: [{ title: "Orçamentos — Kurti 3D" }] }),
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/admin/orcamentos")({
 
 function OrcamentosPage() {
   const ctx = useOrcamentosPageState();
-  const { quotes, search, setSearch, openCreate, filtered } = ctx;
+  const { quotes, search, setSearch, openCreate, filtered, pagination } = ctx;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -76,10 +77,23 @@ function OrcamentosPage() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {filtered.map((quote) => (
+          {pagination.pageRows.map((quote) => (
             <QuoteCard key={quote.id} ctx={ctx} quote={quote} />
           ))}
         </div>
+      )}
+
+      {filtered.length > 0 && (
+        <Card>
+          <PaginationBar
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </Card>
       )}
 
       <QuoteFormDialog ctx={ctx} />

@@ -29,6 +29,7 @@ import { usePortfolio } from "@/lib/hooks/use-portfolio";
 import { useClients } from "@/lib/hooks/use-clients";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
+import { usePagination } from "@/lib/hooks/use-pagination";
 import { invalidarPor, type OperacaoDeNegocio } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
 import { PRINTERS } from "./calc-pedidos-shared";
@@ -357,12 +358,14 @@ export function useCalcPedidosState() {
       (p) => normalizeText(p.nome).includes(s) || normalizeText(p.categoria).includes(s),
     );
   }, [projects, projectSearch]);
+  const projectsPagination = usePagination(filteredProjects, projectSearch);
   const activeOrder = activeId ? (orders.find((o) => o.id === activeId) ?? null) : null;
   const terminalOrders = [
     ...(grouped.vendido ?? []),
     ...(grouped.presente ?? []),
     ...(grouped.falha ?? []),
   ];
+  const terminalOrdersPagination = usePagination(terminalOrders, orderSearch);
   const newOrderPartsTotals = useMemo(
     () =>
       computeOrderTotalsFromParts(
@@ -738,8 +741,10 @@ export function useCalcPedidosState() {
     grouped,
     printingByPrinter,
     filteredProjects,
+    projectsPagination,
     activeOrder,
     terminalOrders,
+    terminalOrdersPagination,
     newOrderPartsTotals,
     newOrderPartSummary,
     updateNewOrderPartField,
