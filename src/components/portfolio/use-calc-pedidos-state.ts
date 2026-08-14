@@ -36,7 +36,6 @@ import {
   FALLBACK_CUSTO_ROLO,
   FALLBACK_PESO_ROLO,
   FALLBACK_QUANTIDADE,
-  buildEmptyExtraCost,
   buildEmptyFilamentoItem,
   buildEmptyOrderPart,
   fileToBase64,
