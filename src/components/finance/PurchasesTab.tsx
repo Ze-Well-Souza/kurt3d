@@ -141,6 +141,7 @@ export function PurchasesTab({ ctx }: { ctx: FinanceCtx }) {
               total={purchasesPagination.total}
               pageSize={purchasesPagination.pageSize}
               onPageChange={purchasesPagination.setPage}
+              onPageSizeChange={purchasesPagination.setPageSize}
             />
           </>
         )}

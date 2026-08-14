@@ -212,6 +212,7 @@ export function SalesTab({ ctx }: { ctx: FinanceCtx }) {
               total={salesPagination.total}
               pageSize={salesPagination.pageSize}
               onPageChange={salesPagination.setPage}
+              onPageSizeChange={salesPagination.setPageSize}
             />
           </>
         )}

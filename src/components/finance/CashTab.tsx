@@ -171,6 +171,7 @@ export function CashTab({ ctx }: { ctx: FinanceCtx }) {
             total={historyPagination.total}
             pageSize={historyPagination.pageSize}
             onPageChange={historyPagination.setPage}
+            onPageSizeChange={historyPagination.setPageSize}
           />
         </>
       )}

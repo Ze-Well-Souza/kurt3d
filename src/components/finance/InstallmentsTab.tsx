@@ -479,6 +479,7 @@ export function InstallmentsTab({ ctx }: { ctx: FinanceCtx }) {
               total={schedulePagination.total}
               pageSize={schedulePagination.pageSize}
               onPageChange={schedulePagination.setPage}
+              onPageSizeChange={schedulePagination.setPageSize}
             />
           </>
         )}

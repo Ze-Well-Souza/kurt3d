@@ -1,9 +1,19 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PAGE_SIZE_OPTIONS, type PageSizeOption } from "@/lib/hooks/use-pagination";
 
 /**
- * Barra de paginacao compacta das listas do sistema (financeiro e estoque).
- * Some quando nao ha registros (os empty states das abas ja comunicam isso).
+ * Barra de paginacao compacta das listas do sistema (financeiro, estoque e demais
+ * telas administrativas). Some quando nao ha registros (os empty states das abas
+ * ja comunicam isso). `onPageSizeChange` e opcional: quando ausente, o seletor de
+ * itens por pagina fica oculto (util para listas com tamanho fixo).
  */
 export function PaginationBar({
   page,
@@ -11,12 +21,14 @@ export function PaginationBar({
   total,
   pageSize,
   onPageChange,
+  onPageSizeChange,
 }: {
   page: number;
   totalPages: number;
   total: number;
   pageSize: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: PageSizeOption) => void;
 }) {
   if (total === 0) return null;
   const from = (page - 1) * pageSize + 1;
@@ -24,8 +36,30 @@ export function PaginationBar({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-3">
-      <div className="text-xs tabular-nums text-muted-foreground">
-        {from}–{to} de {total}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="text-xs tabular-nums text-muted-foreground">
+          {from}–{to} de {total}
+        </div>
+        {onPageSizeChange && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Por página</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => onPageSizeChange(Number(value) as PageSizeOption)}
+            >
+              <SelectTrigger className="h-7 w-[68px] text-xs" aria-label="Itens por página">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <Button

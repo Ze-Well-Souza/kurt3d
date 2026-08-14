@@ -178,6 +178,7 @@ export function HistoryTab({ ctx }: { ctx: StockCtx }) {
         total={pagination.total}
         pageSize={pagination.pageSize}
         onPageChange={pagination.setPage}
+        onPageSizeChange={pagination.setPageSize}
       />
     </div>
   );

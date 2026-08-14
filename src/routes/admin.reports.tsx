@@ -511,13 +511,13 @@ function Reports() {
           icon={<Users className="h-4 w-4" />}
           label="Clientes Ativos"
           value={performanceMetrics.activeClients.toString()}
-          color="var(--filament-blue)"
+          color="var(--filament-pink)"
         />
         <KpiCard
           icon={<Clock className="h-4 w-4" />}
           label="Tempo Médio Produção"
           value={`${performanceMetrics.avgProductionTimeHours.toFixed(1)}h`}
-          color="var(--filament-purple)"
+          color="var(--filament-magenta)"
         />
         <KpiCard
           icon={<Printer className="h-4 w-4" />}
