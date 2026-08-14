@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, scrypt } from "node:crypto";
+import { randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { getPasswordPolicyMessage } from "../domain/password-policy";
 import { nowIso } from "./db.server";
@@ -47,7 +47,42 @@ export async function verifyPassword(password: string, rawHash: string): Promise
   const decoded = decodeHash(rawHash);
   if (!decoded) return false;
   const key = (await scryptAsync(password, decoded.salt, 64)) as Buffer;
-  return key.toString("base64url") === decoded.key;
+  const provided = Buffer.from(key.toString("base64url"));
+  const expected = Buffer.from(decoded.key);
+  // Comparação em tempo constante: `===` sai assim que o primeiro byte diverge,
+  // então o tempo de resposta vaza quantos caracteres iniciais o atacante
+  // acertou. timingSafeEqual sempre compara os buffers inteiros.
+  if (provided.length !== expected.length) return false;
+  return timingSafeEqual(provided, expected);
+}
+
+const PROVISIONAL_PASSWORD_ALPHABET = {
+  upper: "ABCDEFGHJKLMNPQRSTUVWXYZ",
+  lower: "abcdefghijkmnpqrstuvwxyz",
+  digits: "23456789",
+};
+
+/**
+ * Gera uma senha provisória aleatória que atende à política (maiúscula,
+ * minúscula, número, 10 caracteres).
+ *
+ * Substitui a constante `"Kurti-3D"` que era reutilizada em TODO reset: quem
+ * soubesse o telefone de um usuário recém-resetado — ou lesse este mesmo
+ * código-fonte — entrava na conta. A senha gerada aqui só existe em texto
+ * plano no retorno desta chamada; nunca é persistida nem logada.
+ */
+export function generateProvisionalPassword(): string {
+  const { upper, lower, digits } = PROVISIONAL_PASSWORD_ALPHABET;
+  const all = upper + lower + digits;
+  const bytes = randomBytes(10);
+  const pick = (set: string, n: number) => set[n % set.length];
+  const chars = [pick(upper, bytes[0]), pick(lower, bytes[1]), pick(digits, bytes[2])];
+  for (let i = 3; i < 10; i++) chars.push(pick(all, bytes[i]));
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = bytes[i] % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
 }
 
 export async function getAuthSetupState() {
@@ -132,10 +167,31 @@ export async function validateLogin(input: { phone: string; password: string }) 
   return { id: user.id, username: user.username, nome: user.nome };
 }
 
-export async function changeUserPassword(userId: string, newPassword: string) {
+/**
+ * Troca a senha do usuário logado.
+ *
+ * `currentPassword` é obrigatório quando a senha já deixou de ser provisória
+ * (`mustChangePassword: false`): sem essa checagem, um cookie de sessão
+ * roubado — sem a senha em si — bastava para tomar a conta, trocando a senha
+ * e trancando o dono de fora. No primeiro acesso (senha ainda provisória) o
+ * usuário já provou conhecer a senha provisória para chegar até aqui, então
+ * a troca obrigatória de boas-vindas não exige repeti-la.
+ */
+export async function changeUserPassword(
+  userId: string,
+  newPassword: string,
+  currentPassword?: string,
+) {
   const repo = await usersRepo();
   const user = repo.list.find((u) => u.id === userId);
   if (!user) throw new Error("user_not_found");
+
+  if (!user.mustChangePassword) {
+    if (!currentPassword) throw new Error("current_password_required");
+    const confere = await verifyPassword(currentPassword, user.passwordHash);
+    if (!confere) throw new Error("current_password_invalid");
+  }
+
   assertPasswordPolicy(newPassword);
   await repo.update({
     ...user,
@@ -161,19 +217,23 @@ export async function listAdminUsers() {
   }));
 }
 
-export const DEFAULT_PROVISIONAL_PASSWORD = "Kurti-3D";
-
-/** Reseta a senha de um usuario para a senha provisoria padrao e exige troca no proximo acesso. */
-export async function resetUserPassword(userId: string) {
+/**
+ * Reseta a senha de um usuário para uma senha provisória aleatória e exige
+ * troca no próximo acesso. Devolve a senha em texto plano — é a única vez que
+ * ela existe fora do hash; quem chama deve exibi-la uma vez e descartar.
+ */
+export async function resetUserPassword(userId: string): Promise<string> {
   const repo = await usersRepo();
   const user = repo.list.find((u) => u.id === userId);
   if (!user) throw new Error("user_not_found");
+  const provisionalPassword = generateProvisionalPassword();
   await repo.update({
     ...user,
-    passwordHash: await hashPassword(DEFAULT_PROVISIONAL_PASSWORD),
+    passwordHash: await hashPassword(provisionalPassword),
     mustChangePassword: true,
     updatedAt: nowIso(),
   });
+  return provisionalPassword;
 }
 
 export async function createAdminUser(input: {

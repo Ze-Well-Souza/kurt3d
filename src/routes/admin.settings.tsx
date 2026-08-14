@@ -59,7 +59,6 @@ import { getPasswordPolicyMessage } from "@/lib/domain/password-policy";
 import {
   buildWhatsAppUrl,
   buildCredentialsMessage,
-  DEFAULT_PROVISIONAL_PASSWORD,
   type CredentialsPayload,
 } from "@/lib/domain/auth-credentials";
 import type { AppSettings, SiteContent } from "@/lib/domain/types";
@@ -499,16 +498,25 @@ function PreviewCard({
 
 function ChangePasswordCard() {
   const qc = useQueryClient();
+  const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirm, setConfirm] = useState("");
   const handleChangePasswordError = useToastErrorHandler({
     fallbackMessage: "Erro ao alterar senha.",
+    mapMessage: (error) => {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "current_password_invalid") return "Senha atual incorreta.";
+      if (message === "current_password_required") return "Informe a senha atual.";
+      return null;
+    },
   });
 
   const mutate = useMutation({
-    mutationFn: () => changePassword({ data: { newPassword: newPass } }),
+    mutationFn: () =>
+      changePassword({ data: { newPassword: newPass, currentPassword: currentPass } }),
     onSuccess: () => {
       toast.success("Senha alterada com sucesso.");
+      setCurrentPass("");
       setNewPass("");
       setConfirm("");
     },
@@ -517,6 +525,14 @@ function ChangePasswordCard() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    // A conta ja pode ter senha pessoal definida — nesse caso a senha atual e
+    // obrigatoria (o servidor tambem valida isso, este e so o aviso rapido).
+    // Sem essa checagem, um cookie de sessao roubado bastaria para tomar a
+    // conta trocando a senha sem saber a original.
+    if (!currentPass.trim()) {
+      toast.error("Informe a senha atual.");
+      return;
+    }
     const passwordMessage = getPasswordPolicyMessage(newPass);
     if (passwordMessage) {
       toast.error(passwordMessage);
@@ -539,6 +555,16 @@ function ChangePasswordCard() {
         <p className="mt-0.5 text-xs text-muted-foreground">Altere a senha de acesso ao painel.</p>
       </div>
       <form onSubmit={submit} className="grid gap-5 p-6 sm:grid-cols-2">
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label className="text-sm font-medium">Senha atual</Label>
+          <Input
+            type="password"
+            value={currentPass}
+            onChange={(e) => setCurrentPass(e.target.value)}
+            placeholder="sua senha atual"
+            autoComplete="current-password"
+          />
+        </div>
         <div className="space-y-1.5">
           <Label className="text-sm font-medium">Nova senha</Label>
           <Input
@@ -636,9 +662,7 @@ function CredentialsShareDialog({
         )}
         {!warnSingleView && (
           <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-700 dark:text-blue-400">
-            A senha provisoria e{" "}
-            <span className="font-semibold">{DEFAULT_PROVISIONAL_PASSWORD}</span>. No primeiro
-            acesso o usuario devera troca-la por uma senha pessoal.
+            No primeiro acesso o usuario devera trocar esta senha provisoria por uma senha pessoal.
           </div>
         )}
         <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4 text-sm">
@@ -693,7 +717,12 @@ function UserManagementCard() {
   const isSuperAdmin = authQ.data?.role === "super_admin";
   const [showDialog, setShowDialog] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ nome: "", phone: "", username: "", password: "Kurti-3D" });
+  const [form, setForm] = useState(() => ({
+    nome: "",
+    phone: "",
+    username: "",
+    password: generateProvisionalPassword(),
+  }));
   const [showPassword, setShowPassword] = useState(false);
   const [editTarget, setEditTarget] = useState<{
     id: string;
@@ -723,7 +752,7 @@ function UserManagementCard() {
       invalidarPor(qc, "gerenciarUsuarios");
       toast.success("Usuário criado.");
       setCreatedCreds({ ...form });
-      setForm({ nome: "", phone: "", username: "", password: "Kurti-3D" });
+      setForm({ nome: "", phone: "", username: "", password: generateProvisionalPassword() });
       setShowPassword(false);
     },
     onError: handleCreateUserError,
@@ -739,9 +768,13 @@ function UserManagementCard() {
     onError: handleDeleteUserError,
   });
 
+  // A senha provisoria agora e gerada no servidor e devolvida so nesta
+  // resposta — nunca fica em nenhuma constante nem e persistida em texto
+  // plano. Por isso todo reenvio de credenciais precisa resetar de novo: nao
+  // ha como reexibir uma senha provisoria ja gerada anteriormente.
   const mutateReset = useMutation({
     mutationFn: (userId: string) => resetPassword({ data: { userId } }),
-    onSuccess: (_, userId) => {
+    onSuccess: (result, userId) => {
       invalidarPor(qc, "gerenciarUsuarios");
       const user = (usersQ.data ?? []).find((u) => u.id === userId);
       if (user) {
@@ -749,11 +782,11 @@ function UserManagementCard() {
           nome: user.nome ?? user.username,
           phone: user.phone ?? "",
           username: user.username,
-          password: DEFAULT_PROVISIONAL_PASSWORD,
+          password: result.password,
         });
         toast.success("Senha resetada. Envie as novas credenciais ao usuário.");
       } else {
-        toast.success("Senha resetada para Kurti-3D. O usuário deverá trocá-la no próximo acesso.");
+        toast.success("Senha resetada. O usuário deverá trocá-la no próximo acesso.");
       }
     },
     onError: () => toast.error("Erro ao resetar senha."),
@@ -761,7 +794,7 @@ function UserManagementCard() {
 
   const mutateResetForShare = useMutation({
     mutationFn: (userId: string) => resetPassword({ data: { userId } }),
-    onSuccess: (_, userId) => {
+    onSuccess: (result, userId) => {
       invalidarPor(qc, "gerenciarUsuarios");
       const user = (usersQ.data ?? []).find((u) => u.id === userId);
       if (user) {
@@ -769,7 +802,7 @@ function UserManagementCard() {
           nome: user.nome ?? user.username,
           phone: user.phone ?? "",
           username: user.username,
-          password: DEFAULT_PROVISIONAL_PASSWORD,
+          password: result.password,
         });
       }
       setPendingShareUserId(null);
@@ -817,23 +850,12 @@ function UserManagementCard() {
     },
   });
 
-  function handleShareCredentialsClick(user: {
-    id: string;
-    nome: string | null;
-    phone: string | null;
-    username: string;
-    mustChangePassword: boolean;
-  }) {
-    if (user.mustChangePassword) {
-      setShareCreds({
-        nome: user.nome ?? user.username,
-        phone: user.phone ?? "",
-        username: user.username,
-        password: DEFAULT_PROVISIONAL_PASSWORD,
-      });
-    } else {
-      setPendingShareUserId(user.id);
-    }
+  function handleShareCredentialsClick(user: { id: string }) {
+    // A senha provisoria nunca fica guardada em texto plano — mesmo que o
+    // usuario ainda nao tenha trocado a senha (mustChangePassword: true), o
+    // valor gerado no ultimo reset ja foi descartado da memoria do servidor.
+    // Reenviar credenciais sempre exige gerar uma senha nova.
+    setPendingShareUserId(user.id);
   }
 
   function confirmShareWithReset() {
@@ -985,7 +1007,7 @@ function UserManagementCard() {
             setShowDialog(false);
             setCreatedCreds(null);
             setShowPassword(false);
-            setForm({ nome: "", phone: "", username: "", password: "Kurti-3D" });
+            setForm({ nome: "", phone: "", username: "", password: generateProvisionalPassword() });
           }
         }}
       >
@@ -1075,11 +1097,11 @@ function UserManagementCard() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setForm((f) => ({ ...f, password: "Kurti-3D" }));
+                        setForm((f) => ({ ...f, password: generateProvisionalPassword() }));
                         setShowPassword(true);
                       }}
                     >
-                      Padrão
+                      Gerar
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -1107,7 +1129,7 @@ function UserManagementCard() {
             <CredentialsShareDialog
               creds={shareCreds}
               title="Reenvio de Credenciais"
-              warnSingleView={false}
+              warnSingleView
               onClose={() => setShareCreds(null)}
             />
           )}
@@ -1120,10 +1142,8 @@ function UserManagementCard() {
           <DialogHeader>
             <DialogTitle>Enviar credenciais</DialogTitle>
             <DialogDescription>
-              Este usuario ja definiu uma senha pessoal. Para gerar a mensagem de acesso, a senha
-              sera resetada para{" "}
-              <span className="font-semibold">{DEFAULT_PROVISIONAL_PASSWORD}</span> e o usuario
-              devera troca-la no proximo login.
+              Para gerar a mensagem de acesso, a senha sera resetada para uma nova senha provisoria
+              e o usuario devera troca-la no proximo login.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-2">

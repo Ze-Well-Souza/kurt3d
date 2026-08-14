@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildWhatsAppUrl,
   buildCredentialsMessage,
-  isProvisionalPasswordActive,
-  DEFAULT_PROVISIONAL_PASSWORD,
   type CredentialsPayload,
 } from "./auth-credentials";
 
@@ -69,35 +67,13 @@ describe("auth-credentials: buildCredentialsMessage", () => {
     expect(msg).toContain("Ola admin");
   });
 
-  it("usa DEFAULT_PROVISIONAL_PASSWORD corretamente quando passado", () => {
+  it("repassa qualquer senha provisoria recebida, sem transformar o valor", () => {
+    // P2-8: a senha provisoria e gerada aleatoriamente a cada reset (nunca mais
+    // uma constante fixa) — esta funcao so precisa encaixar o que recebeu.
     const msg = buildCredentialsMessage(
-      { ...baseCreds, password: DEFAULT_PROVISIONAL_PASSWORD },
+      { ...baseCreds, password: "Xk7pQm2Rvb" },
       "http://localhost:5173/login",
     );
-    expect(msg).toContain(`Senha provisoria: ${DEFAULT_PROVISIONAL_PASSWORD}`);
-  });
-});
-
-describe("auth-credentials: isProvisionalPasswordActive", () => {
-  it("retorna true quando mustChangePassword e true", () => {
-    expect(isProvisionalPasswordActive(true)).toBe(true);
-  });
-
-  it("retorna false quando mustChangePassword e false", () => {
-    expect(isProvisionalPasswordActive(false)).toBe(false);
-  });
-
-  it("garante que nao e truthy (apenas true === true)", () => {
-    // mustChangePassword pode vir como undefined em projections do repo;
-    // essa funcao deixa claro que apenas boolean true conta.
-    expect(isProvisionalPasswordActive(undefined as unknown as boolean)).toBe(false);
-  });
-});
-
-describe("auth-credentials: DEFAULT_PROVISIONAL_PASSWORD invariant", () => {
-  it("mantem o valor conhecido usado por auth.server.ts e resetPassword", () => {
-    // Este teste trava o valor para evitar divergencia acidental entre
-    // frontend (compartilhamento) e backend (reset da hash).
-    expect(DEFAULT_PROVISIONAL_PASSWORD).toBe("Kurti-3D");
+    expect(msg).toContain("Senha provisoria: Xk7pQm2Rvb");
   });
 });

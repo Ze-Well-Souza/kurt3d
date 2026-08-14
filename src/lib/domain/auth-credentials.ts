@@ -1,8 +1,6 @@
 // Lógica pura (testável fora do React) para composição de mensagens
 // de credenciais e URLs do WhatsApp usadas no compartilhamento de acesso.
 
-export const DEFAULT_PROVISIONAL_PASSWORD = "Kurti-3D";
-
 export type CredentialsPayload = {
   nome: string;
   phone: string;
@@ -25,8 +23,4 @@ export function buildCredentialsMessage(creds: CredentialsPayload, loginUrl: str
     `Senha provisoria: ${creds.password}\n\n` +
     `No primeiro acesso o sistema vai pedir para voce criar uma senha pessoal.`
   );
-}
-
-export function isProvisionalPasswordActive(mustChangePassword: boolean): boolean {
-  return mustChangePassword === true;
 }

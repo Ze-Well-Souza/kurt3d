@@ -17,6 +17,7 @@ import {
   validateLogin,
 } from "../server/auth.server";
 import { getSession, requireSession } from "../server/require-session.server";
+import { checkMutationRateLimit } from "../server/mutation-guard.server";
 import { logger } from "../server/logger.server";
 import { getClientIp } from "../server/rate-limit.server";
 import {
@@ -154,11 +155,17 @@ export const requireAuth = createServerFn({ method: "GET" }).handler(async () =>
 });
 
 export const changePassword = createServerFn({ method: "POST" })
-  .validator(z.object({ newPassword: z.string().min(8).max(200) }))
+  .validator(
+    z.object({
+      newPassword: z.string().min(8).max(200),
+      currentPassword: z.string().min(1).max(200).optional(),
+    }),
+  )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     const userId = await requireSession();
     assertPasswordPolicy(data.newPassword);
-    await changeUserPassword(userId, data.newPassword);
+    await changeUserPassword(userId, data.newPassword, data.currentPassword);
     return { ok: true };
   });
 
@@ -177,6 +184,7 @@ export const createUser = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSuperAdmin();
     assertPasswordPolicy(data.password);
     const created = await createAdminUser(data);
@@ -186,6 +194,7 @@ export const createUser = createServerFn({ method: "POST" })
 export const deleteUser = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     const userId = await requireSuperAdmin();
     if (data.userId === userId) throw new Error("cannot_delete_self");
     await deleteAdminUser(data.userId);
@@ -195,14 +204,16 @@ export const deleteUser = createServerFn({ method: "POST" })
 export const resetPassword = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSuperAdmin();
-    await resetUserPassword(data.userId);
-    return { ok: true };
+    const password = await resetUserPassword(data.userId);
+    return { ok: true, password };
   });
 
 export const deactivateUser = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSuperAdmin();
     await setUserActive(data.userId, false);
     return { ok: true };
@@ -211,6 +222,7 @@ export const deactivateUser = createServerFn({ method: "POST" })
 export const activateUser = createServerFn({ method: "POST" })
   .validator(z.object({ userId: z.string().min(1) }))
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSuperAdmin();
     await setUserActive(data.userId, true);
     return { ok: true };
@@ -225,6 +237,7 @@ export const editUser = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
+    await checkMutationRateLimit();
     await requireSuperAdmin();
     await updateUser(data.userId, { nome: data.nome, username: data.username });
     return { ok: true };
