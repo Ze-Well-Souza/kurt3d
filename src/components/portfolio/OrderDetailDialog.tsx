@@ -1,4 +1,4 @@
-import { Download, ExternalLink, Printer } from "lucide-react";
+import { Clock3, CreditCard, Download, ExternalLink, Package, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ import { formatIsoDatePtBr } from "@/lib/domain/installments";
 import { openPrintReceipt, type ReceiptInput } from "@/lib/domain/payment-receipt-print";
 import type { OrderPartStatus, Status } from "@/lib/domain/types";
 import { DetailItem } from "./DetailItem";
+import { DialogSection } from "./DialogSection";
 import { STATUS_BADGE, formatTime } from "./order-card-shared";
 import { ORDER_PART_STATUS_LABEL } from "./calc-pedidos-shared";
 import type { CalcPedidosCtx } from "./use-calc-pedidos-state";
@@ -77,68 +78,92 @@ export function OrderDetailDialog({ ctx }: { ctx: CalcPedidosCtx }) {
             const partsTotals = parts.length > 0 ? computeOrderTotalsFromParts(parts) : null;
             const partStatusLocked = ["vendido", "presente", "falha"].includes(detailOrder.status);
             return (
-              <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <DetailItem label="Projeto" value={detailOrder.projectName} />
-                  <DetailItem label="Cliente" value={detailOrder.client} />
-                  <DetailItem label="Quantidade" value={`${detailOrder.quantity} un.`} />
-                  <DetailItem label="Tempo" value={formatTime(detailOrder.timeMinutes)} />
-                  <DetailItem
-                    label="Filamento"
-                    value={
-                      detailOrder.filamentoIds?.length
-                        ? detailOrder.filamentoIds
-                            .map((id) => filamentos.find((f) => f.id === id)?.label ?? id)
-                            .join(", ")
-                        : (fil?.label ??
-                          (detailOrder.filamentoId ? `ID: ${detailOrder.filamentoId}` : "—"))
-                    }
-                  />
-                  <DetailItem
-                    label="Gramas / un."
-                    value={detailOrder.gramsPerUnit ? `${detailOrder.gramsPerUnit}g` : "—"}
-                  />
-                  <DetailItem label="Status" value={statusLabel} />
-                  <DetailItem label="Multi-partes" value={detailOrder.multiPart ? "Sim" : "Não"} />
-                  {parts.length > 0 && (
-                    <DetailItem label="Partes" value={`${partsSummary.total} cadastradas`} />
-                  )}
-                  <DetailItem
-                    label="Preço de Venda"
-                    value={detailOrder.precoVenda ? brl(detailOrder.precoVenda) : "—"}
-                  />
-                  <DetailItem label="Custo Total" value={brl(cost.total)} />
-                  {detailOrder.precoVenda && (
+              <div className="space-y-3">
+                <DialogSection icon={Package} title="Produção">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <DetailItem label="Projeto" value={detailOrder.projectName} />
+                    <DetailItem label="Cliente" value={detailOrder.client} />
+                    <DetailItem label="Quantidade" value={`${detailOrder.quantity} un.`} />
+                    <DetailItem label="Tempo" value={formatTime(detailOrder.timeMinutes)} />
                     <DetailItem
-                      label="Lucro"
-                      value={brl(detailOrder.precoVenda * detailOrder.quantity - cost.total)}
-                      accent={detailOrder.precoVenda * detailOrder.quantity - cost.total >= 0}
+                      label="Filamento"
+                      value={
+                        detailOrder.filamentoIds?.length
+                          ? detailOrder.filamentoIds
+                              .map((id) => filamentos.find((f) => f.id === id)?.label ?? id)
+                              .join(", ")
+                          : (fil?.label ??
+                            (detailOrder.filamentoId ? `ID: ${detailOrder.filamentoId}` : "—"))
+                      }
                     />
-                  )}
-                  <DetailItem label="Forma Pagamento" value={detailOrder.formaPagamento ?? "—"} />
-                  <DetailItem
-                    label="Data Pagamento"
-                    value={
-                      detailOrder.dataPagamento ? formatIsoDatePtBr(detailOrder.dataPagamento) : "—"
-                    }
-                  />
-                  {detailOrder.valorRecebido !== undefined && (
-                    <DetailItem label="Valor Recebido" value={brl(detailOrder.valorRecebido)} />
-                  )}
-                  {detailOrder.destino && (
-                    <DetailItem label="Destino" value={detailOrder.destino} />
-                  )}
-                  <DetailItem label="Codigo de acompanhamento" value={tracking.trackingCode} mono />
-                  <DetailItem
-                    label="Previsao operacional"
-                    value={
-                      tracking.estimatedDeliveryAt
-                        ? formatIsoDatePtBr(tracking.estimatedDeliveryAt)
-                        : "—"
-                    }
-                  />
-                  <DetailItem label="Criado em" value={formatIsoDatePtBr(detailOrder.createdAt)} />
-                </div>
+                    <DetailItem
+                      label="Gramas / un."
+                      value={detailOrder.gramsPerUnit ? `${detailOrder.gramsPerUnit}g` : "—"}
+                    />
+                    <DetailItem label="Status" value={statusLabel} />
+                    <DetailItem
+                      label="Multi-partes"
+                      value={detailOrder.multiPart ? "Sim" : "Não"}
+                    />
+                    {parts.length > 0 && (
+                      <DetailItem label="Partes" value={`${partsSummary.total} cadastradas`} />
+                    )}
+                  </div>
+                </DialogSection>
+
+                <DialogSection icon={CreditCard} title="Financeiro">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <DetailItem
+                      label="Preço de Venda"
+                      value={detailOrder.precoVenda ? brl(detailOrder.precoVenda) : "—"}
+                    />
+                    <DetailItem label="Custo Total" value={brl(cost.total)} />
+                    {detailOrder.precoVenda && (
+                      <DetailItem
+                        label="Lucro"
+                        value={brl(detailOrder.precoVenda * detailOrder.quantity - cost.total)}
+                        accent={detailOrder.precoVenda * detailOrder.quantity - cost.total >= 0}
+                      />
+                    )}
+                    <DetailItem label="Forma Pagamento" value={detailOrder.formaPagamento ?? "—"} />
+                    <DetailItem
+                      label="Data Pagamento"
+                      value={
+                        detailOrder.dataPagamento
+                          ? formatIsoDatePtBr(detailOrder.dataPagamento)
+                          : "—"
+                      }
+                    />
+                    {detailOrder.valorRecebido !== undefined && (
+                      <DetailItem label="Valor Recebido" value={brl(detailOrder.valorRecebido)} />
+                    )}
+                    {detailOrder.destino && (
+                      <DetailItem label="Destino" value={detailOrder.destino} />
+                    )}
+                  </div>
+                </DialogSection>
+
+                <DialogSection icon={Clock3} title="Rastreamento">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <DetailItem
+                      label="Codigo de acompanhamento"
+                      value={tracking.trackingCode}
+                      mono
+                    />
+                    <DetailItem
+                      label="Previsao operacional"
+                      value={
+                        tracking.estimatedDeliveryAt
+                          ? formatIsoDatePtBr(tracking.estimatedDeliveryAt)
+                          : "—"
+                      }
+                    />
+                    <DetailItem
+                      label="Criado em"
+                      value={formatIsoDatePtBr(detailOrder.createdAt)}
+                    />
+                  </div>
+                </DialogSection>
                 {parts.length > 0 && (
                   <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">

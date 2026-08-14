@@ -41,6 +41,7 @@ import type { ProductionCalendarEvent } from "@/lib/domain/types";
 import { useOrders } from "@/lib/hooks/use-orders";
 import { useCalendarEvents } from "@/lib/hooks/use-calendar-events";
 import { invalidarPor } from "@/lib/query-keys";
+import { PRINTERS } from "@/components/portfolio/calc-pedidos-shared";
 
 export const Route = createFileRoute("/admin/calendar")({
   component: Calendar,
@@ -219,6 +220,14 @@ function Calendar() {
 
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const monthName = currentMonth.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  // Impressora era texto livre e podia divergir do nome usado no Kanban de
+  // Pedidos. Se um evento antigo tiver um nome fora da lista fixa, mantemos
+  // essa opção no seletor em vez de descartar o valor salvo.
+  const printerOptions = PRINTERS.includes(eventForm.printerName as (typeof PRINTERS)[number])
+    ? PRINTERS
+    : eventForm.printerName
+      ? [...PRINTERS, eventForm.printerName]
+      : PRINTERS;
 
   return (
     <div className="space-y-6">
@@ -425,11 +434,21 @@ function Calendar() {
             </div>
             <div className="grid gap-2">
               <Label>Impressora</Label>
-              <Input
+              <Select
                 value={eventForm.printerName}
-                onChange={(e) => setEventForm((s) => ({ ...s, printerName: e.target.value }))}
-                placeholder="Bambu Lab A1"
-              />
+                onValueChange={(v) => setEventForm((s) => ({ ...s, printerName: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a impressora" />
+                </SelectTrigger>
+                <SelectContent>
+                  {printerOptions.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label>Status</Label>

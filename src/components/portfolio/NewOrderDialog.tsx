@@ -1,4 +1,4 @@
-import { Layers, Plus, Trash2 } from "lucide-react";
+import { CreditCard, FileUp, Layers, Plus, Printer, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,7 @@ import {
   formatFileSize,
   validateOrderAssetFile,
 } from "./calc-pedidos-shared";
+import { DialogSection } from "./DialogSection";
 import type { CalcPedidosCtx } from "./use-calc-pedidos-state";
 
 export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
@@ -67,122 +68,125 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
           <DialogTitle>Novo pedido</DialogTitle>
         </DialogHeader>
         <form className="grid gap-4" onSubmit={submitNewOrder}>
-          <div className="grid gap-2">
-            <Label>Cliente Cadastrado</Label>
-            <Select
-              value={newOrder.clientId || NO_CLIENT_SELECTED}
-              onValueChange={(value) => {
-                const nextClientId = value === NO_CLIENT_SELECTED ? "" : value;
-                const selectedClient = clients.find((client) => client.id === nextClientId);
-                setNewOrder((state) => ({
-                  ...state,
-                  clientId: nextClientId,
-                  client: selectedClient?.nome ?? state.client,
-                }));
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sem vínculo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_CLIENT_SELECTED}>Sem vínculo</SelectItem>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Cliente</Label>
-            <Input
-              value={newOrder.client}
-              onChange={(e) => setNewOrder((s) => ({ ...s, client: e.target.value }))}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Projeto</Label>
-            <Input
-              value={newOrder.projectName}
-              onChange={(e) => setNewOrder((s) => ({ ...s, projectName: e.target.value }))}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Impressora</Label>
-            <Select
-              value={newOrder.printer || NO_PRINTER}
-              onValueChange={(v) =>
-                setNewOrder((s) => ({ ...s, printer: v === NO_PRINTER ? "" : v }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sem impressora" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_PRINTER}>Sem impressora</SelectItem>
-                {PRINTERS.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <DialogSection icon={User} title="Cliente e projeto">
             <div className="grid gap-2">
-              <Label>Quantidade</Label>
-              <Input
-                type="number"
-                min={1}
-                value={newOrder.quantity}
-                onChange={(e) => setNewOrder((s) => ({ ...s, quantity: e.target.value }))}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{newOrder.multiPart ? "Horas (calc.)" : "Horas"}</Label>
-              <Input
-                type="number"
-                min={0}
-                value={
-                  newOrder.multiPart
-                    ? newOrderPartsTotals.timeMinutes > 0
-                      ? String(Math.floor(newOrderPartsTotals.timeMinutes / 60))
-                      : ""
-                    : String(Math.floor(Number(newOrder.timeMinutes) / 60))
-                }
-                onChange={(e) => {
-                  const h = Number(e.target.value) || 0;
-                  const m = Number(newOrder.timeMinutes) % 60;
-                  setNewOrder((s) => ({ ...s, timeMinutes: String(h * 60 + m) }));
+              <Label>Cliente Cadastrado</Label>
+              <Select
+                value={newOrder.clientId || NO_CLIENT_SELECTED}
+                onValueChange={(value) => {
+                  const nextClientId = value === NO_CLIENT_SELECTED ? "" : value;
+                  const selectedClient = clients.find((client) => client.id === nextClientId);
+                  setNewOrder((state) => ({
+                    ...state,
+                    clientId: nextClientId,
+                    client: selectedClient?.nome ?? state.client,
+                  }));
                 }}
-                disabled={newOrder.multiPart}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem vínculo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_CLIENT_SELECTED}>Sem vínculo</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Cliente</Label>
+              <Input
+                value={newOrder.client}
+                onChange={(e) => setNewOrder((s) => ({ ...s, client: e.target.value }))}
               />
             </div>
             <div className="grid gap-2">
-              <Label>{newOrder.multiPart ? "Minutos (calc.)" : "Minutos"}</Label>
+              <Label>Projeto</Label>
               <Input
-                type="number"
-                min={0}
-                max={59}
-                value={
-                  newOrder.multiPart
-                    ? newOrderPartsTotals.timeMinutes > 0
-                      ? String(newOrderPartsTotals.timeMinutes % 60)
-                      : ""
-                    : String(Number(newOrder.timeMinutes) % 60)
-                }
-                onChange={(e) => {
-                  const m = Math.min(Number(e.target.value) || 0, 59);
-                  const h = Math.floor(Number(newOrder.timeMinutes) / 60);
-                  setNewOrder((s) => ({ ...s, timeMinutes: String(h * 60 + m) }));
-                }}
-                disabled={newOrder.multiPart}
+                value={newOrder.projectName}
+                onChange={(e) => setNewOrder((s) => ({ ...s, projectName: e.target.value }))}
               />
             </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2 sm:col-span-2">
+          </DialogSection>
+
+          <DialogSection icon={Printer} title="Produção">
+            <div className="grid gap-2">
+              <Label>Impressora</Label>
+              <Select
+                value={newOrder.printer || NO_PRINTER}
+                onValueChange={(v) =>
+                  setNewOrder((s) => ({ ...s, printer: v === NO_PRINTER ? "" : v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem impressora" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_PRINTER}>Sem impressora</SelectItem>
+                  {PRINTERS.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-2">
+                <Label>Quantidade</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={newOrder.quantity}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, quantity: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>{newOrder.multiPart ? "Horas (calc.)" : "Horas"}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={
+                    newOrder.multiPart
+                      ? newOrderPartsTotals.timeMinutes > 0
+                        ? String(Math.floor(newOrderPartsTotals.timeMinutes / 60))
+                        : ""
+                      : String(Math.floor(Number(newOrder.timeMinutes) / 60))
+                  }
+                  onChange={(e) => {
+                    const h = Number(e.target.value) || 0;
+                    const m = Number(newOrder.timeMinutes) % 60;
+                    setNewOrder((s) => ({ ...s, timeMinutes: String(h * 60 + m) }));
+                  }}
+                  disabled={newOrder.multiPart}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>{newOrder.multiPart ? "Minutos (calc.)" : "Minutos"}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={
+                    newOrder.multiPart
+                      ? newOrderPartsTotals.timeMinutes > 0
+                        ? String(newOrderPartsTotals.timeMinutes % 60)
+                        : ""
+                      : String(Number(newOrder.timeMinutes) % 60)
+                  }
+                  onChange={(e) => {
+                    const m = Math.min(Number(e.target.value) || 0, 59);
+                    const h = Math.floor(Number(newOrder.timeMinutes) / 60);
+                    setNewOrder((s) => ({ ...s, timeMinutes: String(h * 60 + m) }));
+                  }}
+                  disabled={newOrder.multiPart}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label>Filamentos</Label>
                 <Button
@@ -250,8 +254,6 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                 </div>
               )}
             </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label>{newOrder.multiPart ? "Gramas totais (calculado)" : "Gramas / unidade"}</Label>
               <Input
@@ -268,71 +270,11 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                 disabled={newOrder.multiPart}
               />
             </div>
-          </div>
-          <div className="grid gap-2">
-            <Label>Link externo (opcional)</Label>
-            <Input
-              type="url"
-              value={newOrder.linkProjeto}
-              onChange={(e) => setNewOrder((s) => ({ ...s, linkProjeto: e.target.value }))}
-              placeholder="https://..."
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>Arquivo STL ou 3MF (opcional)</Label>
-            <Input
-              type="file"
-              accept=".stl,.3mf,model/stl,application/sla,application/vnd.ms-package.3dmanufacturing-3dmodel+xml"
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                if (!file) {
-                  setNewOrderAsset(null);
-                  return;
-                }
-                const extension = file.name.split(".").pop()?.toLowerCase();
-                if (!extension || !["stl", "3mf"].includes(extension)) {
-                  toast.error("Envie apenas arquivos STL ou 3MF.");
-                  e.currentTarget.value = "";
-                  return;
-                }
-                if (file.size > MAX_ORDER_ASSET_SIZE) {
-                  toast.error("O arquivo excede o limite de 25 MB.");
-                  e.currentTarget.value = "";
-                  return;
-                }
-                setNewOrderAsset(file);
-              }}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              O arquivo fica salvo em Storage para reimpressao futura. Se enviar um arquivo, ele
-              sera a referencia principal do pedido.
-            </p>
-            {newOrderAsset && (
-              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
-                <span className="truncate font-medium">{newOrderAsset.name}</span>
-                <span className="shrink-0 text-muted-foreground">
-                  {formatFileSize(newOrderAsset.size)}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Preço de Venda (R$)</Label>
-              <Input
-                type="number"
-                min={0}
-                step={0.01}
-                value={newOrder.precoVenda}
-                onChange={(e) => setNewOrder((s) => ({ ...s, precoVenda: e.target.value }))}
-                placeholder="0,00"
-              />
-            </div>
-            <div className="flex items-end">
+            <div>
               <Button
                 type="button"
                 variant={newOrder.multiPart ? "default" : "outline"}
-                className="flex-1 gap-2"
+                className="w-full gap-2"
                 onClick={() => {
                   setNewOrder((s) => ({ ...s, multiPart: !s.multiPart }));
                   setNewOrderParts((current) =>
@@ -344,7 +286,8 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                 {newOrder.multiPart ? "Multi-partes" : "Peça única"}
               </Button>
             </div>
-          </div>
+          </DialogSection>
+
           {newOrder.multiPart && (
             <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -510,34 +453,99 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
               </div>
             </div>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
+
+          <DialogSection icon={FileUp} title="Arquivo e referência">
             <div className="grid gap-2">
-              <Label>Forma de Pagamento</Label>
-              <Select
-                value={newOrder.formaPagamento}
-                onValueChange={(v) => setNewOrder((s) => ({ ...s, formaPagamento: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Data do Pagamento</Label>
+              <Label>Link externo (opcional)</Label>
               <Input
-                type="date"
-                value={newOrder.dataPagamento}
-                onChange={(e) => setNewOrder((s) => ({ ...s, dataPagamento: e.target.value }))}
+                type="url"
+                value={newOrder.linkProjeto}
+                onChange={(e) => setNewOrder((s) => ({ ...s, linkProjeto: e.target.value }))}
+                placeholder="https://..."
               />
             </div>
-          </div>
+            <div className="grid gap-2">
+              <Label>Arquivo STL ou 3MF (opcional)</Label>
+              <Input
+                type="file"
+                accept=".stl,.3mf,model/stl,application/sla,application/vnd.ms-package.3dmanufacturing-3dmodel+xml"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (!file) {
+                    setNewOrderAsset(null);
+                    return;
+                  }
+                  const extension = file.name.split(".").pop()?.toLowerCase();
+                  if (!extension || !["stl", "3mf"].includes(extension)) {
+                    toast.error("Envie apenas arquivos STL ou 3MF.");
+                    e.currentTarget.value = "";
+                    return;
+                  }
+                  if (file.size > MAX_ORDER_ASSET_SIZE) {
+                    toast.error("O arquivo excede o limite de 25 MB.");
+                    e.currentTarget.value = "";
+                    return;
+                  }
+                  setNewOrderAsset(file);
+                }}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                O arquivo fica salvo em Storage para reimpressao futura. Se enviar um arquivo, ele
+                sera a referencia principal do pedido.
+              </p>
+              {newOrderAsset && (
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                  <span className="truncate font-medium">{newOrderAsset.name}</span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {formatFileSize(newOrderAsset.size)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </DialogSection>
+
+          <DialogSection icon={CreditCard} title="Preço e pagamento">
+            <div className="grid gap-2">
+              <Label>Preço de Venda (R$)</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.01}
+                value={newOrder.precoVenda}
+                onChange={(e) => setNewOrder((s) => ({ ...s, precoVenda: e.target.value }))}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Forma de Pagamento</Label>
+                <Select
+                  value={newOrder.formaPagamento}
+                  onValueChange={(v) => setNewOrder((s) => ({ ...s, formaPagamento: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Data do Pagamento</Label>
+                <Input
+                  type="date"
+                  value={newOrder.dataPagamento}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, dataPagamento: e.target.value }))}
+                />
+              </div>
+            </div>
+          </DialogSection>
+
           <DialogFooter>
             <Button
               type="button"

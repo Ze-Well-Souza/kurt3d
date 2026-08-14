@@ -34,7 +34,12 @@ import { logout } from "@/lib/api/auth.functions";
 const items = [
   { title: "Painel", url: "/admin", icon: LayoutDashboard },
   { title: "Estoque de Filamentos", url: "/admin/stock", icon: Layers },
-  { title: "Calculadora e Pedidos", url: "/admin/portfolio", icon: Calculator },
+  {
+    title: "Calculadora e Pedidos",
+    description: "Calculadora e Pedidos — orce custos e acompanhe a fila de produção",
+    url: "/admin/portfolio",
+    icon: Calculator,
+  },
   { title: "Clientes", url: "/admin/clients", icon: Users },
   { title: "Leads", url: "/admin/leads", icon: MessageSquare },
   { title: "Finanças", url: "/admin/finances", icon: Wallet },
@@ -85,7 +90,7 @@ export function AdminSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={active}
-                      tooltip={item.title}
+                      tooltip={item.description ?? item.title}
                       className={active ? "filament-active font-semibold" : ""}
                     >
                       <Link to={item.url}>
