@@ -4,6 +4,24 @@
 **Responsável Técnico:** Sr FullStack+Data+QA+Lead  
 **Projeto:** kurt3d (TS/React + Supabase + TanStack Start + Vitest)
 
+> **Status em 13/08/2026 — arquivado como referência histórica, não como plano ativo.**
+> Este relatório propôs uma refatoração da calculadora que não foi executada como planejado
+> aqui. Partes do diagnóstico já ficaram desatualizadas:
+>
+> - `src/lib/domain/pricing-calculator.ts`, citado como "código órfão" (itens 6.8, 6.10 e no
+>   índice de arquivos), **não existe mais** no repositório — já foi removido.
+> - `calcPortfolioPricing` (a versão simplificada, sem multi-filamento), que este relatório
+>   não menciona como problema, foi removida em 13/08/2026 por ter um único call site
+>   divergente do `calcAdvancedPortfolioPricing` usado no resto da tela — ver commit
+>   `fix(P2-2)`.
+> - `src/lib/domain/portfolio-pricing.test.ts` hoje tem cobertura completa (a lacuna P0
+>   apontada na seção 6.10 já foi fechada).
+>
+> Mantido no repositório por registrar o raciocínio original sobre a arquitetura da
+> calculadora (pipeline de 9 passos, modos slicer/unit, precedência multi-filamento). Antes
+> de retomar qualquer item deste documento, confira o estado atual do código — não assuma que
+> a numeração de linhas ou os nomes de arquivo abaixo ainda batem.
+
 ---
 
 ## 1️⃣ MAPEAMENTO COMPLETO DA CALCULADORA ATUAL
