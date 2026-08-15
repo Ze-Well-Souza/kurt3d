@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -201,10 +201,18 @@ export function useStockPageState() {
 
   const [fForm, setFForm] = useState<FilamentoForm>(() => ({
     ...initialFilamentoForm,
-    sku: generateSku(allUsedSkus),
+    sku: "",
     dataCompra: todayIso(),
     dataParaPagamento: addCalendarMonthsIso(todayIso(), 1),
   }));
+
+  // Atualiza o SKU automaticamente quando os dados carregam (allUsedSkus muda)
+  // e o formulario esta no estado inicial (SKU vazio) ou foi resetado.
+  useEffect(() => {
+    if (allUsedSkus.length > 0 && !fForm.sku) {
+      setFForm((f) => ({ ...f, sku: generateSku(allUsedSkus) }));
+    }
+  }, [allUsedSkus]);
   const [iForm, setIForm] = useState<InsumoForm>({
     ...initialInsumoForm,
     dataCompra: todayIso(),
@@ -219,6 +227,7 @@ export function useStockPageState() {
   const [filCorFilter, setFilCorFilter] = useState("all");
   const [filMaterialFilter, setFilMaterialFilter] = useState("all");
   const [filDataCompraFilter, setFilDataCompraFilter] = useState("");
+  const [filDataEntregaFilter, setFilDataEntregaFilter] = useState("");
   const [historySearch, setHistorySearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
   const [stockView, setStockViewState] = useState<"cards" | "table">(
@@ -506,7 +515,7 @@ export function useStockPageState() {
       );
       setFForm({
         ...initialFilamentoForm,
-        sku: generateSku([...usedLower]),
+        sku: "",
         dataCompra: todayIso(),
         dataParaPagamento: addCalendarMonthsIso(todayIso(), 1),
       });
@@ -617,22 +626,41 @@ export function useStockPageState() {
   // ── Filtered lists ──
   const filteredFilamentos = useMemo(() => {
     const s = normalizeText(filSearch);
-    return filamentos.filter((f) => {
-      const matchesSearch =
-        !s ||
-        normalizeText(f.sku).includes(s) ||
-        normalizeText(f.marca).includes(s) ||
-        normalizeText(f.cor).includes(s) ||
-        normalizeText(f.material).includes(s);
-      const matchesMarca =
-        filMarcaFilter === "all" || normalizeText(f.marca) === normalizeText(filMarcaFilter);
-      const matchesCor =
-        filCorFilter === "all" || normalizeText(f.cor) === normalizeText(filCorFilter);
-      const matchesMaterial = filMaterialFilter === "all" || f.material === filMaterialFilter;
-      const matchesDataCompra = !filDataCompraFilter || f.dataCompra === filDataCompraFilter;
-      return matchesSearch && matchesMarca && matchesCor && matchesMaterial && matchesDataCompra;
-    });
-  }, [filDataCompraFilter, filMarcaFilter, filCorFilter, filMaterialFilter, filamentos, filSearch]);
+    return filamentos
+      .filter((f) => {
+        const matchesSearch =
+          !s ||
+          normalizeText(f.sku).includes(s) ||
+          normalizeText(f.marca).includes(s) ||
+          normalizeText(f.cor).includes(s) ||
+          normalizeText(f.material).includes(s);
+        const matchesMarca =
+          filMarcaFilter === "all" || normalizeText(f.marca) === normalizeText(filMarcaFilter);
+        const matchesCor =
+          filCorFilter === "all" || normalizeText(f.cor) === normalizeText(filCorFilter);
+        const matchesMaterial = filMaterialFilter === "all" || f.material === filMaterialFilter;
+        const matchesDataCompra = !filDataCompraFilter || f.dataCompra === filDataCompraFilter;
+        const matchesDataEntrega =
+          !filDataEntregaFilter || f.dataEntrega === filDataEntregaFilter;
+        return (
+          matchesSearch &&
+          matchesMarca &&
+          matchesCor &&
+          matchesMaterial &&
+          matchesDataCompra &&
+          matchesDataEntrega
+        );
+      })
+      .sort((a, b) => a.sku.localeCompare(b.sku, "pt-BR", { numeric: true }));
+  }, [
+    filDataCompraFilter,
+    filDataEntregaFilter,
+    filMarcaFilter,
+    filCorFilter,
+    filMaterialFilter,
+    filamentos,
+    filSearch,
+  ]);
 
   const marcaOptions = useMemo(
     () =>
@@ -749,6 +777,8 @@ export function useStockPageState() {
     setFilMaterialFilter,
     filDataCompraFilter,
     setFilDataCompraFilter,
+    filDataEntregaFilter,
+    setFilDataEntregaFilter,
     historySearch,
     setHistorySearch,
     insSearch,

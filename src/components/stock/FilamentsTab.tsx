@@ -65,6 +65,8 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
     setFilMaterialFilter,
     filDataCompraFilter,
     setFilDataCompraFilter,
+    filDataEntregaFilter,
+    setFilDataEntregaFilter,
     setDetailFilament,
     openEdit,
     setArchiveDialog,
@@ -74,7 +76,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
   // Paginacao vale para as duas vistas (cards/tabela); trocar a vista nao reseta a pagina.
   const pagination = usePagination(
     filteredFilamentos,
-    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filDataCompraFilter].join("|"),
+    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filDataCompraFilter, filDataEntregaFilter].join("|"),
   );
 
   return (
@@ -109,7 +111,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
           </div>
         </div>
       </div>
-      <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
         <Select value={filMarcaFilter} onValueChange={setFilMarcaFilter}>
           <SelectTrigger>
@@ -155,6 +157,13 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
             type="date"
             value={filDataCompraFilter}
             onChange={(e) => setFilDataCompraFilter(e.target.value)}
+          />
+        </Field>
+        <Field label="Data da Entrega" className="space-y-1">
+          <Input
+            type="date"
+            value={filDataEntregaFilter}
+            onChange={(e) => setFilDataEntregaFilter(e.target.value)}
           />
         </Field>
       </div>
