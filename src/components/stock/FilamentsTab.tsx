@@ -1,6 +1,9 @@
 import {
   AlertTriangle,
   Archive,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Banknote,
   CreditCard,
   ExternalLink,
@@ -40,7 +43,50 @@ import { brl } from "@/lib/utils";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import { getFilamentoAlertLevel } from "@/lib/domain/stock-alert";
 import { MATERIALS, QUALIDADE_CONFIG } from "./stock-shared";
-import type { StockCtx } from "./use-stock-page-state";
+import type { FilSortDir, FilSortKey, StockCtx } from "./use-stock-page-state";
+
+/** Cabecalho de coluna ordenavel (padrao de paineis profissionais). */
+function SortableHead({
+  label,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: FilSortKey;
+  activeKey: FilSortKey;
+  dir: FilSortDir;
+  onSort: (k: FilSortKey) => void;
+  className?: string;
+}) {
+  const active = activeKey === sortKey;
+  return (
+    <TableHead
+      aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : undefined}
+      className={className}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 hover:text-foreground"
+        title={`Ordenar por ${label}`}
+      >
+        {label}
+        {active ? (
+          dir === "asc" ? (
+            <ArrowUp className="h-3 w-3" />
+          ) : (
+            <ArrowDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
 
 export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
   const {
@@ -63,8 +109,9 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
     setFilCorFilter,
     filMaterialFilter,
     setFilMaterialFilter,
-    filSortOrder,
-    setFilSortOrder,
+    filSortKey,
+    filSortDir,
+    toggleFilSort,
     setDetailFilament,
     openEdit,
     setArchiveDialog,
@@ -74,7 +121,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
   // Paginacao vale para as duas vistas (cards/tabela); trocar a vista nao reseta a pagina.
   const pagination = usePagination(
     filteredFilamentos,
-    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filSortOrder].join("|"),
+    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filSortKey, filSortDir].join("|"),
   );
 
   return (
@@ -109,7 +156,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
           </div>
         </div>
       </div>
-      <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 lg:grid-cols-4">
         <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
         <Select value={filMarcaFilter} onValueChange={setFilMarcaFilter}>
           <SelectTrigger>
@@ -150,18 +197,6 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filSortOrder} onValueChange={(v) => setFilSortOrder(v as typeof filSortOrder)}>
-          <SelectTrigger>
-            <SelectValue placeholder="Ordenar por" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sku">Ordenar por SKU</SelectItem>
-            <SelectItem value="compra-asc">Compra: mais antigo primeiro</SelectItem>
-            <SelectItem value="compra-desc">Compra: mais recente primeiro</SelectItem>
-            <SelectItem value="entrega-asc">Entrega: mais antigo primeiro</SelectItem>
-            <SelectItem value="entrega-desc">Entrega: mais recente primeiro</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
       {lowFilamentosCount > 0 && (
         <div className="flex items-center gap-2 border-b border-red-500/20 bg-red-500/5 px-6 py-3 text-sm text-red-700">
@@ -181,8 +216,8 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>SKU</TableHead>
-                <TableHead>Marca</TableHead>
+                <SortableHead label="SKU" sortKey="sku" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
+                <SortableHead label="Marca" sortKey="marca" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
                 <TableHead>Cor</TableHead>
                 <TableHead>Material</TableHead>
                 <TableHead className="text-center">Pagamento</TableHead>
@@ -192,8 +227,8 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
                 <TableHead className="text-right">Investido</TableHead>
                 <TableHead className="text-right">Consumido</TableHead>
                 <TableHead className="text-right">Em Estoque</TableHead>
-                <TableHead>Data Compra</TableHead>
-                <TableHead>Entrega</TableHead>
+                <SortableHead label="Data Compra" sortKey="dataCompra" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
+                <SortableHead label="Entrega" sortKey="dataEntrega" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
                 <TableHead>Data p/ Pagto</TableHead>
                 <TableHead>Qualidade</TableHead>
                 <TableHead>Link</TableHead>

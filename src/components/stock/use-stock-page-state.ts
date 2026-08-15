@@ -58,6 +58,8 @@ import {
  * metricas derivadas. As abas recebem este objeto como `ctx` e apenas
  * renderizam — nenhuma logica de dominio vive nos componentes de aba.
  */
+export type FilSortKey = "sku" | "marca" | "dataCompra" | "dataEntrega";
+export type FilSortDir = "asc" | "desc";
 export function useStockPageState() {
   const qc = useQueryClient();
   const { data: filamentosData } = useFilamentos();
@@ -226,9 +228,16 @@ export function useStockPageState() {
   const [filMarcaFilter, setFilMarcaFilter] = useState("all");
   const [filCorFilter, setFilCorFilter] = useState("all");
   const [filMaterialFilter, setFilMaterialFilter] = useState("all");
-  const [filSortOrder, setFilSortOrder] = useState<
-    "sku" | "compra-asc" | "compra-desc" | "entrega-asc" | "entrega-desc"
-  >("sku");
+  const [filSortKey, setFilSortKey] = useState<FilSortKey>("sku");
+  const [filSortDir, setFilSortDir] = useState<FilSortDir>("asc");
+  const toggleFilSort = (key: FilSortKey) => {
+    if (key === filSortKey) {
+      setFilSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setFilSortKey(key);
+      setFilSortDir("asc");
+    }
+  };
   const [historySearch, setHistorySearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
   const [stockView, setStockViewState] = useState<"cards" | "table">(
@@ -643,21 +652,27 @@ export function useStockPageState() {
         return matchesSearch && matchesMarca && matchesCor && matchesMaterial;
       })
       .sort((a, b) => {
-        switch (filSortOrder) {
-          case "compra-asc":
-            return a.dataCompra.localeCompare(b.dataCompra);
-          case "compra-desc":
-            return b.dataCompra.localeCompare(a.dataCompra);
-          case "entrega-asc":
-            return (a.dataEntrega ?? "").localeCompare(b.dataEntrega ?? "");
-          case "entrega-desc":
-            return (b.dataEntrega ?? "").localeCompare(a.dataEntrega ?? "");
-          default:
-            return a.sku.localeCompare(b.sku, "pt-BR", { numeric: true });
-        }
+        const value = (f: (typeof filamentos)[number]) => {
+          switch (filSortKey) {
+            case "marca":
+              return f.marca;
+            case "dataCompra":
+              return f.dataCompra;
+            case "dataEntrega":
+              return f.dataEntrega ?? "";
+            default:
+              return f.sku;
+          }
+        };
+        const cmp =
+          filSortKey === "sku"
+            ? value(a).localeCompare(value(b), "pt-BR", { numeric: true })
+            : value(a).localeCompare(value(b), "pt-BR");
+        return filSortDir === "asc" ? cmp : -cmp;
       });
   }, [
-    filSortOrder,
+    filSortKey,
+    filSortDir,
     filMarcaFilter,
     filCorFilter,
     filMaterialFilter,
@@ -778,8 +793,9 @@ export function useStockPageState() {
     setFilCorFilter,
     filMaterialFilter,
     setFilMaterialFilter,
-    filSortOrder,
-    setFilSortOrder,
+    filSortKey,
+    filSortDir,
+    toggleFilSort,
     historySearch,
     setHistorySearch,
     insSearch,
