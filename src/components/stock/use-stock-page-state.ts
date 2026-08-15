@@ -226,8 +226,8 @@ export function useStockPageState() {
   const [filMarcaFilter, setFilMarcaFilter] = useState("all");
   const [filCorFilter, setFilCorFilter] = useState("all");
   const [filMaterialFilter, setFilMaterialFilter] = useState("all");
-  const [filDataCompraFilter, setFilDataCompraFilter] = useState("");
-  const [filDataEntregaFilter, setFilDataEntregaFilter] = useState("");
+  const [filDataCompraSort, setFilDataCompraSort] = useState<"" | "asc" | "desc">("");
+  const [filDataEntregaSort, setFilDataEntregaSort] = useState<"" | "asc" | "desc">("");
   const [historySearch, setHistorySearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
   const [stockView, setStockViewState] = useState<"cards" | "table">(
@@ -639,22 +639,28 @@ export function useStockPageState() {
         const matchesCor =
           filCorFilter === "all" || normalizeText(f.cor) === normalizeText(filCorFilter);
         const matchesMaterial = filMaterialFilter === "all" || f.material === filMaterialFilter;
-        const matchesDataCompra = !filDataCompraFilter || f.dataCompra === filDataCompraFilter;
-        const matchesDataEntrega =
-          !filDataEntregaFilter || f.dataEntrega === filDataEntregaFilter;
-        return (
-          matchesSearch &&
-          matchesMarca &&
-          matchesCor &&
-          matchesMaterial &&
-          matchesDataCompra &&
-          matchesDataEntrega
-        );
+        return matchesSearch && matchesMarca && matchesCor && matchesMaterial;
       })
-      .sort((a, b) => a.sku.localeCompare(b.sku, "pt-BR", { numeric: true }));
+      .sort((a, b) => {
+        // Ordenacao por SKU como padrao
+        const skuCmp = a.sku.localeCompare(b.sku, "pt-BR", { numeric: true });
+        if (filDataCompraSort === "asc") return a.dataCompra.localeCompare(b.dataCompra);
+        if (filDataCompraSort === "desc") return b.dataCompra.localeCompare(a.dataCompra);
+        if (filDataEntregaSort === "asc") {
+          const da = a.dataEntrega ?? "";
+          const db = b.dataEntrega ?? "";
+          return da.localeCompare(db);
+        }
+        if (filDataEntregaSort === "desc") {
+          const da = a.dataEntrega ?? "";
+          const db = b.dataEntrega ?? "";
+          return db.localeCompare(da);
+        }
+        return skuCmp;
+      });
   }, [
-    filDataCompraFilter,
-    filDataEntregaFilter,
+    filDataCompraSort,
+    filDataEntregaSort,
     filMarcaFilter,
     filCorFilter,
     filMaterialFilter,
@@ -775,10 +781,10 @@ export function useStockPageState() {
     setFilCorFilter,
     filMaterialFilter,
     setFilMaterialFilter,
-    filDataCompraFilter,
-    setFilDataCompraFilter,
-    filDataEntregaFilter,
-    setFilDataEntregaFilter,
+    filDataCompraSort,
+    setFilDataCompraSort,
+    filDataEntregaSort,
+    setFilDataEntregaSort,
     historySearch,
     setHistorySearch,
     insSearch,

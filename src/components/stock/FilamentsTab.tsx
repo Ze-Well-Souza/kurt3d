@@ -63,10 +63,10 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
     setFilCorFilter,
     filMaterialFilter,
     setFilMaterialFilter,
-    filDataCompraFilter,
-    setFilDataCompraFilter,
-    filDataEntregaFilter,
-    setFilDataEntregaFilter,
+    filDataCompraSort,
+    setFilDataCompraSort,
+    filDataEntregaSort,
+    setFilDataEntregaSort,
     setDetailFilament,
     openEdit,
     setArchiveDialog,
@@ -76,7 +76,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
   // Paginacao vale para as duas vistas (cards/tabela); trocar a vista nao reseta a pagina.
   const pagination = usePagination(
     filteredFilamentos,
-    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filDataCompraFilter, filDataEntregaFilter].join("|"),
+    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filDataCompraSort, filDataEntregaSort].join("|"),
   );
 
   return (
@@ -152,20 +152,26 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
             ))}
           </SelectContent>
         </Select>
-        <Field label="Data da Compra" className="space-y-1">
-          <Input
-            type="date"
-            value={filDataCompraFilter}
-            onChange={(e) => setFilDataCompraFilter(e.target.value)}
-          />
-        </Field>
-        <Field label="Data da Entrega" className="space-y-1">
-          <Input
-            type="date"
-            value={filDataEntregaFilter}
-            onChange={(e) => setFilDataEntregaFilter(e.target.value)}
-          />
-        </Field>
+        <Select value={filDataCompraSort} onValueChange={(v) => setFilDataCompraSort(v as "" | "asc" | "desc")}>
+          <SelectTrigger>
+            <SelectValue placeholder="Data da Compra" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Data da Compra</SelectItem>
+            <SelectItem value="asc">Compra: mais antigo primeiro</SelectItem>
+            <SelectItem value="desc">Compra: mais recente primeiro</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filDataEntregaSort} onValueChange={(v) => setFilDataEntregaSort(v as "" | "asc" | "desc")}>
+          <SelectTrigger>
+            <SelectValue placeholder="Data da Entrega" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Data da Entrega</SelectItem>
+            <SelectItem value="asc">Entrega: mais antigo primeiro</SelectItem>
+            <SelectItem value="desc">Entrega: mais recente primeiro</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       {lowFilamentosCount > 0 && (
         <div className="flex items-center gap-2 border-b border-red-500/20 bg-red-500/5 px-6 py-3 text-sm text-red-700">
