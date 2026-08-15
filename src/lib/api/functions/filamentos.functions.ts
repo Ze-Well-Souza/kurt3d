@@ -4,6 +4,8 @@ import { z } from "zod";
 import type { Filamento, FilamentoQualidade } from "../../domain/types";
 import { computeReservedByFilament } from "../../domain/inventory";
 import {
+  filamentoInstallmentsRepo,
+  filamentoPaymentsRepo,
   filamentosHistoryRepo,
   filamentosRepo,
   inventoryRepo,
@@ -118,11 +120,16 @@ export const removeFilamento = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkMutationRateLimit();
     await requireSession();
-    const [repo, inv, orders] = await Promise.all([
+    const [repo, inv, orders, history, payments, installments] = await Promise.all([
       filamentosRepo(),
       inventoryRepo(),
       ordersRepo(),
+      filamentosHistoryRepo(),
+      filamentoPaymentsRepo(),
+      filamentoInstallmentsRepo(),
     ]);
+
+    const alvo = repo.list.find((filamento) => filamento.id === data.id);
 
     // P1-9: nao ha FK de orders.filamento_id para filamentos, entao apagar um
     // rolo em uso deixava o pedido apontando para uma linha inexistente — e a
@@ -151,6 +158,26 @@ export const removeFilamento = createServerFn({ method: "POST" })
     }
 
     await repo.remove(data.id);
+
+    // Deduz do financeiro: se o rolo removido era o unico vinculado ao plano de
+    // pagamento e nenhuma parcela foi paga, remove o plano e as parcelas. Se outro
+    // rolo compartilhar o lote ou houver historico de pagamento, o plano e mantido
+    // para nao apagar registro financeiro ja quitado.
+    const paymentId = alvo?.paymentId;
+    if (paymentId) {
+      const aindaReferenciado =
+        repo.list.some((f) => f.id !== data.id && f.paymentId === paymentId) ||
+        history.list.some((f) => f.paymentId === paymentId);
+      const temParcelaPaga = installments.list.some(
+        (i) => i.paymentId === paymentId && ((i.valorPago ?? 0) > 0 || i.pago),
+      );
+      if (!aindaReferenciado && !temParcelaPaga) {
+        await installments.deleteByPayment(paymentId);
+        await payments.detach(paymentId);
+        await payments.remove(paymentId);
+      }
+    }
+
     return { ok: true };
   });
 
