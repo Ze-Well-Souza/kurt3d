@@ -226,8 +226,9 @@ export function useStockPageState() {
   const [filMarcaFilter, setFilMarcaFilter] = useState("all");
   const [filCorFilter, setFilCorFilter] = useState("all");
   const [filMaterialFilter, setFilMaterialFilter] = useState("all");
-  const [filDataCompraSort, setFilDataCompraSort] = useState<"" | "asc" | "desc">("");
-  const [filDataEntregaSort, setFilDataEntregaSort] = useState<"" | "asc" | "desc">("");
+  const [filSortOrder, setFilSortOrder] = useState<
+    "sku" | "compra-asc" | "compra-desc" | "entrega-asc" | "entrega-desc"
+  >("sku");
   const [historySearch, setHistorySearch] = useState("");
   const [insSearch, setInsSearch] = useState("");
   const [stockView, setStockViewState] = useState<"cards" | "table">(
@@ -642,25 +643,21 @@ export function useStockPageState() {
         return matchesSearch && matchesMarca && matchesCor && matchesMaterial;
       })
       .sort((a, b) => {
-        // Ordenacao por SKU como padrao
-        const skuCmp = a.sku.localeCompare(b.sku, "pt-BR", { numeric: true });
-        if (filDataCompraSort === "asc") return a.dataCompra.localeCompare(b.dataCompra);
-        if (filDataCompraSort === "desc") return b.dataCompra.localeCompare(a.dataCompra);
-        if (filDataEntregaSort === "asc") {
-          const da = a.dataEntrega ?? "";
-          const db = b.dataEntrega ?? "";
-          return da.localeCompare(db);
+        switch (filSortOrder) {
+          case "compra-asc":
+            return a.dataCompra.localeCompare(b.dataCompra);
+          case "compra-desc":
+            return b.dataCompra.localeCompare(a.dataCompra);
+          case "entrega-asc":
+            return (a.dataEntrega ?? "").localeCompare(b.dataEntrega ?? "");
+          case "entrega-desc":
+            return (b.dataEntrega ?? "").localeCompare(a.dataEntrega ?? "");
+          default:
+            return a.sku.localeCompare(b.sku, "pt-BR", { numeric: true });
         }
-        if (filDataEntregaSort === "desc") {
-          const da = a.dataEntrega ?? "";
-          const db = b.dataEntrega ?? "";
-          return db.localeCompare(da);
-        }
-        return skuCmp;
       });
   }, [
-    filDataCompraSort,
-    filDataEntregaSort,
+    filSortOrder,
     filMarcaFilter,
     filCorFilter,
     filMaterialFilter,
@@ -781,10 +778,8 @@ export function useStockPageState() {
     setFilCorFilter,
     filMaterialFilter,
     setFilMaterialFilter,
-    filDataCompraSort,
-    setFilDataCompraSort,
-    filDataEntregaSort,
-    setFilDataEntregaSort,
+    filSortOrder,
+    setFilSortOrder,
     historySearch,
     setHistorySearch,
     insSearch,

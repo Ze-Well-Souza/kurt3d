@@ -63,10 +63,8 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
     setFilCorFilter,
     filMaterialFilter,
     setFilMaterialFilter,
-    filDataCompraSort,
-    setFilDataCompraSort,
-    filDataEntregaSort,
-    setFilDataEntregaSort,
+    filSortOrder,
+    setFilSortOrder,
     setDetailFilament,
     openEdit,
     setArchiveDialog,
@@ -76,7 +74,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
   // Paginacao vale para as duas vistas (cards/tabela); trocar a vista nao reseta a pagina.
   const pagination = usePagination(
     filteredFilamentos,
-    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filDataCompraSort, filDataEntregaSort].join("|"),
+    [filSearch, filMarcaFilter, filCorFilter, filMaterialFilter, filSortOrder].join("|"),
   );
 
   return (
@@ -111,7 +109,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
           </div>
         </div>
       </div>
-      <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
         <Select value={filMarcaFilter} onValueChange={setFilMarcaFilter}>
           <SelectTrigger>
@@ -152,24 +150,16 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filDataCompraSort} onValueChange={(v) => setFilDataCompraSort(v as "" | "asc" | "desc")}>
+        <Select value={filSortOrder} onValueChange={(v) => setFilSortOrder(v as typeof filSortOrder)}>
           <SelectTrigger>
-            <SelectValue placeholder="Data da Compra" />
+            <SelectValue placeholder="Ordenar por" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Data da Compra</SelectItem>
-            <SelectItem value="asc">Compra: mais antigo primeiro</SelectItem>
-            <SelectItem value="desc">Compra: mais recente primeiro</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filDataEntregaSort} onValueChange={(v) => setFilDataEntregaSort(v as "" | "asc" | "desc")}>
-          <SelectTrigger>
-            <SelectValue placeholder="Data da Entrega" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Data da Entrega</SelectItem>
-            <SelectItem value="asc">Entrega: mais antigo primeiro</SelectItem>
-            <SelectItem value="desc">Entrega: mais recente primeiro</SelectItem>
+            <SelectItem value="sku">Ordenar por SKU</SelectItem>
+            <SelectItem value="compra-asc">Compra: mais antigo primeiro</SelectItem>
+            <SelectItem value="compra-desc">Compra: mais recente primeiro</SelectItem>
+            <SelectItem value="entrega-asc">Entrega: mais antigo primeiro</SelectItem>
+            <SelectItem value="entrega-desc">Entrega: mais recente primeiro</SelectItem>
           </SelectContent>
         </Select>
       </div>
