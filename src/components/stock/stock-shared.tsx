@@ -28,6 +28,7 @@ export const filamentoSchema = z.object({
     .max(500)
     .nullable()
     .optional(),
+  ondeComprou: z.string().trim().max(120).nullable().optional(),
 });
 
 export type FilamentoForm = {
@@ -42,6 +43,7 @@ export type FilamentoForm = {
   qualidade: FilamentoQualidadeInput;
   observacao: string;
   linkProduto: string;
+  ondeComprou: string;
   quantidade: string;
   formaPagamento: FormaPagamento;
   custoTotal: string;
@@ -66,6 +68,7 @@ export const initialFilamentoForm: FilamentoForm = {
   qualidade: "",
   observacao: "",
   linkProduto: "",
+  ondeComprou: "",
   quantidade: "1",
   formaPagamento: "a_vista",
   custoTotal: "",
@@ -84,6 +87,7 @@ export const insumoSchema = z.object({
     .max(500)
     .nullable()
     .optional(),
+  ondeComprou: z.string().trim().max(120).nullable().optional(),
   classificacaoFinanceira: z.enum(["operacional", "investimento"]),
   formaPagamento: z.enum(["a_vista", "parcelado"]),
   parcelas: z.number().int().min(1).max(48),
@@ -96,6 +100,7 @@ export type InsumoForm = {
   quantidade: string;
   precoTotal: string;
   linkProduto: string;
+  ondeComprou: string;
   classificacaoFinanceira: InsumoClassificacaoFinanceira;
   formaPagamento: FormaPagamento;
   parcelas: string;
@@ -108,6 +113,7 @@ export const initialInsumoForm: InsumoForm = {
   quantidade: "",
   precoTotal: "",
   linkProduto: "",
+  ondeComprou: "",
   classificacaoFinanceira: "operacional",
   formaPagamento: "a_vista",
   parcelas: "1",

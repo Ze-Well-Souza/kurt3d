@@ -148,6 +148,7 @@ export type Filamento = {
   observacao?: string | null;
   comentario?: string | null;
   linkProduto?: string | null;
+  ondeComprou?: string | null;
   batchId?: string | null;
   paymentId?: string | null;
 };
@@ -163,6 +164,7 @@ export type Insumo = {
   quantidade: string;
   precoTotal: number;
   linkProduto?: string | null;
+  ondeComprou?: string | null;
   paymentId?: string | null;
   classificacaoFinanceira: InsumoClassificacaoFinanceira;
 };

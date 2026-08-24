@@ -58,7 +58,7 @@ import {
  * metricas derivadas. As abas recebem este objeto como `ctx` e apenas
  * renderizam — nenhuma logica de dominio vive nos componentes de aba.
  */
-export type FilSortKey = "sku" | "marca" | "dataCompra" | "dataEntrega";
+export type FilSortKey = "sku" | "marca" | "dataCompra" | "dataEntrega" | "ondeComprou";
 export type FilSortDir = "asc" | "desc";
 export function useStockPageState() {
   const qc = useQueryClient();
@@ -271,6 +271,7 @@ export function useStockPageState() {
       qualidade: f.qualidade ?? "",
       observacao: f.observacao ?? f.comentario ?? "",
       linkProduto: f.linkProduto ?? "",
+      ondeComprou: f.ondeComprou ?? "",
       quantidade: "1",
       formaPagamento: payment?.formaPagamento ?? "a_vista",
       custoTotal: payment ? String(payment.custoTotal) : String(f.precoPago),
@@ -300,6 +301,7 @@ export function useStockPageState() {
       qualidade: h.qualidade ?? "",
       observacao: h.observacao ?? h.comentario ?? "",
       linkProduto: h.linkProduto ?? "",
+      ondeComprou: h.ondeComprou ?? "",
       quantidade: "1",
       formaPagamento: "a_vista",
       custoTotal: String(h.precoPago),
@@ -324,6 +326,7 @@ export function useStockPageState() {
       qualidade: editForm.qualidade || null,
       observacao: editForm.observacao || null,
       linkProduto: editForm.linkProduto || null,
+      ondeComprou: editForm.ondeComprou || null,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
@@ -402,6 +405,7 @@ export function useStockPageState() {
       qualidade: editForm.qualidade || null,
       observacao: editForm.observacao || null,
       linkProduto: editForm.linkProduto || null,
+      ondeComprou: editForm.ondeComprou || null,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
@@ -471,6 +475,7 @@ export function useStockPageState() {
       qualidade: fForm.qualidade || null,
       observacao: fForm.observacao || null,
       linkProduto: fForm.linkProduto || null,
+      ondeComprou: fForm.ondeComprou || null,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
@@ -561,6 +566,7 @@ export function useStockPageState() {
       quantidade: iForm.quantidade,
       precoTotal: Number(iForm.precoTotal),
       linkProduto: iForm.linkProduto || null,
+      ondeComprou: iForm.ondeComprou || null,
       classificacaoFinanceira: iForm.classificacaoFinanceira,
       formaPagamento: iForm.formaPagamento,
       parcelas:
@@ -593,6 +599,7 @@ export function useStockPageState() {
       quantidade: editInsumo.quantidade,
       precoTotal: Number(editInsumo.precoTotal),
       linkProduto: editInsumo.linkProduto || null,
+      ondeComprou: editInsumo.ondeComprou || null,
       classificacaoFinanceira: editInsumo.classificacaoFinanceira,
       formaPagamento: editInsumo.formaPagamento,
       parcelas:
@@ -643,7 +650,8 @@ export function useStockPageState() {
           normalizeText(f.sku).includes(s) ||
           normalizeText(f.marca).includes(s) ||
           normalizeText(f.cor).includes(s) ||
-          normalizeText(f.material).includes(s);
+          normalizeText(f.material).includes(s) ||
+          normalizeText(f.ondeComprou ?? "").includes(s);
         const matchesMarca =
           filMarcaFilter === "all" || normalizeText(f.marca) === normalizeText(filMarcaFilter);
         const matchesCor =
@@ -660,6 +668,8 @@ export function useStockPageState() {
               return f.dataCompra;
             case "dataEntrega":
               return f.dataEntrega ?? "";
+            case "ondeComprou":
+              return f.ondeComprou ?? "";
             default:
               return f.sku;
           }
@@ -698,7 +708,9 @@ export function useStockPageState() {
   const filteredInsumos = useMemo(() => {
     if (!insSearch.trim()) return insumos;
     const s = normalizeText(insSearch);
-    return insumos.filter((i) => normalizeText(i.nome).includes(s));
+    return insumos.filter(
+      (i) => normalizeText(i.nome).includes(s) || normalizeText(i.ondeComprou ?? "").includes(s),
+    );
   }, [insumos, insSearch]);
 
   const filteredHistory = useMemo(() => {

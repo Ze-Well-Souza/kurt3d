@@ -92,6 +92,7 @@ export function InsumosTab({ ctx }: { ctx: StockCtx }) {
               <TableHead>Quantidade</TableHead>
               <TableHead>Alerta</TableHead>
               <TableHead>Data</TableHead>
+              <TableHead>Onde Comprou</TableHead>
               <TableHead>Classificação</TableHead>
               <TableHead>Pagamento</TableHead>
               <TableHead>Data p/ Pagto</TableHead>
@@ -134,6 +135,13 @@ export function InsumosTab({ ctx }: { ctx: StockCtx }) {
                   </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
                     {formatIsoDatePtBr(i.dataCompra)}
+                  </TableCell>
+                  <TableCell className="max-w-[140px] truncate text-xs" title={i.ondeComprou ?? ""}>
+                    {i.ondeComprou ? (
+                      i.ondeComprou
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-[10px]">
@@ -196,6 +204,7 @@ export function InsumosTab({ ctx }: { ctx: StockCtx }) {
                             quantidade: i.quantidade,
                             precoTotal: String(i.precoTotal),
                             linkProduto: i.linkProduto ?? "",
+                            ondeComprou: i.ondeComprou ?? "",
                             classificacaoFinanceira: i.classificacaoFinanceira,
                             formaPagamento: payment?.formaPagamento ?? "a_vista",
                             parcelas: String(payment?.parcelas ?? 1),

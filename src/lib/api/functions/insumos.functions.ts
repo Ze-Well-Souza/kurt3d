@@ -183,6 +183,7 @@ export const addInsumo = createServerFn({ method: "POST" })
       quantidade: z.string().trim().min(1).max(100),
       precoTotal: z.number().min(0.01).max(1000000),
       linkProduto: z.string().url().max(500).nullable().optional(),
+      ondeComprou: z.string().trim().max(120).nullable().optional(),
       classificacaoFinanceira: z.enum(["operacional", "investimento"]).default("operacional"),
       ...paymentFields,
     }),
@@ -200,6 +201,7 @@ export const addInsumo = createServerFn({ method: "POST" })
       quantidade: data.quantidade,
       precoTotal: data.precoTotal,
       linkProduto: data.linkProduto ?? null,
+      ondeComprou: data.ondeComprou ?? null,
       paymentId: provisionalPaymentId,
       classificacaoFinanceira: data.classificacaoFinanceira,
     };
@@ -290,6 +292,7 @@ export const updateInsumo = createServerFn({ method: "POST" })
       quantidade: z.string().trim().min(1).max(100),
       precoTotal: z.number().min(0.01).max(1000000),
       linkProduto: z.string().url().max(500).nullable().optional(),
+      ondeComprou: z.string().trim().max(120).nullable().optional(),
       classificacaoFinanceira: z.enum(["operacional", "investimento"]).default("operacional"),
       ...paymentFields,
     }),
@@ -317,6 +320,7 @@ export const updateInsumo = createServerFn({ method: "POST" })
       quantidade: data.quantidade,
       precoTotal: data.precoTotal,
       linkProduto: data.linkProduto ?? null,
+      ondeComprou: data.ondeComprou ?? null,
       paymentId: paymentResult.paymentId,
       classificacaoFinanceira: data.classificacaoFinanceira,
     };

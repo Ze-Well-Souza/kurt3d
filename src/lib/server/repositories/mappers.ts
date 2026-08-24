@@ -135,6 +135,7 @@ export function fromFilamentoRow(row: FilamentoRow): Filamento {
     observacao: row.observacao ?? null,
     comentario: row.observacao ?? null,
     linkProduto: row.link_produto ?? null,
+    ondeComprou: row.onde_comprou ?? null,
     batchId: row.batch_id ?? null,
     paymentId: row.payment_id ?? null,
   };
@@ -157,6 +158,7 @@ export function toFilamentoRow(row: Filamento) {
     qualidade: row.qualidade ?? null,
     observacao,
     link_produto: row.linkProduto ?? null,
+    onde_comprou: row.ondeComprou ?? null,
     batch_id: row.batchId ?? null,
     payment_id: row.paymentId ?? null,
   };
@@ -188,6 +190,7 @@ export function fromFilamentoHistoryRow(row: FilamentoHistoryRow): FilamentoHist
     observacao: row.observacao ?? null,
     comentario: row.observacao ?? null,
     linkProduto: row.link_produto ?? null,
+    ondeComprou: row.onde_comprou ?? null,
     batchId: row.batch_id ?? null,
     paymentId: row.payment_id ?? null,
     arquivadoAt: row.arquivado_at,
@@ -211,6 +214,7 @@ export function toFilamentoHistoryRow(row: FilamentoHistory) {
     qualidade: row.qualidade ?? null,
     observacao,
     link_produto: row.linkProduto ?? null,
+    onde_comprou: row.ondeComprou ?? null,
     batch_id: row.batchId ?? null,
     payment_id: row.paymentId ?? null,
     arquivado_at: row.arquivadoAt,
@@ -387,6 +391,7 @@ export function fromInsumoRow(row: InsumoRow): Insumo {
     quantidade: row.quantidade,
     precoTotal: row.preco_total,
     linkProduto: row.link_produto ?? null,
+    ondeComprou: row.onde_comprou ?? null,
     paymentId: row.payment_id ?? null,
     classificacaoFinanceira:
       (row.classificacao_financeira as Insumo["classificacaoFinanceira"]) ?? "operacional",
@@ -401,6 +406,7 @@ export function toInsumoRow(row: Insumo) {
     quantidade: row.quantidade,
     preco_total: row.precoTotal,
     link_produto: row.linkProduto ?? null,
+    onde_comprou: row.ondeComprou ?? null,
     payment_id: row.paymentId ?? null,
     classificacao_financeira: row.classificacaoFinanceira,
   };

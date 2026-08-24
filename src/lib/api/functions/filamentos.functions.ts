@@ -54,6 +54,7 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       qualidade: filamentoQualidadeSchema.nullable().optional(),
       observacao: z.string().max(500).nullable().optional(),
       linkProduto: z.string().url().max(500).nullable().optional(),
+      ondeComprou: z.string().trim().max(120).nullable().optional(),
       batchId: z.string().min(1).optional(),
       paymentId: z.string().min(1).optional(),
     }),
@@ -107,6 +108,8 @@ export const upsertFilamento = createServerFn({ method: "POST" })
       comentario: data.observacao !== undefined ? data.observacao : (existing?.comentario ?? null),
       linkProduto:
         data.linkProduto !== undefined ? data.linkProduto : (existing?.linkProduto ?? null),
+      ondeComprou:
+        data.ondeComprou !== undefined ? data.ondeComprou : (existing?.ondeComprou ?? null),
       batchId: data.batchId ?? existing?.batchId ?? null,
       paymentId: data.paymentId ?? existing?.paymentId ?? null,
     };
@@ -279,6 +282,7 @@ export const updateArchivedFilamento = createServerFn({ method: "POST" })
       qualidade: filamentoQualidadeSchema.nullable().optional(),
       observacao: z.string().max(500).nullable().optional(),
       linkProduto: z.string().url().max(500).nullable().optional(),
+      ondeComprou: z.string().trim().max(120).nullable().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -331,6 +335,7 @@ export const updateArchivedFilamento = createServerFn({ method: "POST" })
           ? data.observacao
           : (existing.observacao ?? existing.comentario),
       linkProduto: data.linkProduto !== undefined ? data.linkProduto : existing.linkProduto,
+      ondeComprou: data.ondeComprou !== undefined ? data.ondeComprou : existing.ondeComprou,
     };
     await historyRepo.update(updated);
     return { ok: true as const, filamento: updated };
@@ -373,6 +378,7 @@ export const restoreFilamento = createServerFn({ method: "POST" })
       observacao: archived.observacao ?? archived.comentario,
       comentario: archived.comentario,
       linkProduto: archived.linkProduto,
+      ondeComprou: archived.ondeComprou,
       batchId: archived.batchId,
       paymentId: archived.paymentId,
     };

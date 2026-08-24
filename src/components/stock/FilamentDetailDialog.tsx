@@ -76,6 +76,7 @@ export function FilamentDetailDialog({ ctx }: { ctx: StockCtx }) {
                     label="Data para pagto"
                     value={dataParaPagamento ? formatIsoDatePtBr(dataParaPagamento) : "—"}
                   />
+                  <DetailRow label="Onde comprou" value={detailFilament.ondeComprou || "—"} />
                   <DetailRow
                     label="Custo por grama"
                     value={brl(

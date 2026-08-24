@@ -129,6 +129,14 @@ export function FilamentCreateDialog({ ctx }: { ctx: StockCtx }) {
               </Select>
             </Field>
 
+            <Field label="Onde Comprou (opcional)" className="md:col-span-2">
+              <Input
+                value={fForm.ondeComprou}
+                onChange={(e) => setFField("ondeComprou", e.target.value)}
+                placeholder="Shopee, Mercado Livre, Amazon, TikTok Shop, loja física..."
+                maxLength={120}
+              />
+            </Field>
             <Field label="Link do Produto (opcional)" className="md:col-span-2">
               <Input
                 type="url"

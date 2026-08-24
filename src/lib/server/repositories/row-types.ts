@@ -46,6 +46,7 @@ export interface FilamentoRow {
   qualidade: FilamentoQualidadeRow;
   observacao: string | null;
   link_produto: string | null;
+  onde_comprou: string | null;
   batch_id: string | null;
   payment_id: string | null;
   created_at: string;
@@ -129,6 +130,7 @@ export interface InsumoRow {
   quantidade: string;
   preco_total: number;
   link_produto: string | null;
+  onde_comprou: string | null;
   payment_id: string | null;
   classificacao_financeira: string;
 }

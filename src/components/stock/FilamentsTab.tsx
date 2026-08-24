@@ -216,10 +216,29 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <SortableHead label="SKU" sortKey="sku" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
-                <SortableHead label="Marca" sortKey="marca" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
+                <SortableHead
+                  label="SKU"
+                  sortKey="sku"
+                  activeKey={filSortKey}
+                  dir={filSortDir}
+                  onSort={toggleFilSort}
+                />
+                <SortableHead
+                  label="Marca"
+                  sortKey="marca"
+                  activeKey={filSortKey}
+                  dir={filSortDir}
+                  onSort={toggleFilSort}
+                />
                 <TableHead>Cor</TableHead>
                 <TableHead>Material</TableHead>
+                <SortableHead
+                  label="Onde Comprou"
+                  sortKey="ondeComprou"
+                  activeKey={filSortKey}
+                  dir={filSortDir}
+                  onSort={toggleFilSort}
+                />
                 <TableHead className="text-center">Pagamento</TableHead>
                 <TableHead className="text-right">Estoque</TableHead>
                 <TableHead className="text-center">Nível</TableHead>
@@ -227,8 +246,20 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
                 <TableHead className="text-right">Investido</TableHead>
                 <TableHead className="text-right">Consumido</TableHead>
                 <TableHead className="text-right">Em Estoque</TableHead>
-                <SortableHead label="Data Compra" sortKey="dataCompra" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
-                <SortableHead label="Entrega" sortKey="dataEntrega" activeKey={filSortKey} dir={filSortDir} onSort={toggleFilSort} />
+                <SortableHead
+                  label="Data Compra"
+                  sortKey="dataCompra"
+                  activeKey={filSortKey}
+                  dir={filSortDir}
+                  onSort={toggleFilSort}
+                />
+                <SortableHead
+                  label="Entrega"
+                  sortKey="dataEntrega"
+                  activeKey={filSortKey}
+                  dir={filSortDir}
+                  onSort={toggleFilSort}
+                />
                 <TableHead>Data p/ Pagto</TableHead>
                 <TableHead>Qualidade</TableHead>
                 <TableHead>Link</TableHead>
@@ -273,6 +304,16 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
                       <Badge variant="secondary" className="text-[10px]">
                         {f.material}
                       </Badge>
+                    </TableCell>
+                    <TableCell
+                      className="max-w-[140px] truncate text-xs"
+                      title={f.ondeComprou ?? ""}
+                    >
+                      {f.ondeComprou ? (
+                        f.ondeComprou
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       {!payment ? (
@@ -593,6 +634,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
                   <span>
                     Pagto: {dataParaPagamento ? formatIsoDatePtBr(dataParaPagamento) : "—"}
                   </span>
+                  {f.ondeComprou && <span>Onde: {f.ondeComprou}</span>}
                 </div>
 
                 {/* Link (if set) */}

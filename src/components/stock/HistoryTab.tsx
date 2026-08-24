@@ -61,6 +61,7 @@ export function HistoryTab({ ctx }: { ctx: StockCtx }) {
               <TableHead>SKU</TableHead>
               <TableHead>Marca / Cor</TableHead>
               <TableHead>Material</TableHead>
+              <TableHead>Onde Comprou</TableHead>
               <TableHead>Compra</TableHead>
               <TableHead>Entrega</TableHead>
               <TableHead>Data p/ Pagto</TableHead>
@@ -92,6 +93,13 @@ export function HistoryTab({ ctx }: { ctx: StockCtx }) {
                     {h.marca} — {h.cor}
                   </TableCell>
                   <TableCell>{h.material}</TableCell>
+                  <TableCell className="max-w-[140px] truncate text-xs" title={h.ondeComprou ?? ""}>
+                    {h.ondeComprou ? (
+                      h.ondeComprou
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
                     {formatIsoDatePtBr(h.dataCompra)}
                   </TableCell>

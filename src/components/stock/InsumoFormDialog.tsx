@@ -103,6 +103,14 @@ export function InsumoFormDialog({ ctx }: { ctx: StockCtx }) {
                   </SelectContent>
                 </Select>
               </Field>
+              <Field label="Onde Comprou (opcional)" className="md:col-span-2">
+                <Input
+                  value={editInsumo.ondeComprou}
+                  onChange={(e) => setEditInsumoField("ondeComprou", e.target.value)}
+                  placeholder="Shopee, Mercado Livre, Amazon, TikTok Shop, loja física..."
+                  maxLength={120}
+                />
+              </Field>
               <Field label="Link do Produto (opcional)" className="md:col-span-2">
                 <Input
                   type="url"
@@ -219,6 +227,14 @@ export function InsumoFormDialog({ ctx }: { ctx: StockCtx }) {
                     <SelectItem value="investimento">Investimento / Imobilizado</SelectItem>
                   </SelectContent>
                 </Select>
+              </Field>
+              <Field label="Onde Comprou (opcional)" className="md:col-span-2">
+                <Input
+                  value={iForm.ondeComprou}
+                  onChange={(e) => setIField("ondeComprou", e.target.value)}
+                  placeholder="Shopee, Mercado Livre, Amazon, TikTok Shop, loja física..."
+                  maxLength={120}
+                />
               </Field>
               <Field label="Link do Produto (opcional)" className="md:col-span-2">
                 <Input

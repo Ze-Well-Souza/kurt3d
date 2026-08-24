@@ -44,6 +44,7 @@ create table if not exists public.filamentos (
   qualidade public.filamento_qualidade null,
   observacao text null,
   link_produto text null,
+  onde_comprou text null,
   batch_id text null,
   payment_id text null,
   created_at timestamptz not null default now()
@@ -64,6 +65,7 @@ create table if not exists public.filamentos_history (
   qualidade public.filamento_qualidade null,
   observacao text null,
   link_produto text null,
+  onde_comprou text null,
   batch_id text null,
   payment_id text null,
   arquivado_at timestamptz not null default now()
@@ -155,6 +157,7 @@ create table if not exists public.insumos (
   quantidade text not null,
   preco_total double precision not null,
   link_produto text null,
+  onde_comprou text null,
   payment_id text null,
   classificacao_financeira text not null default 'operacional'
 );
@@ -320,6 +323,13 @@ alter table public.filamentos add column if not exists batch_id text null;
 alter table public.filamentos add column if not exists payment_id text null;
 alter table public.filamentos_history add column if not exists batch_id text null;
 alter table public.filamentos_history add column if not exists payment_id text null;
+
+-- Onde a compra foi feita (Shopee, Mercado Livre, Amazon, TikTok Shop, loja
+-- fisica...). Texto livre: a lista de marketplaces muda demais para virar enum.
+-- Fica nulo nos registros antigos ate serem preenchidos manualmente.
+alter table public.filamentos add column if not exists onde_comprou text null;
+alter table public.filamentos_history add column if not exists onde_comprou text null;
+alter table public.insumos add column if not exists onde_comprou text null;
 
 -- ═══════════ Supplies payment tracking (item-level) ═══════════
 create table if not exists public.insumo_payments (

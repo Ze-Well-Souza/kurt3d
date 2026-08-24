@@ -148,6 +148,14 @@ export function FilamentEditDialog({ ctx, mode }: { ctx: StockCtx; mode: "active
                   </SelectContent>
                 </Select>
               </Field>
+              <Field label="Onde Comprou (opcional)">
+                <Input
+                  value={editForm.ondeComprou}
+                  onChange={(e) => setEditField("ondeComprou", e.target.value)}
+                  placeholder="Shopee, Mercado Livre, Amazon, TikTok Shop, loja física..."
+                  maxLength={120}
+                />
+              </Field>
               <Field label="Link do Produto (opcional)">
                 <Input
                   type="url"
