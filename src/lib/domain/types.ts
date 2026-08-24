@@ -427,12 +427,7 @@ export type BudgetQuoteItem = {
 };
 
 export type BudgetQuoteStatus =
-  | "draft"
-  | "sent"
-  | "approved"
-  | "rejected"
-  | "expired"
-  | "converted";
+  "draft" | "sent" | "approved" | "rejected" | "expired" | "converted";
 
 export type BudgetQuote = {
   id: string;

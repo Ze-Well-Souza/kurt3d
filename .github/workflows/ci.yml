@@ -27,8 +27,11 @@ jobs:
       - name: Checagem de tipos
         run: bunx tsc --noEmit
 
+      # `bun test` e o runner do proprio Bun e ignora a config do vitest — os
+      # testes usam vi.mock e 31 deles quebravam nele. `bun run test` executa o
+      # script do package.json, que chama `vitest run`.
       - name: Testes
-        run: bun test
+        run: bun run test
 
   # Separado do job acima para que tipos e testes não fiquem reféns do lint.
   # Bloqueante desde o fim da Fase 4 (zero @typescript-eslint/no-explicit-any).
