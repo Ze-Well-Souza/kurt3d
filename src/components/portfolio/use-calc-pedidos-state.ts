@@ -32,7 +32,7 @@ import { useToastErrorHandler } from "@/lib/hooks/use-toast-error-handler";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import { invalidarPor, type OperacaoDeNegocio } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
-import { PRINTERS } from "./calc-pedidos-shared";
+import { HYBRID_PRINTER, PRINTERS } from "./calc-pedidos-shared";
 import {
   FALLBACK_CUSTO_ROLO,
   FALLBACK_PESO_ROLO,
@@ -346,6 +346,12 @@ export function useCalcPedidosState() {
     const map = new Map<string, Order[]>();
     for (const p of PRINTERS) map.set(p, []);
     for (const o of grouped.printing ?? []) {
+      // Hibrido ocupa as duas maquinas ao mesmo tempo, entao entra nas duas
+      // colunas — as duas ficam marcadas como ocupadas, que e o estado real.
+      if (o.printer === HYBRID_PRINTER) {
+        for (const p of PRINTERS) map.get(p)!.push(o);
+        continue;
+      }
       const key = o.printer && map.has(o.printer) ? o.printer : PRINTERS[0];
       map.get(key)!.push(o);
     }

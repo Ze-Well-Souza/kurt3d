@@ -22,6 +22,7 @@ import { PAYMENT_METHODS, formatTime } from "./order-card-shared";
 import {
   MAX_ORDER_ASSET_SIZE,
   NO_CLIENT_SELECTED,
+  HYBRID_PRINTER,
   NO_PRINTER,
   ORDER_ASSET_ACCEPT,
   PRINTERS,
@@ -131,6 +132,7 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                       {p}
                     </SelectItem>
                   ))}
+                  <SelectItem value={HYBRID_PRINTER}>Híbrido (as duas)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

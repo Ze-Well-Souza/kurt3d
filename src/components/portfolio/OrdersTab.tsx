@@ -11,7 +11,7 @@ import { formatIsoDatePtBr } from "@/lib/domain/installments";
 import { OrderCardView } from "./OrderCardView";
 import { KanbanColumn } from "./KanbanColumn";
 import { STATUS_BADGE, formatTime } from "./order-card-shared";
-import { COLUMNS, PRINTERS } from "./calc-pedidos-shared";
+import { COLUMNS, HYBRID_PRINTER, PRINTERS } from "./calc-pedidos-shared";
 import type { CalcPedidosCtx } from "./use-calc-pedidos-state";
 
 export function OrdersTab({ ctx }: { ctx: CalcPedidosCtx }) {
@@ -69,6 +69,11 @@ export function OrdersTab({ ctx }: { ctx: CalcPedidosCtx }) {
                         {" "}
                         · {o.client} · {formatTime(o.timeMinutes)}
                       </span>
+                      {o.printer === HYBRID_PRINTER && (
+                        <Badge variant="outline" className="ml-1.5 text-[10px]">
+                          híbrido
+                        </Badge>
+                      )}
                     </li>
                   ))}
                 </ul>

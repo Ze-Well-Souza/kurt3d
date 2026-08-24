@@ -40,6 +40,14 @@ export const COLUMNS: { id: Status; title: string; hint: string }[] = [
 
 export const PRINTERS = ["Bambu Lab A1", "Bambu Lab A1 Mini"] as const;
 export const NO_PRINTER = "__none__";
+/**
+ * Pedido impresso nas duas maquinas ao mesmo tempo (peca dividida entre elas).
+ * Fica fora de PRINTERS de proposito: PRINTERS lista maquinas fisicas e alimenta
+ * o painel "o que esta rodando agora", que tem uma coluna por maquina. Um pedido
+ * hibrido ocupa as duas, entao aparece nas duas colunas em vez de criar uma
+ * terceira.
+ */
+export const HYBRID_PRINTER = "Híbrido";
 
 export const projectSchema = z.object({
   nome: z.string().trim().min(1, "Informe o nome").max(100),

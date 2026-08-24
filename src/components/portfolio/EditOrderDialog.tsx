@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { getOrderAssetFileName, isOrderAssetReference } from "@/lib/domain/order-asset";
 import { PAYMENT_METHODS } from "./order-card-shared";
-import { NO_CLIENT_SELECTED, NO_PRINTER, PRINTERS } from "./calc-pedidos-shared";
+import { HYBRID_PRINTER, NO_CLIENT_SELECTED, NO_PRINTER, PRINTERS } from "./calc-pedidos-shared";
 import { DialogSection } from "./DialogSection";
 import type { CalcPedidosCtx } from "./use-calc-pedidos-state";
 
@@ -159,6 +159,7 @@ export function EditOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                         {p}
                       </SelectItem>
                     ))}
+                    <SelectItem value={HYBRID_PRINTER}>Híbrido (as duas)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
