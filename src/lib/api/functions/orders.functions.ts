@@ -97,6 +97,8 @@ export const addOrder = createServerFn({ method: "POST" })
       dataPagamento: z.string().max(30).optional(),
       clientId: z.string().min(1).optional(),
       printer: z.string().trim().max(100).optional(),
+      previsaoInicio: z.string().max(30).nullable().optional(),
+      previsaoEntrega: z.string().max(30).nullable().optional(),
       parts: z.array(orderPartInputSchema).max(50).optional(),
     }),
   )
@@ -148,6 +150,8 @@ export const addOrder = createServerFn({ method: "POST" })
       dataPagamento: data.dataPagamento ?? null,
       clientId: resolveClientId(clientsData.list, data.client, data.clientId),
       printer: data.printer ?? null,
+      previsaoInicio: data.previsaoInicio ?? null,
+      previsaoEntrega: data.previsaoEntrega ?? null,
       parts: normalizedParts,
     };
     await repo.insert(order);
@@ -271,6 +275,7 @@ export const finalizarDestino = createServerFn({ method: "POST" })
       valorRecebido: z.number().min(0).optional(),
       formaPagamento: z.string().trim().max(100).optional(),
       dataPagamento: z.string().max(30).optional(),
+      dataFinalizacao: z.string().max(30).optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -345,7 +350,9 @@ export const finalizarDestino = createServerFn({ method: "POST" })
         valor: data.valorRecebido,
         custo: cost.total,
         depreciacao: cost.depreciacao,
-        data: now,
+        // Pedido antigo sendo cadastrado agora precisa entrar no faturamento
+        // do mes em que foi vendido, nao no de hoje.
+        data: data.dataFinalizacao ? `${data.dataFinalizacao}T12:00:00.000Z` : now,
       };
       await vendas.insert(venda);
     }
@@ -540,6 +547,8 @@ export const updateOrder = createServerFn({ method: "POST" })
       dataPagamento: z.string().max(30).nullable(),
       clientId: z.string().min(1).nullable(),
       printer: z.string().trim().max(100).nullable().optional(),
+      previsaoInicio: z.string().max(30).nullable().optional(),
+      previsaoEntrega: z.string().max(30).nullable().optional(),
     }),
   )
   .handler(async ({ data }) => {
@@ -593,6 +602,10 @@ export const updateOrder = createServerFn({ method: "POST" })
       dataPagamento: data.dataPagamento ?? null,
       clientId: resolveClientId(clientsData.list, data.client, data.clientId),
       printer: data.printer !== undefined ? data.printer : (order.printer ?? null),
+      previsaoInicio:
+        data.previsaoInicio !== undefined ? data.previsaoInicio : (order.previsaoInicio ?? null),
+      previsaoEntrega:
+        data.previsaoEntrega !== undefined ? data.previsaoEntrega : (order.previsaoEntrega ?? null),
       updatedAt: nowIso(),
     };
     await orders.update(updated);

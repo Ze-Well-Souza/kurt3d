@@ -7,6 +7,7 @@ export type FinalizarPedidoArgs = {
   valorRecebido?: number;
   formaPagamento?: string;
   dataPagamento?: string;
+  dataFinalizacao?: string;
 };
 
 export const PAYMENT_METHODS = [

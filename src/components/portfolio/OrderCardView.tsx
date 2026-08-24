@@ -120,7 +120,11 @@ export function OrderCardView({
   onOpenProjectReference?: (reference?: string | null) => Promise<void> | void;
 }) {
   const [showDestino, setShowDestino] = useState(false);
-  const [destinoValor, setDestinoValor] = useState("");
+  // O valor ja foi combinado no orcamento; redigitar so cria chance de erro.
+  const [destinoValor, setDestinoValor] = useState(
+    order.precoVenda ? String(order.precoVenda * order.quantity) : "",
+  );
+  const [destinoDataFinal, setDestinoDataFinal] = useState("");
   const [destinoPagamento, setDestinoPagamento] = useState("");
   const [destinoDataPag, setDestinoDataPag] = useState("");
   const [receiptDialog, setReceiptDialog] = useState<{
@@ -356,6 +360,30 @@ export function OrderCardView({
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">Selecione o destino final desta peça:</p>
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs">
+              <div>
+                <div className="text-muted-foreground">Pedido criado em</div>
+                <div className="font-medium">{formatIsoDatePtBr(order.createdAt)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Previsão de início</div>
+                <div className="font-medium">
+                  {order.previsaoInicio ? formatIsoDatePtBr(order.previsaoInicio) : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Previsão de entrega</div>
+                <div className="font-medium">
+                  {order.previsaoEntrega ? formatIsoDatePtBr(order.previsaoEntrega) : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Orçado</div>
+                <div className="font-medium">
+                  {order.precoVenda ? brl(order.precoVenda * order.quantity) : "—"}
+                </div>
+              </div>
+            </div>
             <div className="grid gap-2">
               <Button
                 variant="outline"
@@ -414,6 +442,18 @@ export function OrderCardView({
                   />
                 </div>
               </div>
+              <div className="grid gap-2">
+                <Label>Data de Finalização</Label>
+                <Input
+                  type="date"
+                  value={destinoDataFinal}
+                  onChange={(e) => setDestinoDataFinal(e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Em branco usa hoje. Preencha ao cadastrar um projeto antigo, para a venda entrar
+                  no mês certo.
+                </p>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Ao confirmar, a venda entra na Receita Total e aparece em Finanças → aba Vendas.
               </p>
@@ -427,6 +467,7 @@ export function OrderCardView({
                     valorRecebido: Number(destinoValor),
                     formaPagamento: destinoPagamento || undefined,
                     dataPagamento: destinoDataPag || undefined,
+                    dataFinalizacao: destinoDataFinal || undefined,
                   });
                   setShowDestino(false);
                 }}

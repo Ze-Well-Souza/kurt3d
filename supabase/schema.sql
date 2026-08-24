@@ -94,11 +94,17 @@ create table if not exists public.orders (
   forma_pagamento text null,
   data_pagamento date null,
   client_id text null,
-  printer text null
+  printer text null,
+  previsao_inicio date null,
+  previsao_entrega date null
 );
 
 -- Compatibilidade com bancos criados antes da coluna de impressora.
 alter table public.orders add column if not exists printer text null;
+
+-- Datas de planejamento: quando o trabalho comeca e quando esta prometido.
+alter table public.orders add column if not exists previsao_inicio date null;
+alter table public.orders add column if not exists previsao_entrega date null;
 
 create table if not exists public.order_parts (
   id text primary key,

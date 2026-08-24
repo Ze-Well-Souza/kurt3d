@@ -79,6 +79,8 @@ export interface OrderRow {
   data_pagamento: string | null;
   client_id: string | null;
   printer: string | null;
+  previsao_inicio: string | null;
+  previsao_entrega: string | null;
 }
 
 export interface OrderPartRow {

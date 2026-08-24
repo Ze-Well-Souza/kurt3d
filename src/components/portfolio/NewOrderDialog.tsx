@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PAYMENT_METHODS, formatTime } from "./order-card-shared";
+import { FilamentPicker } from "./FilamentPicker";
 import {
   MAX_ORDER_ASSET_SIZE,
   NO_CLIENT_SELECTED,
@@ -216,27 +217,18 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                 <div className="space-y-2">
                   {newOrder.filamentoIds.map((fId, idx) => (
                     <div key={idx} className="flex items-center gap-2">
-                      <Select
+                      <FilamentPicker
+                        className="flex-1"
                         value={fId}
-                        onValueChange={(v) =>
+                        filamentos={filamentos}
+                        onChange={(v) =>
                           setNewOrder((s) => {
                             const ids = [...s.filamentoIds];
                             ids[idx] = v;
                             return { ...s, filamentoIds: ids };
                           })
                         }
-                      >
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {filamentos.map((f) => (
-                            <SelectItem key={f.id} value={f.id}>
-                              {f.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                       <Button
                         type="button"
                         variant="ghost"
@@ -506,9 +498,12 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
             </div>
           </DialogSection>
 
-          <DialogSection icon={CreditCard} title="Preço e pagamento">
+          {/* Ao criar o pedido ainda nao ha pagamento — isso e registrado em
+              "Finalizar Destino", quando a peca fica pronta e e vendida. Aqui
+              entra o planejamento: quanto foi orcado e para quando. */}
+          <DialogSection icon={CreditCard} title="Orçamento e prazos">
             <div className="grid gap-2">
-              <Label>Preço de Venda (R$)</Label>
+              <Label>Valor do Orçamento (R$)</Label>
               <Input
                 type="number"
                 min={0}
@@ -520,29 +515,19 @@ export function NewOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Forma de Pagamento</Label>
-                <Select
-                  value={newOrder.formaPagamento}
-                  onValueChange={(v) => setNewOrder((s) => ({ ...s, formaPagamento: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Data do Pagamento</Label>
+                <Label>Previsão de Início</Label>
                 <Input
                   type="date"
-                  value={newOrder.dataPagamento}
-                  onChange={(e) => setNewOrder((s) => ({ ...s, dataPagamento: e.target.value }))}
+                  value={newOrder.previsaoInicio}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, previsaoInicio: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Previsão de Entrega</Label>
+                <Input
+                  type="date"
+                  value={newOrder.previsaoEntrega}
+                  onChange={(e) => setNewOrder((s) => ({ ...s, previsaoEntrega: e.target.value }))}
                 />
               </div>
             </div>

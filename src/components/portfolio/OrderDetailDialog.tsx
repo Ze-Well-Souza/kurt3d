@@ -162,6 +162,22 @@ export function OrderDetailDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                       label="Criado em"
                       value={formatIsoDatePtBr(detailOrder.createdAt)}
                     />
+                    <DetailItem
+                      label="Previsao de inicio"
+                      value={
+                        detailOrder.previsaoInicio
+                          ? formatIsoDatePtBr(detailOrder.previsaoInicio)
+                          : "—"
+                      }
+                    />
+                    <DetailItem
+                      label="Previsao de entrega"
+                      value={
+                        detailOrder.previsaoEntrega
+                          ? formatIsoDatePtBr(detailOrder.previsaoEntrega)
+                          : "—"
+                      }
+                    />
                   </div>
                 </DialogSection>
                 {parts.length > 0 && (

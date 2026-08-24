@@ -255,6 +255,8 @@ export function useCalcPedidosState() {
     precoVenda: "",
     formaPagamento: "",
     dataPagamento: "",
+    previsaoInicio: "",
+    previsaoEntrega: "",
     printer: "",
   });
   const [newOrderAsset, setNewOrderAsset] = useState<File | null>(null);
@@ -288,6 +290,8 @@ export function useCalcPedidosState() {
       precoVenda: "",
       formaPagamento: "",
       dataPagamento: "",
+      previsaoInicio: "",
+      previsaoEntrega: "",
       printer: "",
     });
     setNewOrderAsset(null);
@@ -670,6 +674,8 @@ export function useCalcPedidosState() {
         precoVenda: newOrder.precoVenda ? Number(newOrder.precoVenda) : undefined,
         formaPagamento: newOrder.formaPagamento || undefined,
         dataPagamento: newOrder.dataPagamento || undefined,
+        previsaoInicio: newOrder.previsaoInicio || undefined,
+        previsaoEntrega: newOrder.previsaoEntrega || undefined,
         printer: newOrder.printer || undefined,
         parts: partsPayload,
       });

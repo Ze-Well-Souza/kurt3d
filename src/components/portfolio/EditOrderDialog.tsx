@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { getOrderAssetFileName, isOrderAssetReference } from "@/lib/domain/order-asset";
 import { PAYMENT_METHODS } from "./order-card-shared";
+import { FilamentPickerField } from "./FilamentPicker";
 import { HYBRID_PRINTER, NO_CLIENT_SELECTED, NO_PRINTER, PRINTERS } from "./calc-pedidos-shared";
 import { DialogSection } from "./DialogSection";
 import type { CalcPedidosCtx } from "./use-calc-pedidos-state";
@@ -67,6 +68,8 @@ export function EditOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                 dataPagamento: (fd.get("dataPagamento") as string) || null,
                 clientId: selectedClient?.id ?? null,
                 printer: printerValue && printerValue !== NO_PRINTER ? printerValue : null,
+                previsaoInicio: (fd.get("previsaoInicio") as string) || null,
+                previsaoEntrega: (fd.get("previsaoEntrega") as string) || null,
               });
               setEditOrder(null);
             }}
@@ -120,18 +123,11 @@ export function EditOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
                   <Label>Filamento</Label>
-                  <Select name="filamentoId" defaultValue={editOrder.filamentoId ?? ""}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filamentos.map((f) => (
-                        <SelectItem key={f.id} value={f.id}>
-                          {f.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FilamentPickerField
+                    name="filamentoId"
+                    defaultValue={editOrder.filamentoId ?? ""}
+                    filamentos={filamentos}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>
@@ -234,6 +230,22 @@ export function EditOrderDialog({ ctx }: { ctx: CalcPedidosCtx }) {
                     name="dataPagamento"
                     type="date"
                     defaultValue={editOrder.dataPagamento ?? ""}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Previsão de Início</Label>
+                  <Input
+                    name="previsaoInicio"
+                    type="date"
+                    defaultValue={editOrder.previsaoInicio ?? ""}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Previsão de Entrega</Label>
+                  <Input
+                    name="previsaoEntrega"
+                    type="date"
+                    defaultValue={editOrder.previsaoEntrega ?? ""}
                   />
                 </div>
               </div>

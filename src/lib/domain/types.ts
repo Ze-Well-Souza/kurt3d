@@ -45,6 +45,10 @@ export type Order = {
   dataPagamento?: string | null;
   clientId?: string | null;
   printer?: string | null;
+  /** Quando o trabalho deve comecar. */
+  previsaoInicio?: string | null;
+  /** Quando esta prometido ao cliente. */
+  previsaoEntrega?: string | null;
   parts?: OrderPart[];
 };
 
