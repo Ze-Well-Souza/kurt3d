@@ -1,4 +1,4 @@
-import { Banknote, CalendarClock, CreditCard, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Field, NumberField } from "@/components/admin/stock-fields";
 import type { InsumoClassificacaoFinanceira } from "@/lib/domain/types";
+import { PaymentDetailsSection } from "./PaymentDetailsSection";
 import type { StockCtx } from "./use-stock-page-state";
 
 /**
@@ -120,53 +121,14 @@ export function InsumoFormDialog({ ctx }: { ctx: StockCtx }) {
                 />
               </Field>
             </div>
-            <div className="rounded-xl border border-border p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                <h3 className="font-medium">Detalhes do Pagamento</h3>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Field label="Forma de Pagamento" className="md:col-span-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant={editInsumo.formaPagamento === "a_vista" ? "default" : "outline"}
-                      className="justify-center"
-                      onClick={() => setEditInsumoField("formaPagamento", "a_vista")}
-                    >
-                      <Banknote className="mr-2 h-4 w-4" /> À vista
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={editInsumo.formaPagamento === "parcelado" ? "default" : "outline"}
-                      className="justify-center"
-                      onClick={() => setEditInsumoField("formaPagamento", "parcelado")}
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" /> Parcelado
-                    </Button>
-                  </div>
-                </Field>
-                {editInsumo.formaPagamento === "parcelado" && (
-                  <NumberField
-                    label="Número de Parcelas"
-                    value={editInsumo.parcelas}
-                    onChange={(value) => setEditInsumoField("parcelas", value)}
-                    placeholder="12"
-                    step="1"
-                  />
-                )}
-                <Field
-                  label="Data para Pagto"
-                  className={editInsumo.formaPagamento === "parcelado" ? "" : "lg:col-span-2"}
-                >
-                  <Input
-                    type="date"
-                    value={editInsumo.dataParaPagamento}
-                    onChange={(e) => setEditInsumoField("dataParaPagamento", e.target.value)}
-                  />
-                </Field>
-              </div>
-            </div>
+            <PaymentDetailsSection
+              formaPagamento={editInsumo.formaPagamento}
+              parcelas={editInsumo.parcelas}
+              dataParaPagamento={editInsumo.dataParaPagamento}
+              onFormaPagamento={(v) => setEditInsumoField("formaPagamento", v)}
+              onParcelas={(v) => setEditInsumoField("parcelas", v)}
+              onDataParaPagamento={(v) => setEditInsumoField("dataParaPagamento", v)}
+            />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditInsumo(null)}>
                 Cancelar
@@ -246,53 +208,14 @@ export function InsumoFormDialog({ ctx }: { ctx: StockCtx }) {
                 />
               </Field>
             </div>
-            <div className="rounded-xl border border-border p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                <h3 className="font-medium">Detalhes do Pagamento</h3>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Field label="Forma de Pagamento" className="md:col-span-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      type="button"
-                      variant={iForm.formaPagamento === "a_vista" ? "default" : "outline"}
-                      className="justify-center"
-                      onClick={() => setIField("formaPagamento", "a_vista")}
-                    >
-                      <Banknote className="mr-2 h-4 w-4" /> À vista
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={iForm.formaPagamento === "parcelado" ? "default" : "outline"}
-                      className="justify-center"
-                      onClick={() => setIField("formaPagamento", "parcelado")}
-                    >
-                      <CreditCard className="mr-2 h-4 w-4" /> Parcelado
-                    </Button>
-                  </div>
-                </Field>
-                {iForm.formaPagamento === "parcelado" && (
-                  <NumberField
-                    label="Número de Parcelas"
-                    value={iForm.parcelas}
-                    onChange={(v) => setIField("parcelas", v)}
-                    placeholder="12"
-                    step="1"
-                  />
-                )}
-                <Field
-                  label="Data para Pagto"
-                  className={iForm.formaPagamento === "parcelado" ? "" : "lg:col-span-2"}
-                >
-                  <Input
-                    type="date"
-                    value={iForm.dataParaPagamento}
-                    onChange={(e) => setIField("dataParaPagamento", e.target.value)}
-                  />
-                </Field>
-              </div>
-            </div>
+            <PaymentDetailsSection
+              formaPagamento={iForm.formaPagamento}
+              parcelas={iForm.parcelas}
+              dataParaPagamento={iForm.dataParaPagamento}
+              onFormaPagamento={(v) => setIField("formaPagamento", v)}
+              onParcelas={(v) => setIField("parcelas", v)}
+              onDataParaPagamento={(v) => setIField("dataParaPagamento", v)}
+            />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateInsumoOpen(false)}>
                 Cancelar

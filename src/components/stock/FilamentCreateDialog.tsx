@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, NumberField } from "@/components/admin/stock-fields";
 import { brl } from "@/lib/utils";
 import { MATERIALS, type FilamentoQualidadeInput, type Material } from "./stock-shared";
+import { PaymentDetailsSection } from "./PaymentDetailsSection";
 import type { StockCtx } from "./use-stock-page-state";
 
 export function FilamentCreateDialog({ ctx }: { ctx: StockCtx }) {
@@ -157,41 +158,14 @@ export function FilamentCreateDialog({ ctx }: { ctx: StockCtx }) {
             </Field>
           </div>
 
-          <div className="rounded-xl border border-border bg-muted/30 p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-              <h3 className="font-display text-sm font-semibold">Detalhes do Pagamento</h3>
-            </div>
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-              <Field label="Forma de Pagamento" className="md:col-span-2">
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={fForm.formaPagamento === "a_vista" ? "default" : "outline"}
-                    className="flex-1 gap-2"
-                    onClick={() => setFField("formaPagamento", "a_vista")}
-                  >
-                    <Banknote className="h-4 w-4" /> À vista
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={fForm.formaPagamento === "parcelado" ? "default" : "outline"}
-                    className="flex-1 gap-2"
-                    onClick={() => setFField("formaPagamento", "parcelado")}
-                  >
-                    <CreditCard className="h-4 w-4" /> Parcelado
-                  </Button>
-                </div>
-              </Field>
-              {fForm.formaPagamento === "parcelado" && (
-                <NumberField
-                  label="Número de Parcelas"
-                  value={fForm.parcelas}
-                  onChange={(v) => setFField("parcelas", v)}
-                  placeholder="1"
-                  step="1"
-                />
-              )}
+          <PaymentDetailsSection
+            formaPagamento={fForm.formaPagamento}
+            parcelas={fForm.parcelas}
+            dataParaPagamento={fForm.dataParaPagamento}
+            onFormaPagamento={(v) => setFField("formaPagamento", v)}
+            onParcelas={(v) => setFField("parcelas", v)}
+            onDataParaPagamento={(v) => setFField("dataParaPagamento", v)}
+            extraField={
               <NumberField
                 label="Custo Total (R$)"
                 value={fForm.custoTotal}
@@ -206,15 +180,8 @@ export function FilamentCreateDialog({ ctx }: { ctx: StockCtx }) {
                     : "0,00"
                 }
               />
-              <Field label="Data para Pagto" className="md:col-span-2">
-                <Input
-                  type="date"
-                  value={fForm.dataParaPagamento}
-                  onChange={(e) => setFField("dataParaPagamento", e.target.value)}
-                />
-              </Field>
-            </div>
-            {(() => {
+            }
+            summary={(() => {
               const qty = Math.max(1, Number(fForm.quantidade) || 1);
               const preco = Number(fForm.precoPago) || 0;
               const custoTotal = Number(fForm.custoTotal) || preco * qty;
@@ -243,7 +210,7 @@ export function FilamentCreateDialog({ ctx }: { ctx: StockCtx }) {
                 </p>
               );
             })()}
-          </div>
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setCreateFilamentOpen(false)}>
               Cancelar

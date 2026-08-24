@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, NumberField } from "@/components/admin/stock-fields";
 import { brl } from "@/lib/utils";
 import { MATERIALS, type FilamentoQualidadeInput, type Material } from "./stock-shared";
+import { PaymentDetailsSection } from "./PaymentDetailsSection";
 import type { StockCtx } from "./use-stock-page-state";
 
 export function FilamentEditDialog({ ctx, mode }: { ctx: StockCtx; mode: "active" | "archived" }) {
@@ -178,41 +179,14 @@ export function FilamentEditDialog({ ctx, mode }: { ctx: StockCtx; mode: "active
 
             {/* ─── PAYMENT DETAILS (EDIT) — apenas no modo ativo (arquivado não mexe no financeiro) ─── */}
             {!archived && (
-              <div className="rounded-xl border border-border bg-muted/30 p-5">
-                <div className="mb-4 flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
-                  <h3 className="font-display text-sm font-semibold">Detalhes do Pagamento</h3>
-                </div>
-                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-                  <Field label="Forma de Pagamento" className="md:col-span-2">
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={editForm.formaPagamento === "a_vista" ? "default" : "outline"}
-                        className="flex-1 gap-2"
-                        onClick={() => setEditField("formaPagamento", "a_vista")}
-                      >
-                        <Banknote className="h-4 w-4" /> À vista
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={editForm.formaPagamento === "parcelado" ? "default" : "outline"}
-                        className="flex-1 gap-2"
-                        onClick={() => setEditField("formaPagamento", "parcelado")}
-                      >
-                        <CreditCard className="h-4 w-4" /> Parcelado
-                      </Button>
-                    </div>
-                  </Field>
-                  {editForm.formaPagamento === "parcelado" && (
-                    <NumberField
-                      label="Número de Parcelas"
-                      value={editForm.parcelas}
-                      onChange={(v) => setEditField("parcelas", v)}
-                      placeholder="1"
-                      step="1"
-                    />
-                  )}
+              <PaymentDetailsSection
+                formaPagamento={editForm.formaPagamento}
+                parcelas={editForm.parcelas}
+                dataParaPagamento={editForm.dataParaPagamento}
+                onFormaPagamento={(v) => setEditField("formaPagamento", v)}
+                onParcelas={(v) => setEditField("parcelas", v)}
+                onDataParaPagamento={(v) => setEditField("dataParaPagamento", v)}
+                extraField={
                   <NumberField
                     label="Custo Total (R$)"
                     value={editForm.custoTotal}
@@ -221,15 +195,8 @@ export function FilamentEditDialog({ ctx, mode }: { ctx: StockCtx; mode: "active
                       editForm.precoPago ? String(Number(editForm.precoPago).toFixed(2)) : "0,00"
                     }
                   />
-                  <Field label="Data para Pagto" className="md:col-span-2">
-                    <Input
-                      type="date"
-                      value={editForm.dataParaPagamento}
-                      onChange={(e) => setEditField("dataParaPagamento", e.target.value)}
-                    />
-                  </Field>
-                </div>
-                {(() => {
+                }
+                summary={(() => {
                   const preco = Number(editForm.precoPago) || 0;
                   const custoTotal = Number(editForm.custoTotal) || preco;
                   const parcelas = Math.max(1, Math.floor(Number(editForm.parcelas) || 1));
@@ -258,7 +225,7 @@ export function FilamentEditDialog({ ctx, mode }: { ctx: StockCtx; mode: "active
                     </p>
                   );
                 })()}
-              </div>
+              />
             )}
 
             <DialogFooter>

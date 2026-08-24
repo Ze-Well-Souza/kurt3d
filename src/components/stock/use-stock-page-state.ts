@@ -19,7 +19,7 @@ import {
   updateArchivedFilamento,
   upsertFilamento,
 } from "@/lib/api/data.functions";
-import { addCalendarMonthsIso, todayIso } from "@/lib/domain/installments";
+import { todayIso } from "@/lib/domain/installments";
 import type {
   Filamento,
   FilamentoHistory,
@@ -201,11 +201,14 @@ export function useStockPageState() {
     [filamentos, filamentosHistory],
   );
 
+  // A data para pagamento nasce em hoje, igual ao cadastro de insumo. O
+  // servidor continua espacando as parcelas seguintes de mes em mes a partir
+  // dela, entao parcelado segue funcionando como antes.
   const [fForm, setFForm] = useState<FilamentoForm>(() => ({
     ...initialFilamentoForm,
     sku: "",
     dataCompra: todayIso(),
-    dataParaPagamento: addCalendarMonthsIso(todayIso(), 1),
+    dataParaPagamento: todayIso(),
   }));
 
   // Atualiza o SKU automaticamente quando os dados carregam (allUsedSkus muda)
@@ -532,7 +535,7 @@ export function useStockPageState() {
         ...initialFilamentoForm,
         sku: "",
         dataCompra: todayIso(),
-        dataParaPagamento: addCalendarMonthsIso(todayIso(), 1),
+        dataParaPagamento: todayIso(),
       });
       setCreateFilamentOpen(false);
     } catch (err) {
