@@ -10,6 +10,7 @@ import { FilamentRestoreDialog } from "@/components/stock/FilamentRestoreDialog"
 import { FilamentsTab } from "@/components/stock/FilamentsTab";
 import { HistoryTab } from "@/components/stock/HistoryTab";
 import { InsumoFormDialog } from "@/components/stock/InsumoFormDialog";
+import { IndicadoresTab } from "@/components/stock/IndicadoresTab";
 import { InsumosTab } from "@/components/stock/InsumosTab";
 import { useStockPageState } from "@/components/stock/use-stock-page-state";
 
@@ -17,6 +18,7 @@ const STOCK_TABS = [
   { id: "filamentos", label: "Filamentos" },
   { id: "historico", label: "Histórico" },
   { id: "insumos", label: "Insumos" },
+  { id: "indicadores", label: "Indicadores" },
 ] as const;
 
 type StockTabId = (typeof STOCK_TABS)[number]["id"];
@@ -153,6 +155,15 @@ function Stock() {
         className="space-y-8"
       >
         <InsumosTab ctx={ctx} />
+      </div>
+      <div
+        role="tabpanel"
+        id="painel-indicadores"
+        aria-labelledby="aba-indicadores"
+        hidden={activeTab !== "indicadores"}
+        className="space-y-8"
+      >
+        <IndicadoresTab ctx={ctx} />
       </div>
 
       {/* Diálogos (portais — controlados pelo estado global) */}
