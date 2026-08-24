@@ -137,6 +137,8 @@ export type Filamento = {
   sku: string;
   marca: string;
   cor: string;
+  /** Nome comercial da cor: "Cobalto", "Petroleo", "Militar". Texto livre. */
+  corTom?: string | null;
   material: string;
   pesoInicial: number;
   pesoAtual: number;

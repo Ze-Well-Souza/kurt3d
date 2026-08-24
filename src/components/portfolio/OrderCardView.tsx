@@ -42,12 +42,12 @@ import { isOrderAssetReference } from "@/lib/domain/order-asset";
 import { summarizeOrderParts } from "@/lib/domain/order-parts";
 import { openSaleReceiptWhatsApp, openPrintSaleReceipt } from "@/lib/domain/sale-receipt-print";
 import { formatIsoDatePtBr } from "@/lib/domain/installments";
+import { corCompleta, corHex } from "@/lib/domain/filament-colors";
 import {
   PAYMENT_METHODS,
   STATUS_BADGE,
   formatTime,
   getPaymentBadge,
-  swatchDaCor,
   type FinalizarPedidoArgs,
 } from "./order-card-shared";
 
@@ -77,7 +77,7 @@ function FilamentTag({ filamentos, order }: { filamentos?: Filamento[]; order: O
 
   const resolvidos = ids.map((id) => filamentos?.find((f) => f.id === id) ?? null);
   const rotulos = resolvidos.map((f, i) =>
-    f ? `[${f.sku}] ${f.marca} ${f.cor}` : `Filamento ${ids[i].slice(0, 8)}`,
+    f ? `[${f.sku}] ${f.marca} ${corCompleta(f.cor, f.corTom)}` : `Filamento ${ids[i].slice(0, 8)}`,
   );
   const completo = rotulos.join(" · ");
   const resumo = rotulos.length > 1 ? `${rotulos[0]} +${rotulos.length - 1}` : rotulos[0];
@@ -89,7 +89,7 @@ function FilamentTag({ filamentos, order }: { filamentos?: Filamento[]; order: O
           <span
             key={ids[i]}
             className="h-3 w-3 rounded-full border border-border shadow-sm"
-            style={{ background: swatchDaCor(f?.cor) }}
+            style={{ background: corHex(f?.cor) }}
           />
         ))}
       </span>

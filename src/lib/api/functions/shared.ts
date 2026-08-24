@@ -3,7 +3,8 @@ import { nowIso } from "../../server/db.server";
 import { normalizeClientName, normalizePhone } from "../../utils/normalization";
 
 export function buildFilamentoLabel(filamento: Filamento) {
-  return `[${filamento.sku}] ${filamento.marca} ${filamento.cor}`;
+  const cor = [filamento.cor, filamento.corTom].filter(Boolean).join(" ");
+  return `[${filamento.sku}] ${filamento.marca} ${cor}`;
 }
 
 export function allowedStatusTransition(from: Status, to: Status) {

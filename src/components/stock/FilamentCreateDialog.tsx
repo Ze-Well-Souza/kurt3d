@@ -20,6 +20,7 @@ import { Field, NumberField } from "@/components/admin/stock-fields";
 import { brl } from "@/lib/utils";
 import { MATERIALS, type FilamentoQualidadeInput, type Material } from "./stock-shared";
 import { PaymentDetailsSection } from "./PaymentDetailsSection";
+import { ColorSelect } from "./ColorSelect";
 import type { StockCtx } from "./use-stock-page-state";
 
 export function FilamentCreateDialog({ ctx }: { ctx: StockCtx }) {
@@ -50,11 +51,14 @@ export function FilamentCreateDialog({ ctx }: { ctx: StockCtx }) {
               />
             </Field>
             <Field label="Cor">
+              <ColorSelect value={fForm.cor} onChange={(v) => setFField("cor", v)} />
+            </Field>
+            <Field label="Tom / nome comercial">
               <Input
-                value={fForm.cor}
-                onChange={(e) => setFField("cor", e.target.value)}
-                placeholder="Cyan, Magenta, Black..."
-                maxLength={100}
+                value={fForm.corTom}
+                onChange={(e) => setFField("corTom", e.target.value)}
+                placeholder="Cobalto, Petróleo, Claro..."
+                maxLength={60}
               />
             </Field>
             <Field label="Material">

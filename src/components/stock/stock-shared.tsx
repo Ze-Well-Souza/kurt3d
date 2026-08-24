@@ -14,7 +14,8 @@ export type FilamentoQualidadeInput = FilamentoQualidade | "";
 export const filamentoSchema = z.object({
   sku: z.string().trim().min(1, "SKU obrigatório").max(50),
   marca: z.string().trim().min(1, "Informe a marca").max(100),
-  cor: z.string().trim().min(1, "Informe a cor").max(100),
+  cor: z.string().trim().min(1, "Selecione a cor").max(100),
+  corTom: z.string().trim().max(60).nullable().optional(),
   material: z.enum(MATERIALS),
   pesoInicial: z.number().min(1, "Peso inicial inválido").max(100000),
   precoPago: z.number().min(0.01, "Preço pago inválido").max(100000),
@@ -35,6 +36,7 @@ export type FilamentoForm = {
   sku: string;
   marca: string;
   cor: string;
+  corTom: string;
   material: Material;
   pesoInicial: string;
   precoPago: string;
@@ -60,6 +62,7 @@ export const initialFilamentoForm: FilamentoForm = {
   sku: "",
   marca: "",
   cor: "",
+  corTom: "",
   material: "PLA",
   pesoInicial: "1000",
   precoPago: "",

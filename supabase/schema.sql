@@ -41,6 +41,7 @@ create table if not exists public.filamentos (
   data_compra date not null,
   data_entrega date null,
   data_fim date null,
+  cor_tom text null,
   qualidade public.filamento_qualidade null,
   observacao text null,
   link_produto text null,
@@ -62,6 +63,7 @@ create table if not exists public.filamentos_history (
   data_compra date not null,
   data_entrega date null,
   data_fim date null,
+  cor_tom text null,
   qualidade public.filamento_qualidade null,
   observacao text null,
   link_produto text null,
@@ -330,6 +332,19 @@ alter table public.filamentos_history add column if not exists payment_id text n
 alter table public.filamentos add column if not exists onde_comprou text null;
 alter table public.filamentos_history add column if not exists onde_comprou text null;
 alter table public.insumos add column if not exists onde_comprou text null;
+
+-- Nome comercial da cor ("Cobalto", "Petroleo", "Militar"). A coluna `cor`
+-- passou a sair de uma paleta fechada; o que sobrava do texto livre vive aqui.
+alter table public.filamentos add column if not exists cor_tom text null;
+alter table public.filamentos_history add column if not exists cor_tom text null;
+
+-- Texto original da cor antes da normalizacao, para conferencia e rollback.
+create table if not exists public.filamentos_cor_backup (
+  id text primary key,
+  origem text not null,
+  cor_original text not null,
+  migrado_at timestamptz not null default now()
+);
 
 -- ═══════════ Supplies payment tracking (item-level) ═══════════
 create table if not exists public.insumo_payments (

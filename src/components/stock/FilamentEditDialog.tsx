@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, NumberField } from "@/components/admin/stock-fields";
 import { brl } from "@/lib/utils";
 import { MATERIALS, type FilamentoQualidadeInput, type Material } from "./stock-shared";
+import { ColorSelect } from "./ColorSelect";
 import { PaymentDetailsSection } from "./PaymentDetailsSection";
 import type { StockCtx } from "./use-stock-page-state";
 
@@ -86,11 +87,14 @@ export function FilamentEditDialog({ ctx, mode }: { ctx: StockCtx; mode: "active
                 />
               </Field>
               <Field label="Cor">
+                <ColorSelect value={editForm.cor} onChange={(v) => setEditField("cor", v)} />
+              </Field>
+              <Field label="Tom / nome comercial">
                 <Input
-                  value={editForm.cor}
-                  onChange={(e) => setEditField("cor", e.target.value)}
-                  placeholder="Cyan, Magenta, Black..."
-                  maxLength={100}
+                  value={editForm.corTom}
+                  onChange={(e) => setEditField("corTom", e.target.value)}
+                  placeholder="Cobalto, Petróleo, Claro..."
+                  maxLength={60}
                 />
               </Field>
               <NumberField

@@ -16,10 +16,15 @@ import { usePagination } from "@/lib/hooks/use-pagination";
 import { brl } from "@/lib/utils";
 import { QUALIDADE_CONFIG } from "./stock-shared";
 import type { StockCtx } from "./use-stock-page-state";
+import { corCompleta, corHex } from "@/lib/domain/filament-colors";
+import { ColorFilterBar } from "./ColorFilterBar";
 
 export function HistoryTab({ ctx }: { ctx: StockCtx }) {
   const {
     filamentosHistory,
+    historyCorCounts,
+    historyCorFilter,
+    setHistoryCorFilter,
     filteredHistory,
     historySearch,
     setHistorySearch,
@@ -48,6 +53,14 @@ export function HistoryTab({ ctx }: { ctx: StockCtx }) {
             {filamentosHistory.length} rolo(s) arquivado(s)
           </span>
         </div>
+      </div>
+      <div className="border-b border-border px-4 pb-4 sm:px-6">
+        <ColorFilterBar
+          counts={historyCorCounts}
+          active={historyCorFilter}
+          onChange={setHistoryCorFilter}
+          total={historyCorCounts.reduce((sum, c) => sum + c.qtd, 0)}
+        />
       </div>
       {filamentosHistory.length === 0 ? (
         <div className="px-6 py-12 text-center text-sm text-muted-foreground">
@@ -90,7 +103,13 @@ export function HistoryTab({ ctx }: { ctx: StockCtx }) {
                 <TableRow key={h.id}>
                   <TableCell className="font-mono text-xs">{h.sku}</TableCell>
                   <TableCell className="font-medium">
-                    {h.marca} — {h.cor}
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-3 w-3 shrink-0 rounded-full border border-border"
+                        style={{ background: corHex(h.cor) }}
+                      />
+                      {h.marca} — {corCompleta(h.cor, h.corTom)}
+                    </span>
                   </TableCell>
                   <TableCell>{h.material}</TableCell>
                   <TableCell className="max-w-[140px] truncate text-xs" title={h.ondeComprou ?? ""}>

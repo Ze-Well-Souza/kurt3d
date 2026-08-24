@@ -42,6 +42,8 @@ import type { Filamento } from "@/lib/domain/types";
 import { brl } from "@/lib/utils";
 import { usePagination } from "@/lib/hooks/use-pagination";
 import { getFilamentoAlertLevel } from "@/lib/domain/stock-alert";
+import { corCompleta, corHex } from "@/lib/domain/filament-colors";
+import { ColorFilterBar } from "./ColorFilterBar";
 import { MATERIALS, QUALIDADE_CONFIG } from "./stock-shared";
 import type { FilSortDir, FilSortKey, StockCtx } from "./use-stock-page-state";
 
@@ -95,7 +97,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
     filamentoInstallments,
     filteredFilamentos,
     marcaOptions,
-    corOptions,
+    corCounts,
     lowFilamentosCount,
     totalGramas,
     totalInicial,
@@ -156,7 +158,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
           </div>
         </div>
       </div>
-      <div className="grid gap-3 border-b border-border px-4 py-4 sm:px-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 px-4 pt-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3">
         <SearchInput value={filSearch} onChange={setFilSearch} placeholder="Buscar filamento..." />
         <Select value={filMarcaFilter} onValueChange={setFilMarcaFilter}>
           <SelectTrigger>
@@ -167,19 +169,6 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
             {marcaOptions.map((marca) => (
               <SelectItem key={marca} value={marca}>
                 {marca}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filCorFilter} onValueChange={setFilCorFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Filtrar por cor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as cores</SelectItem>
-            {corOptions.map((cor) => (
-              <SelectItem key={cor} value={cor}>
-                {cor}
               </SelectItem>
             ))}
           </SelectContent>
@@ -197,6 +186,14 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
             ))}
           </SelectContent>
         </Select>
+      </div>
+      <div className="border-b border-border px-4 pb-4 pt-3 sm:px-6">
+        <ColorFilterBar
+          counts={corCounts}
+          active={filCorFilter}
+          onChange={setFilCorFilter}
+          total={corCounts.reduce((sum, c) => sum + c.qtd, 0)}
+        />
       </div>
       {lowFilamentosCount > 0 && (
         <div className="flex items-center gap-2 border-b border-red-500/20 bg-red-500/5 px-6 py-3 text-sm text-red-700">
@@ -294,10 +291,10 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
                     <TableCell>
                       <span className="inline-flex items-center gap-1.5">
                         <span
-                          className="h-3 w-3 rounded-full border border-border"
-                          style={{ background: levelColor }}
+                          className="h-3 w-3 shrink-0 rounded-full border border-border"
+                          style={{ background: corHex(f.cor) }}
                         />
-                        {f.cor}
+                        {corCompleta(f.cor, f.corTom)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -531,7 +528,7 @@ export function FilamentsTab({ ctx }: { ctx: StockCtx }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-display font-bold leading-tight">
-                      {f.marca} — {f.cor}
+                      {f.marca} — {corCompleta(f.cor, f.corTom)}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <Badge variant="outline" className="font-mono text-[10px]">

@@ -15,6 +15,7 @@ import { formatIsoDatePtBr } from "@/lib/domain/installments";
 import { brl } from "@/lib/utils";
 import { QUALIDADE_CONFIG } from "./stock-shared";
 import type { StockCtx } from "./use-stock-page-state";
+import { corCompleta, corHex } from "@/lib/domain/filament-colors";
 
 export function FilamentDetailDialog({ ctx }: { ctx: StockCtx }) {
   const {
@@ -57,7 +58,18 @@ export function FilamentDetailDialog({ ctx }: { ctx: StockCtx }) {
                   <DetailRow label="SKU" value={detailFilament.sku} mono />
                   <DetailRow label="Material" value={detailFilament.material} />
                   <DetailRow label="Marca" value={detailFilament.marca} />
-                  <DetailRow label="Cor" value={detailFilament.cor} />
+                  <DetailRow
+                    label="Cor"
+                    value={
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full border border-border"
+                          style={{ background: corHex(detailFilament.cor) }}
+                        />
+                        {corCompleta(detailFilament.cor, detailFilament.corTom)}
+                      </span>
+                    }
+                  />
                   <DetailRow label="Peso inicial" value={`${detailFilament.pesoInicial} g`} />
                   <DetailRow label="Preço pago" value={brl(detailFilament.precoPago)} />
                   <DetailRow

@@ -38,6 +38,7 @@ import { useFilamentoPayments } from "@/lib/hooks/use-filamento-payments";
 import { useInsumoPayments } from "@/lib/hooks/use-insumo-payments";
 import { invalidarPor, type OperacaoDeNegocio } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
+import type { CorCount } from "./ColorFilterBar";
 import { getFilamentoAlertLevel, getInsumoAlertLevel } from "@/lib/domain/stock-alert";
 import {
   filamentoSchema,
@@ -58,6 +59,19 @@ import {
  * metricas derivadas. As abas recebem este objeto como `ctx` e apenas
  * renderizam — nenhuma logica de dominio vive nos componentes de aba.
  */
+/** Rolos e valor investido por cor, do mais numeroso para o menos. */
+function contarPorCor(lista: { cor: string; precoPago: number }[]): CorCount[] {
+  const mapa = new Map<string, CorCount>();
+  for (const f of lista) {
+    const cor = f.cor?.trim() || "Outro";
+    const atual = mapa.get(cor) ?? { cor, qtd: 0, investido: 0 };
+    atual.qtd += 1;
+    atual.investido += f.precoPago;
+    mapa.set(cor, atual);
+  }
+  return [...mapa.values()].sort((a, b) => b.qtd - a.qtd || a.cor.localeCompare(b.cor, "pt-BR"));
+}
+
 export type FilSortKey = "sku" | "marca" | "dataCompra" | "dataEntrega" | "ondeComprou";
 export type FilSortDir = "asc" | "desc";
 export function useStockPageState() {
@@ -231,6 +245,7 @@ export function useStockPageState() {
   const [filMarcaFilter, setFilMarcaFilter] = useState("all");
   const [filCorFilter, setFilCorFilter] = useState("all");
   const [filMaterialFilter, setFilMaterialFilter] = useState("all");
+  const [historyCorFilter, setHistoryCorFilter] = useState("all");
   const [filSortKey, setFilSortKey] = useState<FilSortKey>("sku");
   const [filSortDir, setFilSortDir] = useState<FilSortDir>("asc");
   const toggleFilSort = (key: FilSortKey) => {
@@ -265,6 +280,7 @@ export function useStockPageState() {
       sku: f.sku,
       marca: f.marca,
       cor: f.cor,
+      corTom: f.corTom ?? "",
       material: f.material as Material,
       pesoInicial: String(f.pesoInicial),
       pesoAtual: String(f.pesoAtual),
@@ -295,6 +311,7 @@ export function useStockPageState() {
       sku: h.sku,
       marca: h.marca,
       cor: h.cor,
+      corTom: h.corTom ?? "",
       material: h.material as Material,
       pesoInicial: String(h.pesoInicial),
       pesoAtual: String(h.pesoAtual),
@@ -320,6 +337,7 @@ export function useStockPageState() {
       sku: editForm.sku,
       marca: editForm.marca,
       cor: editForm.cor,
+      corTom: editForm.corTom || null,
       material: editForm.material,
       pesoInicial: Number(editForm.pesoInicial),
       pesoAtual: Number(editForm.pesoAtual),
@@ -399,6 +417,7 @@ export function useStockPageState() {
       sku: editForm.sku,
       marca: editForm.marca,
       cor: editForm.cor,
+      corTom: editForm.corTom || null,
       material: editForm.material,
       pesoInicial: Number(editForm.pesoInicial),
       pesoAtual: Number(editForm.pesoAtual),
@@ -470,6 +489,7 @@ export function useStockPageState() {
       sku: fForm.sku,
       marca: fForm.marca,
       cor: fForm.cor,
+      corTom: fForm.corTom || null,
       material: fForm.material,
       pesoInicial: Number(fForm.pesoInicial),
       precoPago: Number(fForm.precoPago),
@@ -644,6 +664,31 @@ export function useStockPageState() {
   }, 0);
 
   // ── Filtered lists ──
+  /**
+   * Rolos que passam por todos os filtros MENOS o de cor. As contagens dos
+   * chips saem daqui: se descontassem a propria cor, clicar num chip zeraria
+   * todos os outros e a barra deixaria de mostrar o panorama.
+   */
+  const filamentosSemFiltroCor = useMemo(() => {
+    const s = normalizeText(filSearch);
+    return filamentos.filter((f) => {
+      const matchesSearch =
+        !s ||
+        normalizeText(f.sku).includes(s) ||
+        normalizeText(f.marca).includes(s) ||
+        normalizeText(f.cor).includes(s) ||
+        normalizeText(f.corTom ?? "").includes(s) ||
+        normalizeText(f.material).includes(s) ||
+        normalizeText(f.ondeComprou ?? "").includes(s);
+      const matchesMarca =
+        filMarcaFilter === "all" || normalizeText(f.marca) === normalizeText(filMarcaFilter);
+      const matchesMaterial = filMaterialFilter === "all" || f.material === filMaterialFilter;
+      return matchesSearch && matchesMarca && matchesMaterial;
+    });
+  }, [filamentos, filSearch, filMarcaFilter, filMaterialFilter]);
+
+  const corCounts = useMemo(() => contarPorCor(filamentosSemFiltroCor), [filamentosSemFiltroCor]);
+
   const filteredFilamentos = useMemo(() => {
     const s = normalizeText(filSearch);
     return filamentos
@@ -653,6 +698,7 @@ export function useStockPageState() {
           normalizeText(f.sku).includes(s) ||
           normalizeText(f.marca).includes(s) ||
           normalizeText(f.cor).includes(s) ||
+          normalizeText(f.corTom ?? "").includes(s) ||
           normalizeText(f.material).includes(s) ||
           normalizeText(f.ondeComprou ?? "").includes(s);
         const matchesMarca =
@@ -716,16 +762,27 @@ export function useStockPageState() {
     );
   }, [insumos, insSearch]);
 
-  const filteredHistory = useMemo(() => {
+  const historySemFiltroCor = useMemo(() => {
     if (!historySearch.trim()) return filamentosHistory;
     const s = normalizeText(historySearch);
     return filamentosHistory.filter(
       (h) =>
         normalizeText(h.sku).includes(s) ||
         normalizeText(h.marca).includes(s) ||
-        normalizeText(h.cor).includes(s),
+        normalizeText(h.cor).includes(s) ||
+        normalizeText(h.corTom ?? "").includes(s),
     );
   }, [filamentosHistory, historySearch]);
+
+  const historyCorCounts = useMemo(() => contarPorCor(historySemFiltroCor), [historySemFiltroCor]);
+
+  const filteredHistory = useMemo(
+    () =>
+      historyCorFilter === "all"
+        ? historySemFiltroCor
+        : historySemFiltroCor.filter((h) => h.cor === historyCorFilter),
+    [historySemFiltroCor, historyCorFilter],
+  );
 
   const lowFilamentosCount = filteredFilamentos.filter(
     (f) => getFilamentoAlertLevel(f) === "low",
@@ -811,6 +868,10 @@ export function useStockPageState() {
     filSortKey,
     filSortDir,
     toggleFilSort,
+    corCounts,
+    historyCorCounts,
+    historyCorFilter,
+    setHistoryCorFilter,
     historySearch,
     setHistorySearch,
     insSearch,

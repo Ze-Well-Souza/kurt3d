@@ -37,6 +37,7 @@ export interface FilamentoRow {
   marca: string;
   cor: string;
   material: string;
+  cor_tom: string | null;
   peso_inicial: number;
   peso_atual: number;
   preco_pago: number;
