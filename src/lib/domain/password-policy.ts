@@ -26,3 +26,9 @@ export function getPasswordPolicyMessage(password: string) {
 
   return `A senha deve ${issues.map((issue) => labels[issue]).join(", ")}.`;
 }
+
+/** Aplica a politica, lancando com a mensagem de erro quando a senha nao passa. */
+export function assertPasswordPolicy(password: string): void {
+  const message = getPasswordPolicyMessage(password);
+  if (message) throw new Error(message);
+}

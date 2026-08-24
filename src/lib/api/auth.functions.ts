@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { getPasswordPolicyMessage } from "../domain/password-policy";
+import { assertPasswordPolicy } from "../domain/password-policy";
 import {
   changeUserPassword,
   createAdminUser,
@@ -35,11 +35,6 @@ function buildLoginRateLimitKey(phone: string) {
   const ip = getClientIp(request);
   const normalizedPhone = normalizePhone(phone);
   return `login:${ip}:${normalizedPhone || normalizeText(phone)}`;
-}
-
-function assertPasswordPolicy(password: string) {
-  const message = getPasswordPolicyMessage(password);
-  if (message) throw new Error(message);
 }
 
 // Apenas o super admin pode gerenciar perfis de acesso (criar/remover usuários).

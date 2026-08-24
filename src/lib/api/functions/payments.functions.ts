@@ -1,7 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { addCalendarMonthsIso, allocateSettlement, todayIso } from "../../domain/installments";
+import {
+  addCalendarMonthsIso,
+  allocateSettlement,
+  roundMoney,
+  todayIso,
+} from "../../domain/installments";
+import {
+  getInstallmentPaidAmount,
+  getInstallmentRemainingAmount,
+} from "../../domain/finance-schedule";
 import type {
   FilamentoPayment,
   FilamentoPaymentEvent,
@@ -57,18 +66,6 @@ export const listInsumoPaymentEvents = createServerFn({ method: "GET" }).handler
   const repo = await insumoPaymentEventsRepo();
   return repo.list;
 });
-
-function roundMoney(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
-function getInstallmentPaidAmount(installment: { valor: number; valorPago: number | null }) {
-  return Math.min(roundMoney(installment.valorPago ?? 0), installment.valor);
-}
-
-function getInstallmentRemainingAmount(installment: { valor: number; valorPago: number | null }) {
-  return Math.max(roundMoney(installment.valor - getInstallmentPaidAmount(installment)), 0);
-}
 
 async function recordFilamentoEvent(event: FilamentoPaymentEvent) {
   const eventsRepo = await filamentoPaymentEventsRepo();

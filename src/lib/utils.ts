@@ -23,3 +23,8 @@ export function formatPhoneDisplay(raw: string): string {
   }
   return local;
 }
+
+/** Numero seguro para calculo: NaN/Infinity viram 0. */
+export function clampNumber(n: number): number {
+  return Number.isFinite(n) ? n : 0;
+}

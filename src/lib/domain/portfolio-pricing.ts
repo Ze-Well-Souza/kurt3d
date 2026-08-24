@@ -1,5 +1,6 @@
 import type { AppSettings, CalculatorFilamentoInput, CalculatorExtraCost } from "./types";
 import { DEFAULT_APP_SETTINGS } from "./types";
+import { clampNumber } from "../utils";
 
 export const BAMBU_PRESETS = [
   {
@@ -65,10 +66,6 @@ export type PortfolioCalculatorResult = {
   /** Lucro liquido efetivo: usa precoVenda quando informado, senao usa precoSugerido como fallback. */
   lucroLiquidoEfetivo?: number;
 };
-
-function clampNumber(n: number) {
-  return Number.isFinite(n) ? n : 0;
-}
 
 // ── Advanced input for multi-filament + extra costs ──
 export type AdvancedPortfolioCalculatorInput = PortfolioCalculatorInput & {

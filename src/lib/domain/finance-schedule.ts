@@ -7,6 +7,7 @@ import type {
   InsumoPayment,
   InsumoPaymentInstallment,
 } from "./types";
+import { roundMoney } from "./installments";
 
 export type PaymentProgress = {
   totalInstallments: number;
@@ -29,15 +30,24 @@ export type ScheduleEntry<Kind extends ScheduleEntryKind = ScheduleEntryKind> = 
 
 export type InstallmentViewFilter = "pending" | "paid" | "all";
 
+/**
+ * Quanto ja foi pago nesta parcela e quanto ainda falta.
+ *
+ * Estas duas funcoes existiam em duplicata: aqui (sem arredondar) e dentro de
+ * payments.functions.ts (arredondando). A UI lia daqui e o servidor da outra
+ * copia, entao poeira de ponto flutuante podia fazer a tela mostrar "falta R$
+ * 0,00" enquanto o servidor ainda via um resto e nao quitava a parcela. Vale a
+ * versao do servidor, que e quem persiste o valor.
+ */
 export function getInstallmentPaidAmount(installment: { valor: number; valorPago: number | null }) {
-  return Math.min(installment.valorPago ?? 0, installment.valor);
+  return Math.min(roundMoney(installment.valorPago ?? 0), installment.valor);
 }
 
 export function getInstallmentRemainingAmount(installment: {
   valor: number;
   valorPago: number | null;
 }) {
-  return Math.max(installment.valor - getInstallmentPaidAmount(installment), 0);
+  return Math.max(roundMoney(installment.valor - getInstallmentPaidAmount(installment)), 0);
 }
 
 export function isPartialInstallment(installment: {

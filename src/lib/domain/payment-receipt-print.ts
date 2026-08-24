@@ -7,6 +7,7 @@
  */
 
 import { brl, formatPhoneDisplay } from "../utils";
+import { escapeHtml, formatPrintDate, generateDocumentNumber } from "./print-html";
 
 export type ReceiptInput = {
   /** Nome do cliente que efetuou o pagamento. */
@@ -31,26 +32,6 @@ export type ReceiptInput = {
   receiptNumber?: string;
 };
 
-function escapeHtml(str: string) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function formatDate(d: Date) {
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function generateReceiptNumber() {
-  const now = new Date();
-  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `REC-${datePart}-${random}`;
-}
-
 /** Kurti 3D thumbs-up logo as inline SVG (print-safe). */
 const LOGO_SVG = `
 <svg viewBox="0 0 56 56" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
@@ -70,8 +51,8 @@ const LOGO_SVG = `
  * Builds the full payment receipt HTML document.
  */
 export function buildPaymentReceiptHtml(input: ReceiptInput): string {
-  const receiptNumber = input.receiptNumber || generateReceiptNumber();
-  const issueDate = formatDate(new Date());
+  const receiptNumber = input.receiptNumber || generateDocumentNumber("REC");
+  const issueDate = formatPrintDate(new Date());
   const studio = escapeHtml(input.studioNome);
   const client = escapeHtml(input.clientName || "__________________________");
   const project = escapeHtml(input.projectName || "Pedido Kurti 3D");
@@ -79,7 +60,7 @@ export function buildPaymentReceiptHtml(input: ReceiptInput): string {
   // Format payment date
   let paymentDateStr: string;
   try {
-    paymentDateStr = formatDate(new Date(input.dataPagamento + "T12:00:00"));
+    paymentDateStr = formatPrintDate(new Date(input.dataPagamento + "T12:00:00"));
   } catch {
     paymentDateStr = input.dataPagamento;
   }

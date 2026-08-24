@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { getPasswordPolicyMessage } from "../domain/password-policy";
+import { assertPasswordPolicy } from "../domain/password-policy";
 import { nowIso } from "./db.server";
 import { getServerConfig } from "../config.server";
 import { usersRepo } from "./repositories.server";
@@ -36,11 +36,6 @@ export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString("base64url");
   const key = (await scryptAsync(password, salt, 64)) as Buffer;
   return encodeHash({ algo: "scrypt", salt, key: key.toString("base64url") });
-}
-
-function assertPasswordPolicy(password: string) {
-  const message = getPasswordPolicyMessage(password);
-  if (message) throw new Error(message);
 }
 
 export async function verifyPassword(password: string, rawHash: string): Promise<boolean> {

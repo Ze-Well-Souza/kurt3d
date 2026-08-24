@@ -1,5 +1,6 @@
 import type { Filamento, Order, PortfolioProject, AppSettings } from "./types";
 import { DEFAULT_APP_SETTINGS } from "./types";
+import { clampNumber } from "../utils";
 
 export type CostBreakdown = {
   custoFilamento: number;
@@ -11,10 +12,6 @@ export type CostBreakdown = {
   receitaTotal: number;
   lucroLiquido: number;
 };
-
-function clampNumber(n: number) {
-  return Number.isFinite(n) ? n : 0;
-}
 
 function costPerGramFromFilamento(f?: Filamento): number | null {
   if (!f) return null;

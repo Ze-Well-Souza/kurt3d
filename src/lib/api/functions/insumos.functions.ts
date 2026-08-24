@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { addCalendarMonthsIso } from "../../domain/installments";
+import { addCalendarMonthsIso, roundMoney } from "../../domain/installments";
 import type {
   Expense,
   FormaPagamento,
@@ -38,10 +38,6 @@ function buildInsumoExpenseCategory(
   return classificacaoFinanceira === "investimento"
     ? "Investimento / Imobilizado"
     : "Despesa Operacional";
-}
-
-function roundMoney(value: number) {
-  return Math.round(value * 100) / 100;
 }
 
 async function createOrUpdateInsumoPayment(input: {

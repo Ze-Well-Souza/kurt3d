@@ -5,6 +5,7 @@
  */
 
 import { brl, formatPhoneDisplay } from "../utils";
+import { escapeHtml, formatPrintDate, generateDocumentNumber } from "./print-html";
 
 export type QuoteItem = {
   name: string;
@@ -34,26 +35,6 @@ export function getWhatsAppLink(numero: string) {
   return `https://wa.me/${full}`;
 }
 
-function escapeHtml(str: string) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function formatDate(d: Date) {
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function generateQuoteNumber() {
-  const now = new Date();
-  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `ORC-${datePart}-${random}`;
-}
-
 /** Kurti 3D thumbs-up logo as inline SVG (print-safe). */
 const LOGO_SVG = `
 <svg viewBox="0 0 56 56" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
@@ -76,10 +57,10 @@ const WORDMARK_SVG = `
 </svg>`;
 
 export function buildQuoteHtml(input: QuoteInput): string {
-  const quoteNumber = generateQuoteNumber();
-  const issueDate = formatDate(new Date());
+  const quoteNumber = generateDocumentNumber("ORC");
+  const issueDate = formatPrintDate(new Date());
   const validUntil = new Date(Date.now() + (input.validityDays ?? 7) * 86_400_000);
-  const validityStr = formatDate(validUntil);
+  const validityStr = formatPrintDate(validUntil);
   const whatsappLink = getWhatsAppLink(input.whatsappNumero);
   const phoneDisplay = formatPhoneDisplay(input.whatsappNumero);
   const instagramUrl = input.instagramUrl || "https://instagram.com/kurti3d";
@@ -364,7 +345,7 @@ export function buildQuoteWhatsAppMessage(input: QuoteInput): string {
   }
   lines.push("");
   lines.push(`*Total: ${brl(total)}*`);
-  lines.push(`Válido até ${formatDate(validUntil)}`);
+  lines.push(`Válido até ${formatPrintDate(validUntil)}`);
   if (input.observations?.trim()) {
     lines.push("");
     lines.push(`Obs.: ${input.observations.trim()}`);

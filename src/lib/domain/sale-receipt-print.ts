@@ -8,6 +8,7 @@
  */
 
 import { brl, formatPhoneDisplay } from "../utils";
+import { escapeHtml, formatPrintDate, generateDocumentNumber } from "./print-html";
 
 export type SaleReceiptItem = {
   description: string;
@@ -51,19 +52,6 @@ export type SaleReceiptInput = {
   receiptNumber?: string;
 };
 
-function escapeHtml(str: string) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function formatDate(d: Date) {
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
 function formatDocNumber(docType: "cnpj" | "cpf", raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (docType === "cpf") {
@@ -78,15 +66,6 @@ function formatDocNumber(docType: "cnpj" | "cpf", raw: string): string {
     return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
   }
   return raw;
-}
-
-function generateReceiptNumber() {
-  const now = new Date();
-  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const rand = Math.floor(Math.random() * 10000)
-    .toString()
-    .padStart(4, "0");
-  return `REC-${datePart}-${rand}`;
 }
 
 /** Kurti 3D thumbs-up logo as inline SVG (print-safe). */
@@ -105,8 +84,8 @@ const LOGO_SVG = `
 </svg>`;
 
 function buildSaleReceiptHtml(input: SaleReceiptInput): string {
-  const receiptNumber = input.receiptNumber || generateReceiptNumber();
-  const issueDate = formatDate(new Date());
+  const receiptNumber = input.receiptNumber || generateDocumentNumber("REC");
+  const issueDate = formatPrintDate(new Date());
   const studioWhatsappDigits = (input.whatsappNumero ?? "").replace(/\D/g, "");
   const studioWhatsappLink = studioWhatsappDigits
     ? `https://wa.me/${studioWhatsappDigits.length <= 11 ? `55${studioWhatsappDigits}` : studioWhatsappDigits}`
@@ -122,7 +101,7 @@ function buildSaleReceiptHtml(input: SaleReceiptInput): string {
     ? formatDocNumber(input.studioDocType, input.studioDocNumber)
     : "";
   const paymentDateStr = input.dataRecebimento
-    ? formatDate(new Date(input.dataRecebimento + "T12:00:00"))
+    ? formatPrintDate(new Date(input.dataRecebimento + "T12:00:00"))
     : issueDate;
 
   const subtotal = input.items.reduce((sum, i) => sum + i.subtotal, 0);
@@ -487,7 +466,7 @@ export function buildSaleReceiptWhatsAppMessage(input: SaleReceiptInput): string
   const discountPercent = input.discountPercent ?? 0;
   const discountValue = subtotal * (discountPercent / 100);
   const total = subtotal - discountValue;
-  const issueDate = formatDate(new Date());
+  const issueDate = formatPrintDate(new Date());
   const docTypeLabel = input.docType === "cnpj" ? "CNPJ" : "CPF";
   const docDisplay = input.docNumber ? formatDocNumber(input.docType, input.docNumber) : "";
   const studioDocTypeLabel = input.studioDocType === "cnpj" ? "CNPJ" : "CPF";

@@ -37,15 +37,6 @@ export const formatMonthYearLabel = (monthIso: string) => {
   });
 };
 
-export function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 /**
  * Chip com o periodo ativo, exibido dentro de cada aba para reforcar
  * que todas respondem ao mesmo controle global.

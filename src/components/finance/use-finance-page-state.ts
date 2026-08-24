@@ -52,8 +52,8 @@ import {
 import { invalidarPor } from "@/lib/query-keys";
 import { normalizeText } from "@/lib/utils/normalization";
 import { brl } from "@/lib/utils";
+import { escapeHtml } from "@/lib/domain/print-html";
 import {
-  escapeHtml,
   formatMonthYearLabel,
   getEventSignedAmount,
   SOURCE_LABELS,
