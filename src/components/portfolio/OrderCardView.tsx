@@ -43,23 +43,57 @@ import { summarizeOrderParts } from "@/lib/domain/order-parts";
 import { openSaleReceiptWhatsApp, openPrintSaleReceipt } from "@/lib/domain/sale-receipt-print";
 import { formatIsoDatePtBr } from "@/lib/domain/installments";
 import {
-  FILAMENT_SWATCHES,
   PAYMENT_METHODS,
   STATUS_BADGE,
   formatTime,
   getPaymentBadge,
+  swatchDaCor,
   type FinalizarPedidoArgs,
 } from "./order-card-shared";
 
-function FilamentTag({ label, color }: { label: string; color?: string }) {
+/**
+ * Filamento(s) do pedido, resolvidos para um rotulo legivel.
+ *
+ * Antes o card mostrava `Filamento <uuid>` e pintava a bolinha com
+ * FILAMENT_SWATCHES[filamentoId] — mas aquele mapa e indexado por nome de cor,
+ * nao por id, entao a bolinha saia sempre ciano. Pior: o uuid inteiro ocupava a
+ * largura toda do cabecalho e espremia o nome do projeto ate sumir.
+ */
+function FilamentTag({ filamentos, order }: { filamentos?: Filamento[]; order: Order }) {
+  const ids = order.filamentoIds?.length
+    ? order.filamentoIds
+    : order.filamentoId
+      ? [order.filamentoId]
+      : [];
+
+  if (ids.length === 0) {
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="h-3 w-3 shrink-0 rounded-full border border-border bg-muted" />
+        <span className="truncate text-[11px] text-muted-foreground">Sem filamento</span>
+      </div>
+    );
+  }
+
+  const resolvidos = ids.map((id) => filamentos?.find((f) => f.id === id) ?? null);
+  const rotulos = resolvidos.map((f, i) =>
+    f ? `[${f.sku}] ${f.marca} ${f.cor}` : `Filamento ${ids[i].slice(0, 8)}`,
+  );
+  const completo = rotulos.join(" · ");
+  const resumo = rotulos.length > 1 ? `${rotulos[0]} +${rotulos.length - 1}` : rotulos[0];
+
   return (
-    <div className="flex items-center gap-2">
-      <span
-        title={label}
-        className="h-3.5 w-3.5 rounded-full border border-border shadow-sm"
-        style={{ background: color ?? "var(--filament-cyan)" }}
-      />
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+    <div className="flex min-w-0 items-center gap-1.5" title={completo}>
+      <span className="flex shrink-0 -space-x-1">
+        {resolvidos.slice(0, 3).map((f, i) => (
+          <span
+            key={ids[i]}
+            className="h-3 w-3 rounded-full border border-border shadow-sm"
+            style={{ background: swatchDaCor(f?.cor) }}
+          />
+        ))}
+      </span>
+      <span className="truncate text-[11px] text-muted-foreground">{resumo}</span>
     </div>
   );
 }
@@ -132,7 +166,7 @@ export function OrderCardView({
         onClick={() => onDetail?.(order)}
       >
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-foreground">{order.projectName}</p>
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
               <User className="h-3 w-3" />
@@ -140,10 +174,6 @@ export function OrderCardView({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <FilamentTag
-              label={order.filamentoId ? `Filamento ${order.filamentoId}` : "Sem filamento"}
-              color={order.filamentoId ? FILAMENT_SWATCHES[order.filamentoId] : undefined}
-            />
             {!badge && onEdit && (
               <Button
                 size="icon"
@@ -171,6 +201,11 @@ export function OrderCardView({
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
+        </div>
+        {/* Filamento em linha propria: no cabecalho ele competia por largura
+            com o nome do projeto e ganhava. */}
+        <div className="mt-2">
+          <FilamentTag filamentos={filamentos} order={order} />
         </div>
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">

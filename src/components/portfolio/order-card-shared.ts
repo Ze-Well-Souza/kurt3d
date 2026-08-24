@@ -23,18 +23,6 @@ export const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   falha: { label: "Falha", color: "var(--filament-magenta)" },
 };
 
-export const FILAMENT_SWATCHES: Record<string, string> = {
-  cyan: "var(--filament-cyan)",
-  magenta: "var(--filament-magenta)",
-  yellow: "var(--filament-yellow)",
-  pink: "var(--filament-pink)",
-  green: "var(--filament-green)",
-  black: "#1a1a1a",
-  white: "#f5f5f5",
-  orange: "#ff8a3d",
-  purple: "#8b5cf6",
-};
-
 export function formatTime(min: number) {
   const h = Math.floor(min / 60);
   const m = min % 60;
@@ -51,4 +39,50 @@ export function getPaymentBadge(order: Order) {
     return { label: "Pago", className: "border-green-600/30 bg-green-50 text-green-700" };
   }
   return { label: "Pendente", className: "border-yellow-600/30 bg-yellow-50 text-yellow-700" };
+}
+
+/**
+ * Cor de amostra a partir do nome livre da cor do filamento.
+ *
+ * A cor do filamento e texto livre em portugues ("Azul Cobalto", "Marrom
+ * Caramelo"...), entao casamos pelo primeiro termo reconhecido, sem diferenciar
+ * caixa. O que nao casa cai no cinza neutro em vez de fingir uma cor errada.
+ */
+const CINZA_NEUTRO = "#9ca3af";
+
+/**
+ * Termos em minusculas, sem acento. "lil" cobre lilas com e sem acento, que e o
+ * unico nome da lista onde o acento aparece na pratica.
+ */
+const COR_PT_PARA_SWATCH: Array<[string, string]> = [
+  ["preto", "#1a1a1a"],
+  ["branco", "#f5f5f5"],
+  ["cinza", "#9ca3af"],
+  ["prata", "#c0c5ce"],
+  ["dourado", "#d4af37"],
+  ["bronze", "#b08d57"],
+  ["amarelo", "var(--filament-yellow)"],
+  ["laranja", "#ff8a3d"],
+  ["vermelho", "#ef4444"],
+  ["rosa", "var(--filament-pink)"],
+  ["roxo", "#8b5cf6"],
+  ["lil", "#c4b5fd"],
+  ["azul", "#3b82f6"],
+  ["ciano", "var(--filament-cyan)"],
+  ["turquesa", "#2dd4bf"],
+  ["verde", "var(--filament-green)"],
+  ["marrom", "#8b5a2b"],
+  ["bege", "#e3c9a8"],
+  ["pele", "#f0c9a0"],
+  ["natural", "#ede4d3"],
+  ["transparente", "#dbeafe"],
+];
+
+export function swatchDaCor(cor?: string | null): string {
+  if (!cor) return CINZA_NEUTRO;
+  const normalizada = cor.trim().toLowerCase();
+  for (const [termo, hex] of COR_PT_PARA_SWATCH) {
+    if (normalizada.includes(termo)) return hex;
+  }
+  return CINZA_NEUTRO;
 }
