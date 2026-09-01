@@ -384,14 +384,23 @@ export function useFinancePageState() {
   // Metadados do lote de filamento por plano de pagamento (cores distintas,
   // data de compra mais antiga e total de parcelas), usados pelo modal de contas.
   const filamentoBatchMetaByPaymentId = useMemo(() => {
-    const map = new Map<string, { cor: string | null; dataCompra: string | null; parcelas: number }>();
+    const map = new Map<string, { cor: string | null; dataCompra: string | null; parcelas: number; descricao: string | null }>();
     for (const payment of filamentoPayments) {
       const batch = allFilamentPurchases.filter((item) => item.batchId === payment.batchId);
       const cores = Array.from(new Set(batch.map((item) => item.cor.trim()).filter(Boolean)));
+      // Descricao legivel do lote: "cor - modelo(marca)", ex.: "Preto - Creality SOLEYIN".
+      const descricoes = Array.from(
+        new Set(
+          batch
+            .map((item) => [item.cor.trim(), item.marca.trim()].filter(Boolean).join(" - "))
+            .filter(Boolean),
+        ),
+      );
       map.set(payment.id, {
         cor: cores.length > 0 ? cores.join(", ") : null,
         dataCompra: batch.map((item) => item.dataCompra).sort()[0] ?? null,
         parcelas: payment.parcelas,
+        descricao: descricoes.length > 0 ? descricoes.join(", ") : null,
       });
     }
     return map;
@@ -974,22 +983,30 @@ export function useFinancePageState() {
     const parcelaRows = [
       ...filamentoInstallments
         .filter((inst) => isDateInSelectedPeriod(inst.vencimento))
-        .map((inst) => ({
-          tipo: "Parcela",
-          data: inst.vencimento,
-          descricao: filamentoLabelByPaymentId.get(inst.paymentId) ?? "Filamento",
-          categoria: "Filamento",
-          cliente: "",
-          valor: inst.valor,
-          custo: "",
-          depreciacao: "",
-          status: installmentStatusLabel(inst),
-          observacao: `Parcela ${inst.numero}`,
-        })),
+        .map((inst) => {
+          const meta = filamentoBatchMetaByPaymentId.get(inst.paymentId);
+          return {
+            tipo: "Parcela",
+            data: inst.vencimento,
+            descricao:
+              meta?.descricao ??
+              filamentoLabelByPaymentId.get(inst.paymentId) ??
+              "Filamento",
+            categoria: "Filamento",
+            cliente: "",
+            valor: inst.valor,
+            custo: "",
+            depreciacao: "",
+            status: installmentStatusLabel(inst),
+            observacao:
+              (meta?.parcelas ?? 1) > 1 ? `${inst.numero}/${meta?.parcelas}` : "À vista",
+          };
+        }),
       ...insumoInstallments
         .filter((inst) => isDateInSelectedPeriod(inst.vencimento))
         .map((inst) => {
           const insumo = insumoByPaymentId.get(inst.paymentId) ?? null;
+          const payment = insumoPayments.find((item) => item.id === inst.paymentId);
           return {
             tipo: "Parcela",
             data: inst.vencimento,
@@ -1001,7 +1018,8 @@ export function useFinancePageState() {
             custo: "",
             depreciacao: "",
             status: installmentStatusLabel(inst),
-            observacao: `Parcela ${inst.numero}`,
+            observacao:
+              (payment?.parcelas ?? 1) > 1 ? `${inst.numero}/${payment?.parcelas}` : "À vista",
           };
         }),
     ];
@@ -1016,7 +1034,9 @@ export function useFinancePageState() {
     filamentoInstallments,
     insumoInstallments,
     filamentoLabelByPaymentId,
+    filamentoBatchMetaByPaymentId,
     insumoByPaymentId,
+    insumoPayments,
     isDateInSelectedPeriod,
   ]);
 
@@ -1026,7 +1046,6 @@ export function useFinancePageState() {
       "data",
       "descricao",
       "categoria",
-      "cliente",
       "valor",
       "custo",
       "depreciacao",
@@ -1061,7 +1080,6 @@ export function useFinancePageState() {
             <td>${formatIsoDatePtBr(row.data)}</td>
             <td>${escapeHtml(row.descricao)}</td>
             <td>${escapeHtml(row.categoria)}</td>
-            <td>${escapeHtml(row.cliente)}</td>
             <td>${typeof row.valor === "number" ? brl(row.valor) : escapeHtml(String(row.valor))}</td>
             <td>${escapeHtml(row.status)}</td>
             <td>${escapeHtml(String(row.observacao ?? ""))}</td>
@@ -1081,7 +1099,6 @@ export function useFinancePageState() {
               <th>Data</th>
               <th>Descrição</th>
               <th>Categoria</th>
-              <th>Cliente</th>
               <th>Valor</th>
               <th>Status</th>
               <th>Observação</th>
