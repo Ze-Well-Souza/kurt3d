@@ -104,12 +104,22 @@ export type MonthBillRow = {
   id: string;
   label: string;
   numero: number;
+  /** Total de parcelas do plano (para exibir "3/6" em compras parceladas). */
+  parcelaTotal: number;
+  /** Cor do rolo (apenas filamentos; insumos nao tem cor cadastrada). */
+  cor: string | null;
+  dataCompra: string | null;
   vencimento: string;
   valor: number;
   pago: boolean;
   pagoValor: number;
   restante: number;
 };
+
+/** Notacao da parcela: "3/6" quando parcelado, "À vista" quando parcela unica. */
+function monthBillParcelaLabel(row: MonthBillRow) {
+  return row.parcelaTotal > 1 ? `${row.numero}/${row.parcelaTotal}` : "À vista";
+}
 
 /**
  * Estado completo da pagina financeira: dados, filtros, dialogs, mutacoes,
@@ -370,6 +380,22 @@ export function useFinancePageState() {
     }
     return map;
   }, [insumoPayments, insumos]);
+
+  // Metadados do lote de filamento por plano de pagamento (cores distintas,
+  // data de compra mais antiga e total de parcelas), usados pelo modal de contas.
+  const filamentoBatchMetaByPaymentId = useMemo(() => {
+    const map = new Map<string, { cor: string | null; dataCompra: string | null; parcelas: number }>();
+    for (const payment of filamentoPayments) {
+      const batch = allFilamentPurchases.filter((item) => item.batchId === payment.batchId);
+      const cores = Array.from(new Set(batch.map((item) => item.cor.trim()).filter(Boolean)));
+      map.set(payment.id, {
+        cor: cores.length > 0 ? cores.join(", ") : null,
+        dataCompra: batch.map((item) => item.dataCompra).sort()[0] ?? null,
+        parcelas: payment.parcelas,
+      });
+    }
+    return map;
+  }, [filamentoPayments, allFilamentPurchases]);
 
   const purchaseBrands = useMemo(
     () =>
@@ -1078,10 +1104,14 @@ export function useFinancePageState() {
     if (monthBillsDialog === "filamentos") {
       for (const inst of filamentoInstallments) {
         if (inst.vencimento.slice(0, 7) !== installmentKpiMonthAnchor) continue;
+        const meta = filamentoBatchMetaByPaymentId.get(inst.paymentId);
         rows.push({
           id: inst.id,
           label: filamentoLabelByPaymentId.get(inst.paymentId) ?? "Filamento",
           numero: inst.numero,
+          parcelaTotal: meta?.parcelas ?? 1,
+          cor: meta?.cor ?? null,
+          dataCompra: meta?.dataCompra ?? null,
           vencimento: inst.vencimento,
           valor: inst.valor,
           pago: inst.pago,
@@ -1096,10 +1126,14 @@ export function useFinancePageState() {
         const isInvestimento = insumo?.classificacaoFinanceira === "investimento";
         if (monthBillsDialog === "impressora" && !isInvestimento) continue;
         if (monthBillsDialog === "insumos" && isInvestimento) continue;
+        const payment = insumoPayments.find((item) => item.id === inst.paymentId);
         rows.push({
           id: inst.id,
           label: insumo?.nome ?? "Insumo",
           numero: inst.numero,
+          parcelaTotal: payment?.parcelas ?? 1,
+          cor: null,
+          dataCompra: insumo?.dataCompra ?? null,
           vencimento: inst.vencimento,
           valor: inst.valor,
           pago: inst.pago,
@@ -1116,22 +1150,31 @@ export function useFinancePageState() {
     filamentoInstallments,
     insumoInstallments,
     filamentoLabelByPaymentId,
+    filamentoBatchMetaByPaymentId,
     insumoByPaymentId,
+    insumoPayments,
     installmentKpiMonthAnchor,
   ]);
 
   const exportMonthBillsCsv = () => {
     if (!monthBillsDialog) return;
-    const headers = ["Descrição", "Parcela", "Vencimento", "Valor", "Pago", "Restante", "Status"];
-    const rows = monthBillsRows.map((row) => [
-      row.label,
-      String(row.numero),
-      formatIsoDatePtBr(row.vencimento),
-      row.valor.toFixed(2).replace(".", ","),
-      row.pagoValor.toFixed(2).replace(".", ","),
-      row.restante.toFixed(2).replace(".", ","),
-      installmentStatusLabel(row),
-    ]);
+    const isFilamento = monthBillsDialog === "filamentos";
+    const headers = isFilamento
+      ? ["Descrição", "Parcela", "Cor", "Data Compra", "Vencimento", "Valor", "Pago", "Restante", "Status"]
+      : ["Descrição", "Parcela", "Data Compra", "Vencimento", "Valor", "Pago", "Restante", "Status"];
+    const rows = monthBillsRows.map((row) => {
+      const cells = [row.label, monthBillParcelaLabel(row)];
+      if (isFilamento) cells.push(row.cor ?? "—");
+      cells.push(
+        row.dataCompra ? formatIsoDatePtBr(row.dataCompra) : "—",
+        formatIsoDatePtBr(row.vencimento),
+        row.valor.toFixed(2).replace(".", ","),
+        row.pagoValor.toFixed(2).replace(".", ","),
+        row.restante.toFixed(2).replace(".", ","),
+        installmentStatusLabel(row),
+      );
+      return cells;
+    });
     downloadCsvFile(
       `contas-${monthBillsDialog}-${installmentKpiMonthAnchor}.csv`,
       headers,
@@ -1145,12 +1188,15 @@ export function useFinancePageState() {
     const monthLabel = formatMonthYearLabel(installmentKpiMonthAnchor);
     const total = monthBillsRows.reduce((sum, row) => sum + row.valor, 0);
     const aPagar = monthBillsRows.reduce((sum, row) => sum + row.restante, 0);
+    const isFilamento = monthBillsDialog === "filamentos";
     const tableRows = monthBillsRows
       .map(
         (row) => `
           <tr>
             <td>${escapeHtml(row.label)}</td>
-            <td>${row.numero}</td>
+            <td>${escapeHtml(monthBillParcelaLabel(row))}</td>
+            ${isFilamento ? `<td>${escapeHtml(row.cor ?? "—")}</td>` : ""}
+            <td>${row.dataCompra ? formatIsoDatePtBr(row.dataCompra) : "—"}</td>
             <td>${formatIsoDatePtBr(row.vencimento)}</td>
             <td>${brl(row.valor)}</td>
             <td>${escapeHtml(installmentStatusLabel(row))}</td>
@@ -1172,6 +1218,8 @@ export function useFinancePageState() {
             <tr>
               <th>Descrição</th>
               <th>Parcela</th>
+              ${isFilamento ? "<th>Cor</th>" : ""}
+              <th>Data Compra</th>
               <th>Vencimento</th>
               <th>Valor</th>
               <th>Status</th>

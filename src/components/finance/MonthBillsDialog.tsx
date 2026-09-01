@@ -30,13 +30,14 @@ export function MonthBillsDialog({ ctx }: { ctx: FinanceCtx }) {
 
   const open = monthBillsDialog !== null;
   const title = monthBillsDialog ? MONTH_BILLS_TITLES[monthBillsDialog] : "";
+  const isFilamento = monthBillsDialog === "filamentos";
   const monthLabel = formatMonthYearLabel(installmentKpiMonthAnchor);
   const total = monthBillsRows.reduce((sum, row) => sum + row.valor, 0);
   const aPagar = monthBillsRows.reduce((sum, row) => sum + row.restante, 0);
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && setMonthBillsDialog(null)}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <DialogTitle>
             Contas de {title} — <span className="capitalize">{monthLabel}</span>
@@ -70,6 +71,8 @@ export function MonthBillsDialog({ ctx }: { ctx: FinanceCtx }) {
               <thead className="sticky top-0 bg-muted/80 text-xs uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left">Descrição</th>
+                  {isFilamento && <th className="px-3 py-2 text-left">Cor</th>}
+                  <th className="px-3 py-2 text-left">Data Compra</th>
                   <th className="px-3 py-2 text-left">Vencimento</th>
                   <th className="px-3 py-2 text-right">Valor</th>
                   <th className="px-3 py-2 text-center">Status</th>
@@ -80,7 +83,15 @@ export function MonthBillsDialog({ ctx }: { ctx: FinanceCtx }) {
                   <tr key={row.id}>
                     <td className="px-3 py-2">
                       <div className="font-medium">{row.label}</div>
-                      <div className="text-xs text-muted-foreground">Parcela {row.numero}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.parcelaTotal > 1
+                          ? `Parcela ${row.numero}/${row.parcelaTotal}`
+                          : "À vista"}
+                      </div>
+                    </td>
+                    {isFilamento && <td className="px-3 py-2">{row.cor ?? "—"}</td>}
+                    <td className="px-3 py-2 tabular-nums">
+                      {row.dataCompra ? formatIsoDatePtBr(row.dataCompra) : "—"}
                     </td>
                     <td className="px-3 py-2 tabular-nums">{formatIsoDatePtBr(row.vencimento)}</td>
                     <td className="px-3 py-2 text-right font-semibold tabular-nums">
