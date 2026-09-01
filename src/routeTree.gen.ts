@@ -9,42 +9,27 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TrocarSenhaRouteImport } from './routes/trocar-senha'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as KeepAliveRouteImport } from './routes/keep-alive'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AcompanharRouteImport } from './routes/acompanhar'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AcompanharRouteImport } from './routes/acompanhar'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as KeepAliveRouteImport } from './routes/keep-alive'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as TrocarSenhaRouteImport } from './routes/trocar-senha'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as AdminStockRouteImport } from './routes/admin.stock'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
-import { Route as AdminReportsRouteImport } from './routes/admin.reports'
-import { Route as AdminPortfolioRouteImport } from './routes/admin.portfolio'
-import { Route as AdminOrcamentosRouteImport } from './routes/admin.orcamentos'
-import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
-import { Route as AdminFinancesRouteImport } from './routes/admin.finances'
-import { Route as AdminFilaRouteImport } from './routes/admin.fila'
-import { Route as AdminClientsRouteImport } from './routes/admin.clients'
 import { Route as AdminCalendarRouteImport } from './routes/admin.calendar'
+import { Route as AdminClientsRouteImport } from './routes/admin.clients'
+import { Route as AdminFilaRouteImport } from './routes/admin.fila'
+import { Route as AdminFinancesRouteImport } from './routes/admin.finances'
+import { Route as AdminLeadsRouteImport } from './routes/admin.leads'
+import { Route as AdminOrcamentosRouteImport } from './routes/admin.orcamentos'
+import { Route as AdminPortfolioRouteImport } from './routes/admin.portfolio'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminStockRouteImport } from './routes/admin.stock'
 
-const TrocarSenhaRoute = TrocarSenhaRouteImport.update({
-  id: '/trocar-senha',
-  path: '/trocar-senha',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KeepAliveRoute = KeepAliveRouteImport.update({
-  id: '/keep-alive',
-  path: '/keep-alive',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AcompanharRoute = AcompanharRouteImport.update({
@@ -52,9 +37,24 @@ const AcompanharRoute = AcompanharRouteImport.update({
   path: '/acompanhar',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KeepAliveRoute = KeepAliveRouteImport.update({
+  id: '/keep-alive',
+  path: '/keep-alive',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrocarSenhaRoute = TrocarSenhaRouteImport.update({
+  id: '/trocar-senha',
+  path: '/trocar-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -62,44 +62,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminStockRoute = AdminStockRouteImport.update({
-  id: '/stock',
-  path: '/stock',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminReportsRoute = AdminReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminPortfolioRoute = AdminPortfolioRouteImport.update({
-  id: '/portfolio',
-  path: '/portfolio',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminOrcamentosRoute = AdminOrcamentosRouteImport.update({
-  id: '/orcamentos',
-  path: '/orcamentos',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminLeadsRoute = AdminLeadsRouteImport.update({
-  id: '/leads',
-  path: '/leads',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminFinancesRoute = AdminFinancesRouteImport.update({
-  id: '/finances',
-  path: '/finances',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminFilaRoute = AdminFilaRouteImport.update({
-  id: '/fila',
-  path: '/fila',
+const AdminCalendarRoute = AdminCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminClientsRoute = AdminClientsRouteImport.update({
@@ -107,9 +72,44 @@ const AdminClientsRoute = AdminClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminCalendarRoute = AdminCalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
+const AdminFilaRoute = AdminFilaRouteImport.update({
+  id: '/fila',
+  path: '/fila',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFinancesRoute = AdminFinancesRouteImport.update({
+  id: '/finances',
+  path: '/finances',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLeadsRoute = AdminLeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOrcamentosRoute = AdminOrcamentosRouteImport.update({
+  id: '/orcamentos',
+  path: '/orcamentos',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPortfolioRoute = AdminPortfolioRouteImport.update({
+  id: '/portfolio',
+  path: '/portfolio',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminStockRoute = AdminStockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
   getParentRoute: () => AdminRoute,
 } as any)
 
@@ -240,32 +240,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/trocar-senha': {
-      id: '/trocar-senha'
-      path: '/trocar-senha'
-      fullPath: '/trocar-senha'
-      preLoaderRoute: typeof TrocarSenhaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/keep-alive': {
-      id: '/keep-alive'
-      path: '/keep-alive'
-      fullPath: '/keep-alive'
-      preLoaderRoute: typeof KeepAliveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/acompanhar': {
@@ -275,11 +254,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AcompanharRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/keep-alive': {
+      id: '/keep-alive'
+      path: '/keep-alive'
+      fullPath: '/keep-alive'
+      preLoaderRoute: typeof KeepAliveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trocar-senha': {
+      id: '/trocar-senha'
+      path: '/trocar-senha'
+      fullPath: '/trocar-senha'
+      preLoaderRoute: typeof TrocarSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -289,60 +289,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/stock': {
-      id: '/admin/stock'
-      path: '/stock'
-      fullPath: '/admin/stock'
-      preLoaderRoute: typeof AdminStockRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/reports': {
-      id: '/admin/reports'
-      path: '/reports'
-      fullPath: '/admin/reports'
-      preLoaderRoute: typeof AdminReportsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/portfolio': {
-      id: '/admin/portfolio'
-      path: '/portfolio'
-      fullPath: '/admin/portfolio'
-      preLoaderRoute: typeof AdminPortfolioRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/orcamentos': {
-      id: '/admin/orcamentos'
-      path: '/orcamentos'
-      fullPath: '/admin/orcamentos'
-      preLoaderRoute: typeof AdminOrcamentosRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/leads': {
-      id: '/admin/leads'
-      path: '/leads'
-      fullPath: '/admin/leads'
-      preLoaderRoute: typeof AdminLeadsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/finances': {
-      id: '/admin/finances'
-      path: '/finances'
-      fullPath: '/admin/finances'
-      preLoaderRoute: typeof AdminFinancesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/fila': {
-      id: '/admin/fila'
-      path: '/fila'
-      fullPath: '/admin/fila'
-      preLoaderRoute: typeof AdminFilaRouteImport
+    '/admin/calendar': {
+      id: '/admin/calendar'
+      path: '/calendar'
+      fullPath: '/admin/calendar'
+      preLoaderRoute: typeof AdminCalendarRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/clients': {
@@ -352,11 +303,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminClientsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/calendar': {
-      id: '/admin/calendar'
-      path: '/calendar'
-      fullPath: '/admin/calendar'
-      preLoaderRoute: typeof AdminCalendarRouteImport
+    '/admin/fila': {
+      id: '/admin/fila'
+      path: '/fila'
+      fullPath: '/admin/fila'
+      preLoaderRoute: typeof AdminFilaRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/finances': {
+      id: '/admin/finances'
+      path: '/finances'
+      fullPath: '/admin/finances'
+      preLoaderRoute: typeof AdminFinancesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leads': {
+      id: '/admin/leads'
+      path: '/leads'
+      fullPath: '/admin/leads'
+      preLoaderRoute: typeof AdminLeadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/orcamentos': {
+      id: '/admin/orcamentos'
+      path: '/orcamentos'
+      fullPath: '/admin/orcamentos'
+      preLoaderRoute: typeof AdminOrcamentosRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/portfolio': {
+      id: '/admin/portfolio'
+      path: '/portfolio'
+      fullPath: '/admin/portfolio'
+      preLoaderRoute: typeof AdminPortfolioRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/stock': {
+      id: '/admin/stock'
+      path: '/stock'
+      fullPath: '/admin/stock'
+      preLoaderRoute: typeof AdminStockRouteImport
       parentRoute: typeof AdminRoute
     }
   }

@@ -20,9 +20,33 @@ import { formatIsoDatePtBr } from "@/lib/domain/installments";
 import { getInstallmentRemainingAmount } from "@/lib/domain/finance-schedule";
 import { brl, cn } from "@/lib/utils";
 import { formatMonthYearLabel, KpiCard } from "./finance-shared";
+import { MonthBillsDialog } from "./MonthBillsDialog";
 import type { FinanceCtx } from "./use-finance-page-state";
 
 type FinanceTabId = "visao-geral" | "parcelas" | "caixa" | "compras" | "despesas" | "vendas";
+
+/** Mini-card clicavel do cartao principal: abre o modal de contas do mes. */
+function BillCategoryButton({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Ver e exportar as parcelas de ${label} neste mês`}
+      className="cursor-pointer rounded-lg border border-border bg-card px-4 py-3 text-center transition-colors hover:border-amber-500/60 hover:bg-muted/40"
+    >
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-1 font-display text-lg font-bold tabular-nums">{brl(value)}</div>
+    </button>
+  );
+}
 
 export function DashboardTab({
   ctx,
@@ -43,6 +67,7 @@ export function DashboardTab({
     totals,
     monthlySalesSeries,
     despesasFalha,
+    setMonthBillsDialog,
   } = ctx;
 
   const monthLabel = formatMonthYearLabel(installmentKpiMonthAnchor);
@@ -121,42 +146,33 @@ export function DashboardTab({
               Soma das parcelas com vencimento neste mês (filamentos, insumos e impressora).
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Filamentos
-                </div>
-                <div className="mt-1 font-display text-lg font-bold tabular-nums">
-                  {brl(
-                    heroCardState.kind === "paid"
-                      ? totalApagarNoMes.filamentosDue
-                      : totalApagarNoMes.filamentos,
-                  )}
-                </div>
-              </div>
-              <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Insumos
-                </div>
-                <div className="mt-1 font-display text-lg font-bold tabular-nums">
-                  {brl(
-                    heroCardState.kind === "paid"
-                      ? totalApagarNoMes.insumosDue
-                      : totalApagarNoMes.insumos,
-                  )}
-                </div>
-              </div>
-              <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Impressora
-                </div>
-                <div className="mt-1 font-display text-lg font-bold tabular-nums">
-                  {brl(
-                    heroCardState.kind === "paid"
-                      ? totalApagarNoMes.impressoraDue
-                      : totalApagarNoMes.impressora,
-                  )}
-                </div>
-              </div>
+              <BillCategoryButton
+                label="Filamentos"
+                value={
+                  heroCardState.kind === "paid"
+                    ? totalApagarNoMes.filamentosDue
+                    : totalApagarNoMes.filamentos
+                }
+                onClick={() => setMonthBillsDialog("filamentos")}
+              />
+              <BillCategoryButton
+                label="Insumos"
+                value={
+                  heroCardState.kind === "paid"
+                    ? totalApagarNoMes.insumosDue
+                    : totalApagarNoMes.insumos
+                }
+                onClick={() => setMonthBillsDialog("insumos")}
+              />
+              <BillCategoryButton
+                label="Impressora"
+                value={
+                  heroCardState.kind === "paid"
+                    ? totalApagarNoMes.impressoraDue
+                    : totalApagarNoMes.impressora
+                }
+                onClick={() => setMonthBillsDialog("impressora")}
+              />
             </div>
             <Button
               variant="ghost"
@@ -476,6 +492,9 @@ export function DashboardTab({
           ))}
         </div>
       </div>
+
+      {/* Modal de contas do mes, aberto pelos mini-cards do cartao principal */}
+      <MonthBillsDialog ctx={ctx} />
     </>
   );
 }

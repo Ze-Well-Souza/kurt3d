@@ -54,8 +54,11 @@ import { normalizeText } from "@/lib/utils/normalization";
 import { brl } from "@/lib/utils";
 import { escapeHtml } from "@/lib/domain/print-html";
 import {
+  buildPrintChips,
+  downloadCsvFile,
   formatMonthYearLabel,
   getEventSignedAmount,
+  openPrintWindow,
   SOURCE_LABELS,
   type FinancePeriodPreset,
   type PaymentHistorySourceFilter,
@@ -76,6 +79,37 @@ const MONTHS_SHORT_PT = [
   "nov",
   "dez",
 ];
+
+/** Situacao legivel de uma parcela, usada nos relatorios e no modal de contas.
+ * Aceita tanto a parcela bruta (valorPago) quanto a linha do modal (pagoValor). */
+function installmentStatusLabel(inst: {
+  pago: boolean;
+  valor: number;
+  valorPago?: number | null;
+  pagoValor?: number | null;
+}) {
+  if (inst.pago) return "Paga";
+  return (inst.valorPago ?? inst.pagoValor ?? 0) > 0 ? "Parcial" : "Pendente";
+}
+
+export type MonthBillsKind = "filamentos" | "insumos" | "impressora";
+
+export const MONTH_BILLS_TITLES: Record<MonthBillsKind, string> = {
+  filamentos: "Filamentos",
+  insumos: "Insumos",
+  impressora: "Impressora",
+};
+
+export type MonthBillRow = {
+  id: string;
+  label: string;
+  numero: number;
+  vencimento: string;
+  valor: number;
+  pago: boolean;
+  pagoValor: number;
+  restante: number;
+};
 
 /**
  * Estado completo da pagina financeira: dados, filtros, dialogs, mutacoes,
@@ -143,6 +177,7 @@ export function useFinancePageState() {
     categoria: "",
   });
   const [periodPreset, setPeriodPreset] = useState<FinancePeriodPreset>("month");
+  const [monthBillsDialog, setMonthBillsDialog] = useState<MonthBillsKind | null>(null);
 
   // P1-2: os efeitos colaterais de cada operacao ficam em query-keys.ts.
   const invalidateExpenses = () => invalidarPor(qc, "despesaManual");
@@ -308,6 +343,33 @@ export function useFinancePageState() {
     () => [...filamentos, ...filamentosHistory],
     [filamentos, filamentosHistory],
   );
+
+  // Rotulo humano de cada plano de pagamento de filamento (SKUs do lote), usado
+  // tanto pelo relatorio exportado quanto pelo modal de contas do mes.
+  const filamentoLabelByPaymentId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const payment of filamentoPayments) {
+      const batch = allFilamentPurchases.filter((item) => item.batchId === payment.batchId);
+      map.set(
+        payment.id,
+        batch.length > 0
+          ? batch.map((item) => item.sku).join(", ")
+          : `Lote ${payment.batchId?.slice(0, 8) ?? payment.id.slice(0, 8)}`,
+      );
+    }
+    return map;
+  }, [filamentoPayments, allFilamentPurchases]);
+
+  const insumoByPaymentId = useMemo(() => {
+    const map = new Map<string, Insumo | null>();
+    for (const payment of insumoPayments) {
+      map.set(
+        payment.id,
+        insumos.find((item) => item.id === payment.insumoId) ?? null,
+      );
+    }
+    return map;
+  }, [insumoPayments, insumos]);
 
   const purchaseBrands = useMemo(
     () =>
@@ -880,10 +942,57 @@ export function useFinancePageState() {
       observacao: event.observacao ?? "",
     }));
 
-    return [...vendaRows, ...expenseRows, ...paymentEventRows].sort((a, b) =>
+    // Contas do periodo: parcelas com vencimento dentro do periodo selecionado,
+    // para que o relatorio mostre o que precisa ser pago — nao so o que ja foi
+    // vendido, gasto ou quitado.
+    const parcelaRows = [
+      ...filamentoInstallments
+        .filter((inst) => isDateInSelectedPeriod(inst.vencimento))
+        .map((inst) => ({
+          tipo: "Parcela",
+          data: inst.vencimento,
+          descricao: filamentoLabelByPaymentId.get(inst.paymentId) ?? "Filamento",
+          categoria: "Filamento",
+          cliente: "",
+          valor: inst.valor,
+          custo: "",
+          depreciacao: "",
+          status: installmentStatusLabel(inst),
+          observacao: `Parcela ${inst.numero}`,
+        })),
+      ...insumoInstallments
+        .filter((inst) => isDateInSelectedPeriod(inst.vencimento))
+        .map((inst) => {
+          const insumo = insumoByPaymentId.get(inst.paymentId) ?? null;
+          return {
+            tipo: "Parcela",
+            data: inst.vencimento,
+            descricao: insumo?.nome ?? "Insumo",
+            categoria:
+              insumo?.classificacaoFinanceira === "investimento" ? "Impressora" : "Insumo",
+            cliente: "",
+            valor: inst.valor,
+            custo: "",
+            depreciacao: "",
+            status: installmentStatusLabel(inst),
+            observacao: `Parcela ${inst.numero}`,
+          };
+        }),
+    ];
+
+    return [...vendaRows, ...expenseRows, ...paymentEventRows, ...parcelaRows].sort((a, b) =>
       a.data.localeCompare(b.data),
     );
-  }, [classifiedExpenses, visibleFinanceHistoryRows, periodFilteredVendas]);
+  }, [
+    classifiedExpenses,
+    visibleFinanceHistoryRows,
+    periodFilteredVendas,
+    filamentoInstallments,
+    insumoInstallments,
+    filamentoLabelByPaymentId,
+    insumoByPaymentId,
+    isDateInSelectedPeriod,
+  ]);
 
   const exportCsv = () => {
     const headers = [
@@ -898,36 +1007,17 @@ export function useFinancePageState() {
       "status",
       "observacao",
     ];
-    const csvLines = [
-      headers.join(";"),
-      ...exportRows.map((row) =>
-        headers
-          .map((header) => {
-            const value = row[header as keyof typeof row] ?? "";
-            const text =
-              typeof value === "number" ? value.toFixed(2).replace(".", ",") : String(value);
-            return `"${text.replaceAll('"', '""')}"`;
-          })
-          .join(";"),
-      ),
-    ];
-    const blob = new Blob(["\uFEFF" + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `financeiro-${periodPreset}-${installmentKpiMonthAnchor}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    const rows = exportRows.map((row) =>
+      headers.map((header) => {
+        const value = row[header as keyof typeof row] ?? "";
+        return typeof value === "number" ? value.toFixed(2).replace(".", ",") : String(value);
+      }),
+    );
+    downloadCsvFile(`financeiro-${periodPreset}-${installmentKpiMonthAnchor}.csv`, headers, rows);
   };
 
   const exportPdf = () => {
-    const popup = window.open("", "_blank", "noopener,noreferrer,width=1200,height=900");
-    if (!popup) {
-      toast.error("Não foi possível abrir a janela de exportação PDF.");
-      return;
-    }
-
-    const summaryCards = [
+    const summaryCards = buildPrintChips([
       ["Período", periodLabel],
       ["Receita", brl(totals.receita)],
       ["Despesas Operacionais", brl(totals.despesasOperacionais)],
@@ -935,70 +1025,165 @@ export function useFinancePageState() {
       ["Lucro", brl(totals.lucro)],
       ["Parcelas pendentes", brl(installmentKpis.pendente)],
       ["Parcelas pagas", brl(installmentKpis.pagoNoMes)],
-    ]
-      .map(
-        ([label, value]) =>
-          `<div class="chip"><span>${label}</span><strong>${value}</strong></div>`,
-      )
-      .join("");
+    ]);
 
     const tableRows = exportRows
       .map(
         (row) => `
           <tr>
-            <td>${row.tipo}</td>
+            <td>${escapeHtml(row.tipo)}</td>
             <td>${formatIsoDatePtBr(row.data)}</td>
             <td>${escapeHtml(row.descricao)}</td>
             <td>${escapeHtml(row.categoria)}</td>
             <td>${escapeHtml(row.cliente)}</td>
-            <td>${typeof row.valor === "number" ? brl(row.valor) : row.valor}</td>
-            <td>${row.status}</td>
+            <td>${typeof row.valor === "number" ? brl(row.valor) : escapeHtml(String(row.valor))}</td>
+            <td>${escapeHtml(row.status)}</td>
             <td>${escapeHtml(String(row.observacao ?? ""))}</td>
           </tr>`,
       )
       .join("");
 
-    popup.document.write(`<!doctype html>
-      <html lang="pt-BR">
-        <head>
-          <title>Financeiro ${periodLabel}</title>
-          <style>
-            body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
-            h1 { margin: 0 0 8px; }
-            p { margin: 0 0 16px; color: #4b5563; }
-            .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
-            .chip { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
-            .chip span { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; }
-            .chip strong { font-size: 18px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-            th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; }
-            th { background: #f9fafb; }
-          </style>
-        </head>
-        <body>
-          <h1>Relatório Financeiro</h1>
-          <p>${periodLabel}</p>
-          <div class="grid">${summaryCards}</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Tipo</th>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Categoria</th>
-                <th>Cliente</th>
-                <th>Valor</th>
-                <th>Status</th>
-                <th>Observação</th>
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </body>
-      </html>`);
-    popup.document.close();
-    popup.focus();
-    popup.print();
+    const opened = openPrintWindow(
+      `Financeiro ${periodLabel}`,
+      `<h1>Relatório Financeiro</h1>
+        <p>${escapeHtml(periodLabel)}</p>
+        ${summaryCards}
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Cliente</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Observação</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>`,
+    );
+    if (!opened) {
+      toast.error("Não foi possível abrir a janela de exportação PDF.");
+    }
+  };
+
+  // ═══ Modal de contas do mes: parcelas com vencimento no mes de referencia,
+  // filtradas pela categoria clicada no cartao principal (Filamentos, Insumos
+  // ou Impressora). ═══
+  const monthBillsRows = useMemo<MonthBillRow[]>(() => {
+    if (!monthBillsDialog) return [];
+    const rows: MonthBillRow[] = [];
+    if (monthBillsDialog === "filamentos") {
+      for (const inst of filamentoInstallments) {
+        if (inst.vencimento.slice(0, 7) !== installmentKpiMonthAnchor) continue;
+        rows.push({
+          id: inst.id,
+          label: filamentoLabelByPaymentId.get(inst.paymentId) ?? "Filamento",
+          numero: inst.numero,
+          vencimento: inst.vencimento,
+          valor: inst.valor,
+          pago: inst.pago,
+          pagoValor: getInstallmentPaidAmount(inst),
+          restante: getInstallmentRemainingAmount(inst),
+        });
+      }
+    } else {
+      for (const inst of insumoInstallments) {
+        if (inst.vencimento.slice(0, 7) !== installmentKpiMonthAnchor) continue;
+        const insumo = insumoByPaymentId.get(inst.paymentId) ?? null;
+        const isInvestimento = insumo?.classificacaoFinanceira === "investimento";
+        if (monthBillsDialog === "impressora" && !isInvestimento) continue;
+        if (monthBillsDialog === "insumos" && isInvestimento) continue;
+        rows.push({
+          id: inst.id,
+          label: insumo?.nome ?? "Insumo",
+          numero: inst.numero,
+          vencimento: inst.vencimento,
+          valor: inst.valor,
+          pago: inst.pago,
+          pagoValor: getInstallmentPaidAmount(inst),
+          restante: getInstallmentRemainingAmount(inst),
+        });
+      }
+    }
+    return rows.sort(
+      (a, b) => a.vencimento.localeCompare(b.vencimento) || a.label.localeCompare(b.label),
+    );
+  }, [
+    monthBillsDialog,
+    filamentoInstallments,
+    insumoInstallments,
+    filamentoLabelByPaymentId,
+    insumoByPaymentId,
+    installmentKpiMonthAnchor,
+  ]);
+
+  const exportMonthBillsCsv = () => {
+    if (!monthBillsDialog) return;
+    const headers = ["Descrição", "Parcela", "Vencimento", "Valor", "Pago", "Restante", "Status"];
+    const rows = monthBillsRows.map((row) => [
+      row.label,
+      String(row.numero),
+      formatIsoDatePtBr(row.vencimento),
+      row.valor.toFixed(2).replace(".", ","),
+      row.pagoValor.toFixed(2).replace(".", ","),
+      row.restante.toFixed(2).replace(".", ","),
+      installmentStatusLabel(row),
+    ]);
+    downloadCsvFile(
+      `contas-${monthBillsDialog}-${installmentKpiMonthAnchor}.csv`,
+      headers,
+      rows,
+    );
+  };
+
+  const exportMonthBillsPdf = () => {
+    if (!monthBillsDialog) return;
+    const title = MONTH_BILLS_TITLES[monthBillsDialog];
+    const monthLabel = formatMonthYearLabel(installmentKpiMonthAnchor);
+    const total = monthBillsRows.reduce((sum, row) => sum + row.valor, 0);
+    const aPagar = monthBillsRows.reduce((sum, row) => sum + row.restante, 0);
+    const tableRows = monthBillsRows
+      .map(
+        (row) => `
+          <tr>
+            <td>${escapeHtml(row.label)}</td>
+            <td>${row.numero}</td>
+            <td>${formatIsoDatePtBr(row.vencimento)}</td>
+            <td>${brl(row.valor)}</td>
+            <td>${escapeHtml(installmentStatusLabel(row))}</td>
+            <td>${brl(row.restante)}</td>
+          </tr>`,
+      )
+      .join("");
+    const opened = openPrintWindow(
+      `Contas de ${title} — ${monthLabel}`,
+      `<h1>Contas de ${escapeHtml(title)}</h1>
+        <p>${escapeHtml(monthLabel)} · ${monthBillsRows.length} parcela(s) com vencimento no mês</p>
+        ${buildPrintChips([
+          ["Total do mês", brl(total)],
+          ["Já pago", brl(total - aPagar)],
+          ["A pagar", brl(aPagar)],
+        ])}
+        <table>
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th>Parcela</th>
+              <th>Vencimento</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>A pagar</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>`,
+    );
+    if (!opened) {
+      toast.error("Não foi possível abrir a janela de exportação PDF.");
+    }
   };
 
   const exportCostCsv = () => {
@@ -1066,6 +1251,8 @@ export function useFinancePageState() {
     setExpForm,
     periodPreset,
     setPeriodPreset,
+    monthBillsDialog,
+    setMonthBillsDialog,
     // mutacoes
     mutateAddExp,
     mutateRemoveExp,
@@ -1106,10 +1293,14 @@ export function useFinancePageState() {
     selectedFinanceInstallment,
     visibleFinanceHistoryRows,
     filteredVendas,
+    // contas do mes (modal)
+    monthBillsRows,
     // exportacoes
     exportCsv,
     exportPdf,
     exportCostCsv,
+    exportMonthBillsCsv,
+    exportMonthBillsPdf,
   };
 }
 

@@ -3,6 +3,63 @@ import { CalendarRange, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { escapeHtml } from "@/lib/domain/print-html";
+
+/**
+ * Gera e baixa um arquivo CSV (separador ";" + BOM para abrir corretamente no
+ * Excel pt-BR). O anchor e anexado ao DOM e o revoke e tardio para garantir o
+ * download em todos os navegadores.
+ */
+export function downloadCsvFile(filename: string, headers: string[], rows: string[][]) {
+  const csvLines = [
+    headers.join(";"),
+    ...rows.map((row) => row.map((value) => `"${value.replaceAll('"', '""')}"`).join(";")),
+  ];
+  const blob = new Blob(["\uFEFF" + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const PRINT_REPORT_CSS = `
+  body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+  h1 { margin: 0 0 8px; }
+  p { margin: 0 0 16px; color: #4b5563; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+  .chip { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+  .chip span { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; }
+  .chip strong { font-size: 18px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  th, td { border: 1px solid #e5e7eb; padding: 8px; font-size: 12px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+`;
+
+/**
+ * Abre a janela de impressao/salvamento em PDF com o HTML do relatorio.
+ * IMPORTANTE: nao usar "noopener" nos window features — com ele o navegador
+ * retorna null e o relatorio nunca abre (bug anterior do Exportar PDF).
+ */
+export function openPrintWindow(documentTitle: string, bodyHtml: string): boolean {
+  const popup = window.open("", "_blank", "width=1200,height=900");
+  if (!popup) return false;
+  popup.document.write(`<!doctype html>
+    <html lang="pt-BR">
+      <head>
+        <title>${escapeHtml(documentTitle)}</title>
+        <style>${PRINT_REPORT_CSS}</style>
+      </head>
+      <body>${bodyHtml}</body>
+    </html>`);
+  popup.document.close();
+  popup.focus();
+  popup.print();
+  return true;
+}
 
 export const EXPENSE_CATEGORIES = [
   "Aluguel",
@@ -72,6 +129,16 @@ export function InfoTip({ text }: { text: string }) {
       </Tooltip>
     </TooltipProvider>
   );
+}
+
+/** Chips de resumo usados pelos relatorios impressos (PDF). */
+export function buildPrintChips(pairs: [string, string][]) {
+  return `<div class="grid">${pairs
+    .map(
+      ([label, value]) =>
+        `<div class="chip"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`,
+    )
+    .join("")}</div>`;
 }
 
 export function KpiCard({
