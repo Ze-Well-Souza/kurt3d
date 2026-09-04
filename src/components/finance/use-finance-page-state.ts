@@ -173,6 +173,31 @@ export function useFinancePageState() {
     open: boolean;
     targetDate: string;
   }>({ open: false, targetDate: "" });
+  // Pagamento em lote: ids das parcelas pendentes marcadas no cronograma.
+  const [selectedInstallmentIds, setSelectedInstallmentIds] = useState<string[]>([]);
+  const [bulkPayDialog, setBulkPayDialog] = useState<{ open: boolean; dataPagamento: string }>({
+    open: false,
+    dataPagamento: todayIso(),
+  });
+  const toggleInstallmentSelection = useCallback((id: string) => {
+    setSelectedInstallmentIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }, []);
+  const setInstallmentsSelected = useCallback((ids: string[], selected: boolean) => {
+    setSelectedInstallmentIds((current) =>
+      selected
+        ? Array.from(new Set([...current, ...ids]))
+        : current.filter((item) => !ids.includes(item)),
+    );
+  }, []);
+  const clearInstallmentSelection = useCallback(() => setSelectedInstallmentIds([]), []);
+  // Trocar o filtro do cronograma descarta a selecao para nao sobrar caixas
+  // marcadas em linhas que sairam da visao.
+  const changeInstallmentViewFilter = useCallback((filter: InstallmentViewFilter) => {
+    setInstallmentViewFilter(filter);
+    setSelectedInstallmentIds([]);
+  }, []);
   const [installmentKpiMonthAnchor, setInstallmentKpiMonthAnchor] = useState(() =>
     todayIso().slice(0, 7),
   );
@@ -230,14 +255,11 @@ export function useFinancePageState() {
       const amount = variables.valorPago ?? remaining;
       const settled = amount >= remaining;
       invalidateFilamentoPayments();
-      setInstallmentViewFilter(settled ? "paid" : "all");
+      // Nao troca o filtro da visao: o usuario permanece na mesma pagina para
+      // poder quitar a proxima parcela em sequencia.
       setHighlightedInstallmentId(variables.installmentId);
       setHighlightedPaymentId(null);
-      toast.success(
-        settled
-          ? "Parcela quitada. Confira em Pagas."
-          : "Pagamento parcial registrado. Confira em Todas.",
-      );
+      toast.success(settled ? "Parcela quitada." : "Pagamento parcial registrado.");
     },
   });
   const mutateSettlePayment = useMutation({
@@ -245,10 +267,9 @@ export function useFinancePageState() {
       settlePayment({ data: input }),
     onSuccess: (_data, variables) => {
       invalidateFilamentoPayments();
-      setInstallmentViewFilter("paid");
       setHighlightedInstallmentId(null);
       setHighlightedPaymentId(variables.paymentId);
-      toast.success("Lote quitado. Confira em Pagas.");
+      toast.success("Lote quitado.");
     },
   });
   const mutatePayInsumoInstallment = useMutation({
@@ -262,13 +283,10 @@ export function useFinancePageState() {
       const amount = variables.valorPago ?? remaining;
       const settled = amount >= remaining;
       invalidateInsumoPayments();
-      setInstallmentViewFilter(settled ? "paid" : "all");
       setHighlightedInstallmentId(variables.installmentId);
       setHighlightedPaymentId(null);
       toast.success(
-        settled
-          ? "Parcela do insumo quitada. Confira em Pagas."
-          : "Pagamento parcial do insumo registrado. Confira em Todas.",
+        settled ? "Parcela do insumo quitada." : "Pagamento parcial do insumo registrado.",
       );
     },
   });
@@ -277,10 +295,55 @@ export function useFinancePageState() {
       settleInsumoPayment({ data: input }),
     onSuccess: (_data, variables) => {
       invalidateInsumoPayments();
-      setInstallmentViewFilter("paid");
       setHighlightedInstallmentId(null);
       setHighlightedPaymentId(variables.paymentId);
-      toast.success("Compra quitada. Confira em Pagas.");
+      toast.success("Compra quitada.");
+    },
+  });
+  // Pagamento em lote: quita o saldo restante de cada parcela selecionada com
+  // uma unica data, reaproveitando as server functions existentes em chamada
+  // sequencial (sem alteracao de servidor, zero regressao).
+  const mutatePaySelectedInstallments = useMutation({
+    mutationFn: async (input: { dataPagamento: string }) => {
+      let paid = 0;
+      const failures: string[] = [];
+      for (const row of selectedInstallmentRows) {
+        try {
+          if (row.kind === "filamento") {
+            await payInstallment({
+              data: {
+                installmentId: row.id,
+                dataPagamento: input.dataPagamento,
+                valorPago: row.restante,
+              },
+            });
+          } else {
+            await payInsumoInstallment({
+              data: {
+                installmentId: row.id,
+                dataPagamento: input.dataPagamento,
+                valorPago: row.restante,
+              },
+            });
+          }
+          paid += 1;
+        } catch (error) {
+          failures.push(error instanceof Error ? error.message : "Erro desconhecido.");
+        }
+      }
+      return { paid, failures };
+    },
+    onSuccess: ({ paid, failures }) => {
+      invalidateFilamentoPayments();
+      invalidateInsumoPayments();
+      setBulkPayDialog({ open: false, dataPagamento: todayIso() });
+      if (failures.length === 0) {
+        clearInstallmentSelection();
+        toast.success(`${paid} parcela(s) quitada(s).`);
+        return;
+      }
+      // Falha parcial: mantem a selecao das pendentes para permitir repetir.
+      toast.error(`${paid} parcela(s) quitada(s), ${failures.length} falha(s): ${failures[0]}`);
     },
   });
   const mutateReschedule = useMutation({
@@ -373,10 +436,7 @@ export function useFinancePageState() {
   const insumoByPaymentId = useMemo(() => {
     const map = new Map<string, Insumo | null>();
     for (const payment of insumoPayments) {
-      map.set(
-        payment.id,
-        insumos.find((item) => item.id === payment.insumoId) ?? null,
-      );
+      map.set(payment.id, insumos.find((item) => item.id === payment.insumoId) ?? null);
     }
     return map;
   }, [insumoPayments, insumos]);
@@ -384,7 +444,10 @@ export function useFinancePageState() {
   // Metadados do lote de filamento por plano de pagamento (cores distintas,
   // data de compra mais antiga e total de parcelas), usados pelo modal de contas.
   const filamentoBatchMetaByPaymentId = useMemo(() => {
-    const map = new Map<string, { cor: string | null; dataCompra: string | null; parcelas: number; descricao: string | null }>();
+    const map = new Map<
+      string,
+      { cor: string | null; dataCompra: string | null; parcelas: number; descricao: string | null }
+    >();
     for (const payment of filamentoPayments) {
       const batch = allFilamentPurchases.filter((item) => item.batchId === payment.batchId);
       const cores = Array.from(new Set(batch.map((item) => item.cor.trim()).filter(Boolean)));
@@ -405,6 +468,51 @@ export function useFinancePageState() {
     }
     return map;
   }, [filamentoPayments, allFilamentPurchases]);
+
+  // Linhas selecionadas para pagamento em lote, resolvidas contra os dados
+  // atuais: parcelas ja quitadas saem da lista automaticamente.
+  const selectedInstallmentRows = useMemo(() => {
+    const selected = new Set(selectedInstallmentIds);
+    const rows: {
+      id: string;
+      kind: "filamento" | "insumo";
+      label: string;
+      numero: number;
+      parcelas: number;
+      restante: number;
+    }[] = [];
+    for (const inst of filamentoInstallments) {
+      if (!selected.has(inst.id) || inst.pago) continue;
+      rows.push({
+        id: inst.id,
+        kind: "filamento",
+        label: filamentoLabelByPaymentId.get(inst.paymentId) ?? "Filamento",
+        numero: inst.numero,
+        parcelas: filamentoBatchMetaByPaymentId.get(inst.paymentId)?.parcelas ?? 1,
+        restante: getInstallmentRemainingAmount(inst),
+      });
+    }
+    for (const inst of insumoInstallments) {
+      if (!selected.has(inst.id) || inst.pago) continue;
+      rows.push({
+        id: inst.id,
+        kind: "insumo",
+        label: insumoByPaymentId.get(inst.paymentId)?.nome ?? "Insumo",
+        numero: inst.numero,
+        parcelas: insumoPayments.find((item) => item.id === inst.paymentId)?.parcelas ?? 1,
+        restante: getInstallmentRemainingAmount(inst),
+      });
+    }
+    return rows;
+  }, [
+    selectedInstallmentIds,
+    filamentoInstallments,
+    insumoInstallments,
+    filamentoLabelByPaymentId,
+    filamentoBatchMetaByPaymentId,
+    insumoByPaymentId,
+    insumoPayments,
+  ]);
 
   const purchaseBrands = useMemo(
     () =>
@@ -989,17 +1097,14 @@ export function useFinancePageState() {
             tipo: "Parcela",
             data: inst.vencimento,
             descricao:
-              meta?.descricao ??
-              filamentoLabelByPaymentId.get(inst.paymentId) ??
-              "Filamento",
+              meta?.descricao ?? filamentoLabelByPaymentId.get(inst.paymentId) ?? "Filamento",
             categoria: "Filamento",
             cliente: "",
             valor: inst.valor,
             custo: "",
             depreciacao: "",
             status: installmentStatusLabel(inst),
-            observacao:
-              (meta?.parcelas ?? 1) > 1 ? `${inst.numero}/${meta?.parcelas}` : "À vista",
+            observacao: (meta?.parcelas ?? 1) > 1 ? `${inst.numero}/${meta?.parcelas}` : "À vista",
           };
         }),
       ...insumoInstallments
@@ -1011,8 +1116,7 @@ export function useFinancePageState() {
             tipo: "Parcela",
             data: inst.vencimento,
             descricao: insumo?.nome ?? "Insumo",
-            categoria:
-              insumo?.classificacaoFinanceira === "investimento" ? "Impressora" : "Insumo",
+            categoria: insumo?.classificacaoFinanceira === "investimento" ? "Impressora" : "Insumo",
             cliente: "",
             valor: inst.valor,
             custo: "",
@@ -1177,8 +1281,27 @@ export function useFinancePageState() {
     if (!monthBillsDialog) return;
     const isFilamento = monthBillsDialog === "filamentos";
     const headers = isFilamento
-      ? ["Descrição", "Parcela", "Cor", "Data Compra", "Vencimento", "Valor", "Pago", "Restante", "Status"]
-      : ["Descrição", "Parcela", "Data Compra", "Vencimento", "Valor", "Pago", "Restante", "Status"];
+      ? [
+          "Descrição",
+          "Parcela",
+          "Cor",
+          "Data Compra",
+          "Vencimento",
+          "Valor",
+          "Pago",
+          "Restante",
+          "Status",
+        ]
+      : [
+          "Descrição",
+          "Parcela",
+          "Data Compra",
+          "Vencimento",
+          "Valor",
+          "Pago",
+          "Restante",
+          "Status",
+        ];
     const rows = monthBillsRows.map((row) => {
       const cells = [row.label, monthBillParcelaLabel(row)];
       if (isFilamento) cells.push(row.cor ?? "—");
@@ -1192,11 +1315,7 @@ export function useFinancePageState() {
       );
       return cells;
     });
-    downloadCsvFile(
-      `contas-${monthBillsDialog}-${installmentKpiMonthAnchor}.csv`,
-      headers,
-      rows,
-    );
+    downloadCsvFile(`contas-${monthBillsDialog}-${installmentKpiMonthAnchor}.csv`, headers, rows);
   };
 
   const exportMonthBillsPdf = () => {
@@ -1306,6 +1425,9 @@ export function useFinancePageState() {
     setPayDialog,
     rescheduleDialog,
     setRescheduleDialog,
+    selectedInstallmentIds,
+    bulkPayDialog,
+    setBulkPayDialog,
     installmentKpiMonthAnchor,
     setInstallmentKpiMonthAnchor,
     paymentHistorySourceFilter,
@@ -1326,6 +1448,11 @@ export function useFinancePageState() {
     mutatePayInsumoInstallment,
     mutateSettleInsumoPayment,
     mutateReschedule,
+    mutatePaySelectedInstallments,
+    toggleInstallmentSelection,
+    setInstallmentsSelected,
+    clearInstallmentSelection,
+    changeInstallmentViewFilter,
     // derivados
     periodLabel,
     isDateInSelectedPeriod,
@@ -1349,6 +1476,7 @@ export function useFinancePageState() {
     previousInstallmentKpiMonth,
     nextInstallmentKpiMonth,
     scheduleEntries,
+    selectedInstallmentRows,
     pendingScheduleEntries,
     pagoNoMesDeOutrosMeses,
     installmentAuditByMonth,
